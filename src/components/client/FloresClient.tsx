@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { RiSearchLine, RiTimeLine, RiShoppingBagLine, RiFilterLine } from "react-icons/ri";
+import { RiSearchLine, RiTimeLine, RiShoppingBagLine, RiFilterLine, RiStarLine, RiFlowerLine } from "react-icons/ri";
 import Link from "next/link";
 import { formatPrice, formatPreparationTime } from "@/lib/utils";
 import { useCartStore } from "@/store/cartStore";
@@ -31,7 +31,7 @@ export default function FloresClient({ products, categories, flowerTypes }: { pr
       quantity: 1, preparationTimeValue: p.preparationTimeValue,
       preparationTimeUnit: p.preparationTimeUnit, addons: [],
     });
-    toast.success(`${p.name} agregado 🌸`);
+    toast.success(`${p.name} agregado al carrito`);
     toggleCart();
   };
 
@@ -79,7 +79,7 @@ export default function FloresClient({ products, categories, flowerTypes }: { pr
                   <div className="relative overflow-hidden aspect-square">
                     <img src={img} alt={p.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"/>
                     <div className="absolute top-3 left-3 flex flex-col gap-1">
-                      {p.featured && <span className="bg-primary-600 text-white text-xs px-2.5 py-1 rounded-full">⭐ Top</span>}
+                      {p.featured && <span className="bg-primary-600 text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1"><RiStarLine size={9}/> Top</span>}
                       {p.requiresSpecialOrder && <span className="bg-amber-500 text-white text-xs px-2.5 py-1 rounded-full">Encargo</span>}
                     </div>
                   </div>
@@ -88,7 +88,7 @@ export default function FloresClient({ products, categories, flowerTypes }: { pr
                   <p className="text-xs text-primary-500 uppercase tracking-wide font-medium">{p.category?.name}</p>
                   <h3 className="font-semibold text-gray-900 line-clamp-1 mb-1">{p.name}</h3>
                   {p.flowers.length > 0 && (
-                    <p className="text-xs text-gray-400 truncate mb-1">🌸 {p.flowers.map((f:any)=>f.flower.name).join(", ")}</p>
+                    <p className="flex items-center gap-1 text-xs text-gray-400 truncate mb-1"><RiFlowerLine size={11}/> {p.flowers.map((f:any)=>f.flower.name).join(", ")}</p>
                   )}
                   {p.preparationTimeValue > 0 && (
                     <p className="flex items-center gap-1 text-xs text-amber-600 mb-2"><RiTimeLine size={11}/> {formatPreparationTime(p.preparationTimeValue, p.preparationTimeUnit)}</p>

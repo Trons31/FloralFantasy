@@ -8,8 +8,11 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { getTotalItems, toggleCart } = useCartStore();
   const total = getTotalItems();
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     const h = () => setScrolled(window.scrollY > 20);
@@ -53,7 +56,7 @@ export default function Header() {
           </a>
           <button onClick={toggleCart} className="relative p-2.5 rounded-full bg-primary-600 text-white hover:bg-primary-700 transition-all hover:scale-105">
             <RiShoppingBagLine size={19}/>
-            {total > 0 && (
+            {mounted && total > 0 && (
               <motion.span key={total} initial={{scale:0}} animate={{scale:1}}
                 className="absolute -top-1 -right-1 bg-rose-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
                 {total}

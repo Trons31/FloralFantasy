@@ -20,7 +20,7 @@ export default async function FloresPage({ searchParams }: { searchParams: { cat
     prisma.category.findMany().catch(() => []),
     prisma.flower.findMany({ select: { type: true } }).catch(() => []),
   ]);
-  const flowerTypes = [...new Set(flowers.map(f => f.type))];
+  const flowerTypes = Array.from(new Set(flowers.map(f => f.type)));
   const serialized  = products.map(p => ({ ...p, createdAt: p.createdAt.toISOString() }));
   return (
     <main className="min-h-screen bg-[#fdfcf8]">
