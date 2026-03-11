@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(ADMIN)
+  createdAt DateTime @default(now())
+}
+
+enum Role {
+  ADMIN
+  SUPER_ADMIN
+}
+
+model Flower {
+  id          String          @id @default(cuid())
+  name        String
+  type        String
+  description String?
+  imageUrl    String?
+  createdAt   DateTime        @default(now())
+  products    ProductFlower[]
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String
+  slug     String    @unique
+  products Product[]
+}
+
+model Product {
+  id                   String          @id @default(cuid())
+  name                 String
+  description          String
+  price                Float
+  categoryId           String
+  category             Category        @relation(fields: [categoryId], references: [id])
+  occasion             String?
+  images               ProductImage[]
+  flowers              ProductFlower[]
+  preparationTimeValue Int             @default(0)
+  preparationTimeUnit  TimeUnit        @default(MINUTES)
+  requiresSpecialOrder Boolean         @default(false)
+  inStock              Boolean         @default(true)
+  featured             Boolean         @default(false)
+  createdAt            DateTime        @default(now())
+  orderItems           OrderItem[]
+}
+
+enum TimeUnit {
+  MINUTES
+  HOURS
+  DAYS
+}
+
+model ProductFlower {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  flowerId  String
+  flower    Flower  @relation(fields: [flowerId], references: [id])
+  quantity  Int     @default(1)
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  publicId  String
+  isMain    Boolean @default(false)
+  order     Int     @default(0)
+}
+
+model AddOn {
+  id         String           @id @default(cuid())
+  name       String
+  price      Float
+  type       AddOnType
+  imageUrl   String?
+  inStock    Boolean          @default(true)
+  orderItems OrderItemAddOn[]
+}
+
+enum AddOnType {
+  BEBIDA
+  VINO
+  PELUCHE
+  DULCE
+  CANASTA
+  OTRO
+}
+
+model Order {
+  id            String               @id @default(cuid())
+  trackingToken String               @unique
+  status        OrderStatus          @default(PENDING)
+  customerName  String
+  customerPhone String
+  customerEmail String
+  address       String
+  addressRef    String?
+  total         Float
+  deliveryFee   Float                @default(0)
+  estimatedTime String               @default("1 dia")
+  wompiTxId     String?
+  items         OrderItem[]
+  statusHistory OrderStatusHistory[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  READY
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+model OrderItem {
+  id        String           @id @default(cuid())
+  orderId   String
+  order     Order            @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product          @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Float
+  addons    OrderItemAddOn[]
+}
+
+model OrderItemAddOn {
+  id          String    @id @default(cuid())
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
+  addonId     String
+  addon       AddOn     @relation(fields: [addonId], references: [id])
+  price       Float
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(cuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id])
+  status    OrderStatus
+  note      String?
+  createdAt DateTime    @default(now())
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  description String
+  amount      Float
+  category    String
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}
