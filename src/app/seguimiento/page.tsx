@@ -1,18 +1,18 @@
 "use client";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RiSearchLine, RiLoader4Line, RiCheckboxCircleLine, RiRadioButtonLine } from "react-icons/ri";
+import { RiSearchLine, RiLoader4Line, RiCheckboxCircleLine, RiRadioButtonLine, RiFileListLine, RiBankCardLine, RiFlowerLine, RiCheckLine, RiTruckLine, RiGiftLine, RiCloseCircleLine } from "react-icons/ri";
 import Header from "@/components/client/Header";
 import Footer from "@/components/client/Footer";
 import { formatPrice } from "@/lib/utils";
 
 const STEPS = [
-  { status:"PENDING",          label:"Pedido recibido",   icon:"📋", desc:"Tu pedido fue registrado" },
-  { status:"PAID",             label:"Pago confirmado",   icon:"💳", desc:"Tu pago fue procesado" },
-  { status:"PROCESSING",       label:"Preparando flores", icon:"🌸", desc:"Nuestros floristas están trabajando" },
-  { status:"READY",            label:"Pedido listo",      icon:"✅", desc:"Tu arreglo está listo" },
-  { status:"OUT_FOR_DELIVERY", label:"En camino",         icon:"🚚", desc:"Tu pedido está en ruta" },
-  { status:"DELIVERED",        label:"Entregado",         icon:"🎁", desc:"¡Tu pedido llegó!" },
+  { status:"PENDING",          label:"Pedido recibido",   Icon: RiFileListLine,  desc:"Tu pedido fue registrado" },
+  { status:"PAID",             label:"Pago confirmado",   Icon: RiBankCardLine,  desc:"Tu pago fue procesado" },
+  { status:"PROCESSING",       label:"Preparando flores", Icon: RiFlowerLine,    desc:"Nuestros floristas están trabajando" },
+  { status:"READY",            label:"Pedido listo",      Icon: RiCheckLine,     desc:"Tu arreglo está listo" },
+  { status:"OUT_FOR_DELIVERY", label:"En camino",         Icon: RiTruckLine,     desc:"Tu pedido está en ruta" },
+  { status:"DELIVERED",        label:"Entregado",         Icon: RiGiftLine,      desc:"¡Tu pedido llegó!" },
 ];
 
 export default function SeguimientoPage() {
@@ -59,7 +59,7 @@ export default function SeguimientoPage() {
                 {loading ? <RiLoader4Line className="animate-spin" size={18}/> : <RiSearchLine size={18}/>}
               </button>
             </div>
-            {error && <p className="text-red-500 text-sm mt-3">❌ {error}</p>}
+            {error && <p className="text-red-500 text-sm mt-3 flex items-center gap-1"><RiCloseCircleLine size={15}/> {error}</p>}
           </div>
 
           <AnimatePresence>
@@ -96,7 +96,7 @@ export default function SeguimientoPage() {
                         <div className="flex flex-col items-center">
                           <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0 transition-all ${
                             done ? "bg-green-100" : active ? "bg-primary-100 ring-4 ring-primary-50" : "bg-gray-100"}`}>
-                            {done ? <RiCheckboxCircleLine className="text-green-500 text-xl"/> : active ? <span>{step.icon}</span> : <RiRadioButtonLine className="text-gray-300 text-xl"/>}
+                            {done ? <RiCheckboxCircleLine className="text-green-500 text-xl"/> : active ? <step.Icon className="text-primary-600" size={18}/> : <RiRadioButtonLine className="text-gray-300 text-xl"/>}
                           </div>
                           {idx < STEPS.length-1 && (
                             <div className={`w-0.5 h-8 mt-1 ${done ? "bg-green-300" : "bg-gray-100"}`}/>

@@ -1,7 +1,7 @@
 "use client";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { RiCheckboxCircleLine, RiArrowRightLine } from "react-icons/ri";
+import { RiCheckboxCircleLine, RiArrowRightLine, RiFlowerLine } from "react-icons/ri";
 import { Suspense } from "react";
 
 function Content() {
@@ -13,8 +13,10 @@ function Content() {
           className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
           <RiCheckboxCircleLine className="text-green-500 text-5xl"/>
         </motion.div>
-        <h1 className="text-3xl font-display font-semibold mb-2" style={{fontFamily:"var(--font-cormorant),Georgia,serif"}}>
-          ¡Gracias por tu compra! 🌸
+        <h1 className="text-3xl font-display font-semibold mb-2 flex items-center justify-center gap-2"
+            style={{fontFamily:"var(--font-cormorant),Georgia,serif"}}>
+          ¡Gracias por tu compra!
+          <RiFlowerLine className="text-primary-500" size={28}/>
         </h1>
         <p className="text-gray-500 mb-6">Recibirás un email con tu token de seguimiento para rastrear tu pedido.</p>
         <div className="flex flex-col gap-3">
@@ -27,4 +29,5 @@ function Content() {
     </div>
   );
 }
+
 export default function ConfirmacionPage() { return <Suspense><Content/></Suspense>; }

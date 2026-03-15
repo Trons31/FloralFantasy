@@ -5,6 +5,16 @@ import { RiMapPin2Line, RiTimeLine } from "react-icons/ri";
 import { formatPrice, STATUS_LABELS } from "@/lib/utils";
 import { toast } from "sonner";
 
+function formatDate(iso: string) {
+  const d = new Date(iso);
+  const months = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  const h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2,"0");
+  const ampm = h >= 12 ? "p. m." : "a. m.";
+  const h12 = h % 12 || 12;
+  return `${d.getDate()} ${months[d.getMonth()]}, ${h12}:${m} ${ampm}`;
+}
+
 const COLS = [
   { id: "PAID",             label: "Pagado",      dot: "bg-blue-500",   bg: "bg-blue-50/70   border-blue-200" },
   { id: "PROCESSING",       label: "Procesando",  dot: "bg-amber-500",  bg: "bg-amber-50/70  border-amber-200" },
@@ -70,7 +80,7 @@ export default function KanbanBoard({ initialOrders }: { initialOrders: any[] })
                             </div>
                             <div className="flex items-center gap-1.5">
                               <RiTimeLine className="flex-shrink-0" />
-                              <span>{new Date(order.createdAt).toLocaleString("es-CO",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</span>
+                              <span>{formatDate(order.createdAt)}</span>
                             </div>
                           </div>
                           <div className="mt-2.5 pt-2.5 border-t border-gray-50 text-xs text-gray-400">

@@ -33,7 +33,7 @@ export default function FeaturedProducts({ products }: { products: any[] }) {
             <span className="text-sm text-primary-700 font-medium">Más vendidos</span>
           </motion.div>
           <motion.h2 initial={{opacity:0,y:20}} whileInView={{opacity:1,y:0}} viewport={{once:true}} transition={{delay:0.1}}
-            className="text-4xl md:text-5xl font-display font-semibold text-gray-900"
+            className="text-3xl md:text-5xl font-display font-semibold text-gray-900"
             style={{fontFamily:"var(--font-cormorant),Georgia,serif"}}>
             Flores más amadas
           </motion.h2>
