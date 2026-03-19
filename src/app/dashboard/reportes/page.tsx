@@ -1,55 +1,87 @@
 import { prisma } from "@/lib/prisma";
-import { formatPrice } from "@/lib/utils";
-import { RiBarChartLine, RiArrowUpLine, RiArrowDownLine } from "react-icons/ri";
+import { startOfDay, startOfWeek, startOfMonth, subMonths, endOfDay } from "date-fns";
+import ReportesClient from "./ReportesClient";
 
-export default async function ReportesPage() {
+export default async function ReportesPage({
+  searchParams,
+}: {
+  searchParams: { periodo?: string; from?: string; to?: string; page?: string };
+}) {
+  const periodo = searchParams.periodo || "semana";
+  const page    = Math.max(1, parseInt(searchParams.page || "1"));
+  const perPage = 15;
+
   const now = new Date();
-  const periods = [
-    { label: "Hoy",   start: new Date(now.getFullYear(),now.getMonth(),now.getDate()) },
-    { label: "Semana",start: new Date(now.getTime() - 7*24*60*60*1000) },
-    { label: "Mes",   start: new Date(now.getFullYear(),now.getMonth(),1) },
-  ];
+  let dateFrom: Date;
+  let dateTo: Date = endOfDay(now);
+  let periodoLabel = "";
 
-  const data = await Promise.all(periods.map(async p => {
-    const [income, expenses, count] = await Promise.all([
-      prisma.order.aggregate({ where: { status: { in: ["PAID","PROCESSING","READY","OUT_FOR_DELIVERY","DELIVERED"] }, createdAt: { gte: p.start } }, _sum: { total: true } }).catch(() => ({_sum:{total:0}})),
-      prisma.expense.aggregate({ where: { date: { gte: p.start } }, _sum: { amount: true } }).catch(() => ({_sum:{amount:0}})),
-      prisma.order.count({ where: { createdAt: { gte: p.start }, status: { not: "CANCELLED" } } }).catch(() => 0),
-    ]);
-    return { label: p.label, income: income._sum.total||0, expenses: expenses._sum.amount||0, count };
+  if (searchParams.from && searchParams.to) {
+    dateFrom     = startOfDay(new Date(searchParams.from));
+    dateTo       = endOfDay(new Date(searchParams.to));
+    periodoLabel = "Personalizado";
+  } else {
+    switch (periodo) {
+      case "hoy":    dateFrom = startOfDay(now);          periodoLabel = "Hoy";          break;
+      case "semana": dateFrom = startOfWeek(now, { weekStartsOn: 1 }); periodoLabel = "Esta semana"; break;
+      case "mes":    dateFrom = startOfMonth(now);        periodoLabel = "Este mes";     break;
+      case "mes_pasado":
+        dateFrom     = startOfMonth(subMonths(now, 1));
+        dateTo       = endOfDay(new Date(now.getFullYear(), now.getMonth(), 0));
+        periodoLabel = "Mes pasado";
+        break;
+      default:       dateFrom = startOfWeek(now, { weekStartsOn: 1 }); periodoLabel = "Esta semana";
+    }
+  }
+
+  const where: any = {
+    status:    { notIn: ["CANCELLED"] },
+    createdAt: { gte: dateFrom, lte: dateTo },
+  };
+
+  const [totalCount, orders, expenses, allOrdersAgg] = await Promise.all([
+    prisma.order.count({ where }),
+    prisma.order.findMany({
+      where,
+      include: { items: { include: { product: true } } },
+      orderBy:  { createdAt: "desc" },
+      skip:     (page - 1) * perPage,
+      take:     perPage,
+    }),
+    prisma.expense.findMany({ where: { date: { gte: dateFrom, lte: dateTo } } }),
+    prisma.order.aggregate({
+      where,
+      _sum:   { total: true },
+      _count: { id: true },
+    }),
+  ]);
+
+  const totalIncome   = allOrdersAgg._sum.total   || 0;
+  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+
+  // Status breakdown
+  const statusCounts = await prisma.order.groupBy({
+    by: ["status"],
+    where,
+    _count: { id: true },
+  });
+
+  const serialized = orders.map(o => ({
+    ...o,
+    createdAt: o.createdAt.toISOString(),
+    updatedAt: o.updatedAt.toISOString(),
   }));
 
   return (
-    <div className="p-6 lg:p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Reportes</h1>
-        <p className="text-gray-500 text-sm mt-1">Resumen financiero por período</p>
-      </div>
-
-      <div className="grid gap-6">
-        {data.map(d => (
-          <div key={d.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-50 flex items-center gap-2">
-              <RiBarChartLine className="text-primary-500"/>
-              <h2 className="font-semibold text-gray-900">{d.label}</h2>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-50">
-              {[
-                { label:"Pedidos",   value: String(d.count),         sub:"órdenes",     color:"text-gray-900" },
-                { label:"Ingresos",  value: formatPrice(d.income),   sub:"ventas",      color:"text-green-600" },
-                { label:"Egresos",   value: formatPrice(d.expenses), sub:"gastos",      color:"text-red-500" },
-                { label:"Ganancia",  value: formatPrice(d.income - d.expenses), sub:"neta", color: (d.income-d.expenses)>=0?"text-primary-600":"text-red-600" },
-              ].map(s => (
-                <div key={s.label} className="p-5">
-                  <p className="text-xs text-gray-400 mb-1">{s.label}</p>
-                  <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{s.sub}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+    <ReportesClient
+      orders={serialized}
+      expenses={expenses.map(e => ({ ...e, date: e.date.toISOString(), createdAt: e.createdAt.toISOString() }))}
+      summary={{ totalIncome, totalExpenses, totalOrders: totalCount }}
+      statusCounts={statusCounts.map(s => ({ status: s.status, count: s._count.id }))}
+      pagination={{ page, perPage, total: totalCount }}
+      filters={{ periodo, from: searchParams.from, to: searchParams.to }}
+      periodoLabel={periodoLabel}
+      dateRange={{ from: dateFrom.toISOString(), to: dateTo.toISOString() }}
+    />
   );
 }

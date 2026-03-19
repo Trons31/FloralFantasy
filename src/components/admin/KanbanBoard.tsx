@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
-import { RiMapPin2Line, RiTimeLine } from "react-icons/ri";
+import { RiMapPin2Line, RiTimeLine, RiFlowerLine } from "react-icons/ri";
 import { formatPrice, STATUS_LABELS } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -65,26 +65,58 @@ export default function KanbanBoard({ initialOrders }: { initialOrders: any[] })
                     <Draggable key={order.id} draggableId={order.id} index={i}>
                       {(prov, snap) => (
                         <div ref={prov.innerRef} {...prov.draggableProps} {...prov.dragHandleProps}
-                          className={`bg-white rounded-xl p-4 shadow-sm border border-gray-100 kanban-card ${snap.isDragging ? "shadow-xl rotate-1 scale-105" : ""}`}>
-                          <div className="flex justify-between mb-2">
-                            <div>
-                              <p className="font-semibold text-sm text-gray-900 leading-tight">{order.customerName}</p>
-                              <p className="text-xs font-mono text-primary-500">{order.trackingToken}</p>
-                            </div>
-                            <p className="font-bold text-sm text-gray-900">{formatPrice(order.total)}</p>
+                          className={`bg-white rounded-xl shadow-sm border border-gray-100 kanban-card overflow-hidden ${snap.isDragging ? "shadow-xl rotate-1 scale-105" : ""}`}>
+
+                          {/* Productos — lo más importante, arriba y grande */}
+                          <div className="px-4 pt-4 pb-3 border-b border-gray-50">
+                            {order.items?.length > 0 ? order.items.map((item: any, idx: number) => (
+                              <div key={idx} className="flex items-center gap-2 mb-1 last:mb-0">
+                                <div className="w-8 h-8 rounded-lg overflow-hidden bg-gray-50 flex-shrink-0">
+                                  {item.product?.images?.[0]?.url
+                                    ? <img src={item.product.images.find((x:any)=>x.isMain)?.url || item.product.images[0].url} alt="" className="w-full h-full object-cover"/>
+                                    : <div className="w-full h-full flex items-center justify-center"><RiFlowerLine className="text-gray-200" size={14}/></div>
+                                  }
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-bold text-sm text-gray-900 leading-tight truncate">
+                                    {item.quantity > 1 && <span className="text-primary-600 mr-1">x{item.quantity}</span>}
+                                    {item.product?.name}
+                                  </p>
+                                  {/* Addons */}
+                                  {item.addons?.length > 0 && (
+                                    <p className="text-xs text-gray-400 truncate">
+                                      + {item.addons.map((a:any) => a.addon?.name).filter(Boolean).join(", ")}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            )) : (
+                              <p className="text-xs text-gray-300">Sin productos</p>
+                            )}
                           </div>
-                          <div className="space-y-1 text-xs text-gray-400">
-                            <div className="flex items-start gap-1.5">
-                              <RiMapPin2Line className="mt-0.5 flex-shrink-0" />
-                              <span className="line-clamp-1">{order.address}</span>
+
+                          {/* Cliente + detalles */}
+                          <div className="px-4 py-3">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <p className="font-semibold text-xs text-gray-700 leading-tight">{order.customerName}</p>
+                                <p className="text-xs font-mono text-primary-500">{order.trackingToken}</p>
+                              </div>
+                              <p className="font-bold text-sm text-gray-900">{formatPrice(order.total)}</p>
                             </div>
-                            <div className="flex items-center gap-1.5">
-                              <RiTimeLine className="flex-shrink-0" />
-                              <span>{formatDate(order.createdAt)}</span>
+                            <div className="space-y-1 text-xs text-gray-400">
+                              <div className="flex items-start gap-1.5">
+                                <RiMapPin2Line className="mt-0.5 flex-shrink-0" size={11}/>
+                                <span className="line-clamp-1">{order.address}</span>
+                              </div>
+                              {order.addressRef && (
+                                <p className="text-xs text-gray-300 pl-4">{order.addressRef}</p>
+                              )}
+                              <div className="flex items-center gap-1.5">
+                                <RiTimeLine className="flex-shrink-0" size={11}/>
+                                <span>{formatDate(order.createdAt)} · {order.estimatedTime}</span>
+                              </div>
                             </div>
-                          </div>
-                          <div className="mt-2.5 pt-2.5 border-t border-gray-50 text-xs text-gray-400">
-                            {order.items?.length || 0} producto(s) · {order.estimatedTime}
                           </div>
                         </div>
                       )}

@@ -2,29 +2,34 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import {
   RiDashboardLine, RiShoppingBagLine, RiFlowerLine, RiLeafLine,
   RiCalculatorLine, RiBarChartLine, RiMenuLine, RiCloseLine,
-  RiLogoutBoxLine, RiShieldLine, RiGiftLine,
+  RiLogoutBoxLine, RiShieldLine, RiGiftLine, RiTeamLine,
+  RiWalletLine,
+  RiLayoutGridLine,
+  RiListCheck,
 } from "react-icons/ri";
 import { motion, AnimatePresence } from "framer-motion";
 
 const NAV = [
   { href: "/dashboard", icon: RiDashboardLine, label: "Dashboard" },
-  { href: "/dashboard/pedidos", icon: RiShoppingBagLine, label: "Pedidos" },
+  { href: "/dashboard/pedidos", icon: RiLayoutGridLine, label: "Tablero" },
+  { href: "/dashboard/todos-pedidos", icon: RiListCheck, label: "Pedidos" },
   { href: "/dashboard/flores", icon: RiFlowerLine, label: "Flores" },
   { href: "/dashboard/productos", icon: RiLeafLine, label: "Productos" },
   { href: "/dashboard/addons", icon: RiGiftLine, label: "Adicionales" },
   { href: "/dashboard/contabilidad", icon: RiCalculatorLine, label: "Contabilidad" },
+  { href: "/dashboard/egresos", icon: RiWalletLine, label: "Egresos" },
   { href: "/dashboard/reportes", icon: RiBarChartLine, label: "Reportes" },
+  { href: "/dashboard/equipo", icon: RiTeamLine, label: "Equipo" },
 ];
 
 export default function AdminSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
-
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -61,8 +66,8 @@ export default function AdminSidebar() {
           return (
             <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${active
-                ? "bg-primary-600 text-white shadow-sm"
-                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  ? "bg-primary-600 text-white shadow-sm"
+                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 }`}>
               <item.icon size={16} className="flex-shrink-0" />
               {item.label}
@@ -101,15 +106,16 @@ export default function AdminSidebar() {
 
       {open && (
         <div className="lg:hidden fixed inset-0 z-50">
-          <div
-            className="absolute fade-in inset-0 bg-black/40 backdrop-blur-sm"
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setOpen(false)} />
           <div
-            className="absolute left-0 top-0 bottom-0 w-64 shadow-xl">
+            className="absolute fade-in left-0 top-0 bottom-0 w-64 shadow-xl">
             <SidebarContent />
           </div>
         </div>
       )}
+
 
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-64 h-screen fixed left-0 top-0 z-40">

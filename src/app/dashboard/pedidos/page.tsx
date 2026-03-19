@@ -4,7 +4,7 @@ import KanbanBoard from "@/components/admin/KanbanBoard";
 export default async function PedidosPage() {
   const orders = await prisma.order.findMany({
     where: { status: { notIn: ["DELIVERED","CANCELLED"] } },
-    include: { items: { include: { product: true } } },
+    include: { items: { include: { product: { include: { images: true } }, addons: { include: { addon: true } } } } },
     orderBy: { createdAt: "desc" },
   }).catch(() => []);
   const serialized = orders.map(o => ({ ...o, createdAt: o.createdAt.toISOString(), updatedAt: o.updatedAt.toISOString() }));
