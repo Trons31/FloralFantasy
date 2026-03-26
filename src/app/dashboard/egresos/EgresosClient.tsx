@@ -85,7 +85,7 @@ export default function EgresosClient({ expenses, summary, categories, paginatio
   };
 
   return (
-    <div className="p-4 lg:p-8 max-w-5xl space-y-5">
+    <div className="p-4 lg:p-8 space-y-5">
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

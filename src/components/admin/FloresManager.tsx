@@ -119,7 +119,7 @@ export default function FloresManager({ flowers: initial }: { flowers: Flower[] 
             <div className="p-6 space-y-4">
               {/* Image upload */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Imagen (Cloudinary)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Imagen</label>
                 <div className="flex items-center gap-3">
                   <div className="w-16 h-16 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
                     {form.imageUrl

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   RiTruckLine, RiCheckLine, RiLoader4Line, RiLogoutBoxLine, RiMapPin2Line,
   RiCameraLine, RiRefreshLine, RiFlowerLine, RiAddLine, RiCloseLine,
-  RiReceiptLine, RiArrowDownLine,
+  RiReceiptLine, RiArrowDownLine, RiErrorWarningLine,
 } from "react-icons/ri";
 import { formatPrice } from "@/lib/utils";
 import { toast } from "sonner";
@@ -24,6 +24,7 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
   const [photoFile,    setPhotoFile]    = useState<File|null>(null);
   const [photoPreview, setPhotoPreview] = useState<string|null>(null);
   const [uploading,    setUploading]    = useState(false);
+  const [photoError,   setPhotoError]   = useState(false);
 
   // Egreso state
   const [showEgreso,    setShowEgreso]    = useState(false);
@@ -61,11 +62,18 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
 
   const handleDeliveryPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
-    setPhotoFile(f); setPhotoPreview(URL.createObjectURL(f));
+    setPhotoFile(f);
+    setPhotoPreview(URL.createObjectURL(f));
+    setPhotoError(false);
   };
 
   const confirmDelivery = async () => {
-    if (!photoFile || !photoOrder) return;
+    if (!photoFile) {
+      setPhotoError(true);
+      toast.error("Debes tomar una foto de la entrega");
+      return;
+    }
+    if (!photoOrder) return;
     setUploading(true);
     const fd = new FormData();
     fd.append("file", photoFile);
@@ -75,6 +83,7 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
       setOrders(p => p.filter(o => o.id !== photoOrder.id));
       toast.success("Entrega confirmada con foto");
       setPhotoOrder(null);
+      setPhotoError(false);
     } else toast.error("Error al subir la foto");
     setUploading(false);
   };
@@ -88,6 +97,9 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
   const handleSaveEgreso = async () => {
     if (!egresoForm.description.trim() || !egresoForm.amount) {
       toast.error("Descripción y monto son requeridos"); return;
+    }
+    if (!egresoFile) {
+      toast.error("La foto de la factura es obligatoria"); return;
     }
     setSavingEgreso(true);
     const fd = new FormData();
@@ -189,7 +201,7 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
                     <DeliveryCard key={order.id} order={order} updating={updating}
                       action={{ label:"Confirmar entrega con foto", color:"bg-green-500 hover:bg-green-600" }}
                       onAction={null}
-                      onDeliver={() => { setPhotoOrder(order); setPhotoFile(null); setPhotoPreview(null); }}/>
+                      onDeliver={() => { setPhotoOrder(order); setPhotoFile(null); setPhotoPreview(null); setPhotoError(false); }}/>
                   ))}
                 </div>
               </div>
@@ -203,7 +215,9 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl w-full max-w-sm p-6">
             <h2 className="font-bold text-lg mb-1">Confirmar entrega</h2>
-            <p className="text-sm text-gray-500 mb-4">Toma una foto como evidencia</p>
+            <p className="text-sm text-gray-500 mb-4">
+              La foto de evidencia es <span className="font-semibold text-red-500">obligatoria</span> para confirmar
+            </p>
             <div className="bg-gray-50 rounded-xl p-3 mb-4 text-sm">
               <p className="font-bold text-gray-900">
                 {photoOrder.items.map(i => `${i.quantity>1?`x${i.quantity} `:""}${i.product.name}`).join(", ")}
@@ -214,24 +228,54 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
               </p>
             </div>
             <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleDeliveryPhoto} className="hidden"/>
+
+            {/* Label with required indicator */}
+            <p className="text-sm font-medium text-gray-700 mb-2">
+              Foto de entrega <span className="text-red-500">*</span>
+            </p>
+
             {photoPreview ? (
               <div className="relative mb-4">
                 <img src={photoPreview} alt="Evidencia" className="w-full h-48 object-cover rounded-2xl"/>
-                <button onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
+                <button onClick={() => { setPhotoFile(null); setPhotoPreview(null); setPhotoError(false); }}
                   className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center">
                   <RiCloseLine size={16}/>
                 </button>
+                <div className="absolute bottom-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-lg flex items-center gap-1">
+                  <RiCheckLine size={11}/> Foto lista
+                </div>
               </div>
             ) : (
-              <button onClick={() => fileRef.current?.click()}
-                className="w-full h-36 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center gap-2 hover:border-primary-400 hover:bg-primary-50 transition-colors mb-4">
-                <RiCameraLine className="text-gray-300" size={36}/>
-                <span className="text-sm text-gray-400">Tomar foto de entrega</span>
-              </button>
+              <>
+                <button onClick={() => { fileRef.current?.click(); setPhotoError(false); }}
+                  className={`w-full h-36 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-2 transition-colors mb-1 ${
+                    photoError
+                      ? "border-red-400 bg-red-50 hover:border-red-500"
+                      : "border-gray-200 hover:border-primary-400 hover:bg-primary-50"
+                  }`}>
+                  <RiCameraLine className={photoError ? "text-red-400" : "text-gray-300"} size={36}/>
+                  <span className={`text-sm font-medium ${photoError ? "text-red-500" : "text-gray-400"}`}>
+                    Tomar foto de entrega
+                  </span>
+                  {photoError && (
+                    <span className="text-xs text-red-400">Debes tomar la foto para continuar</span>
+                  )}
+                </button>
+                {photoError && (
+                  <div className="flex items-center gap-1.5 text-red-500 text-xs mb-3 px-1">
+                    <RiErrorWarningLine size={13}/>
+                    <span>La foto es obligatoria para confirmar la entrega</span>
+                  </div>
+                )}
+              </>
             )}
-            <div className="flex gap-3">
-              <button onClick={() => setPhotoOrder(null)} className="flex-1 py-3 border border-gray-200 rounded-xl text-gray-600 text-sm font-medium">Cancelar</button>
-              <button onClick={confirmDelivery} disabled={!photoFile || uploading}
+
+            <div className="flex gap-3 mt-4">
+              <button onClick={() => { setPhotoOrder(null); setPhotoError(false); }}
+                className="flex-1 py-3 border border-gray-200 rounded-xl text-gray-600 text-sm font-medium">
+                Cancelar
+              </button>
+              <button onClick={confirmDelivery} disabled={uploading}
                 className="flex-1 py-3 bg-green-500 text-white rounded-xl text-sm font-semibold hover:bg-green-600 disabled:opacity-40 flex items-center justify-center gap-2">
                 {uploading ? <RiLoader4Line className="animate-spin" size={16}/> : <RiCheckLine size={16}/>}
                 {uploading ? "Subiendo..." : "Confirmar"}
@@ -295,7 +339,7 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
               {/* Receipt photo */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Foto de la factura <span className="text-gray-400 font-normal">(opcional pero recomendada)</span>
+                  Foto de la factura *
                 </label>
                 <input ref={egresoFileRef} type="file" accept="image/*" capture="environment"
                   onChange={handleEgresoPhoto} className="hidden"/>
@@ -324,7 +368,7 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
                 <button onClick={closeEgreso} className="flex-1 border border-gray-200 text-gray-600 py-3.5 rounded-xl text-sm font-medium">
                   Cancelar
                 </button>
-                <button onClick={handleSaveEgreso} disabled={savingEgreso || !egresoForm.description || !egresoForm.amount}
+                <button onClick={handleSaveEgreso} disabled={savingEgreso || !egresoForm.description || !egresoForm.amount || !egresoFile}
                   className="flex-1 bg-amber-500 text-white py-3.5 rounded-xl text-sm font-semibold hover:bg-amber-600 disabled:opacity-40 flex items-center justify-center gap-2 active:scale-95">
                   {savingEgreso ? <RiLoader4Line className="animate-spin" size={15}/> : <RiArrowDownLine size={15}/>}
                   {savingEgreso ? "Guardando..." : "Registrar gasto"}

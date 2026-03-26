@@ -17,15 +17,15 @@ export default function CartDrawer() {
   const est      = getEstimatedTime();
 
   return (
-    <AnimatePresence>
+    <>
+    
       {isOpen && (
         <>
-          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+          <div
             onClick={toggleCart} className="fixed inset-0 bg-black/40 z-50 backdrop-blur-sm"/>
 
-          <motion.div initial={{x:"100%"}} animate={{x:0}} exit={{x:"100%"}}
-            transition={{type:"spring", damping:25, stiffness:300}}
-            className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white z-50 flex flex-col shadow-2xl">
+          <div 
+            className="fixed fade-in right-0 top-0 bottom-0 w-full max-w-md bg-white z-50 flex flex-col shadow-2xl">
 
             {/* Header */}
             <div className="flex items-center justify-between p-5 border-b">
@@ -111,9 +111,9 @@ export default function CartDrawer() {
                 </Link>
               </div>
             )}
-          </motion.div>
+          </div>
         </>
       )}
-    </AnimatePresence>
+    </>
   );
 }

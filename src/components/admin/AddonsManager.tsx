@@ -18,29 +18,66 @@ const ADDON_ICONS: Record<string, any> = {
 
 export default function AddonsManager({ addons: init }: { addons: any[] }) {
   const [addons, setAddons] = useState(init);
-  const [form,   setForm]   = useState({ name:"", price:"", type:"BEBIDA", imageUrl:"" });
-  const [show,   setShow]   = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [form,   setForm]   = useState({ name:"", price:"", type:"BEBIDA" });
+  // ✅ Guardamos el archivo y preview localmente, NO se sube aún
+  const [pendingFile,    setPendingFile]    = useState<File | null>(null);
+  const [previewUrl,     setPreviewUrl]     = useState<string>("");
+  const [show,           setShow]           = useState(false);
+  const [saving,         setSaving]         = useState(false);
 
-  const handleImg = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return;
-    setUploading(true);
-    const fd = new FormData(); fd.append("file", file);
-    const res  = await fetch("/api/upload", { method:"POST", body: fd });
-    const data = await res.json();
-    setForm(p => ({...p, imageUrl: data.url }));
-    toast.success("Imagen subida");
-    setUploading(false);
+  const handleImg = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Solo generamos preview local, sin subir
+    setPendingFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const resetForm = () => {
+    setForm({ name:"", price:"", type:"BEBIDA" });
+    setPendingFile(null);
+    // Liberar memoria del object URL
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl("");
   };
 
   const handleSave = async () => {
     if (!form.name || !form.price) { toast.error("Nombre y precio son requeridos"); return; }
-    const res   = await fetch("/api/addons", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({...form, price: parseFloat(form.price)}) });
-    const saved = await res.json();
-    setAddons(p => [...p, saved]);
-    setForm({ name:"", price:"", type:"BEBIDA", imageUrl:"" });
+
+    setSaving(true);
+    try {
+      let imageUrl = "";
+
+      // ✅ Solo subimos a Cloudinary si el usuario eligió una imagen Y presionó Guardar
+      if (pendingFile) {
+        const fd = new FormData();
+        fd.append("file", pendingFile);
+        const uploadRes = await fetch("/api/upload", { method: "POST", body: fd });
+        if (!uploadRes.ok) throw new Error("Error subiendo imagen");
+        const uploadData = await uploadRes.json();
+        imageUrl = uploadData.url;
+      }
+
+      const res   = await fetch("/api/addons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, price: parseFloat(form.price), imageUrl }),
+      });
+      const saved = await res.json();
+      setAddons(p => [...p, saved]);
+      resetForm();
+      setShow(false);
+      toast.success("Adicional creado");
+    } catch (err) {
+      toast.error("Error al guardar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    resetForm();
     setShow(false);
-    toast.success("Adicional creado");
   };
 
   const handleDelete = async (id: string) => {
@@ -64,6 +101,7 @@ export default function AddonsManager({ addons: init }: { addons: any[] }) {
         </button>
       </div>
 
+      {/* Grid de adicionales — sin cambios */}
       <div className="space-y-6">
         {Object.entries(grouped).map(([type, items]: any) => {
           const TypeIcon = ADDON_ICONS[type] || RiGiftLine;
@@ -111,22 +149,22 @@ export default function AddonsManager({ addons: init }: { addons: any[] }) {
           <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6">
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-bold text-lg">Nuevo adicional</h2>
-              <button onClick={() => setShow(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-500">
+              <button onClick={handleCancel} className="p-2 hover:bg-gray-100 rounded-full text-gray-500">
                 <RiAddLine size={16} className="rotate-45"/>
               </button>
             </div>
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-14 h-14 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center">
-                  {form.imageUrl
-                    ? <img src={form.imageUrl} className="w-full h-full object-cover" alt=""/>
-                    : (() => { const I = ADDON_ICONS[form.type]||RiGiftLine; return <I size={28} className="text-gray-300"/>; })()
+                  {previewUrl
+                    ? <img src={previewUrl} className="w-full h-full object-cover" alt=""/>
+                    : (() => { const I = ADDON_ICONS[form.type] || RiGiftLine; return <I size={28} className="text-gray-300"/>; })()
                   }
                 </div>
                 <label className="flex-1 flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-xl py-2.5 cursor-pointer hover:border-primary-400 text-sm text-gray-400 transition-colors">
-                  {uploading ? <RiLoader4Line className="animate-spin text-primary-500"/> : <RiUploadCloud2Line size={16}/>}
-                  {uploading ? "Subiendo..." : "Imagen"}
-                  <input type="file" accept="image/*" onChange={handleImg} className="hidden" disabled={uploading}/>
+                  {saving ? <RiLoader4Line className="animate-spin text-primary-500"/> : <RiUploadCloud2Line size={16}/>}
+                  {pendingFile ? pendingFile.name.slice(0, 20) : "Imagen"}
+                  <input type="file" accept="image/*" onChange={handleImg} className="hidden" disabled={saving}/>
                 </label>
               </div>
               <input value={form.name} onChange={e => setForm(p=>({...p,name:e.target.value}))} placeholder="Nombre"
@@ -138,8 +176,15 @@ export default function AddonsManager({ addons: init }: { addons: any[] }) {
                 {TYPES.map(t => <option key={t}>{t}</option>)}
               </select>
               <div className="flex gap-3">
-                <button onClick={() => setShow(false)} className="flex-1 border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:bg-gray-50">Cancelar</button>
-                <button onClick={handleSave} className="flex-1 bg-primary-600 text-white py-3 rounded-xl text-sm font-medium hover:bg-primary-700">Guardar</button>
+                <button onClick={handleCancel} disabled={saving}
+                  className="flex-1 border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+                  Cancelar
+                </button>
+                <button onClick={handleSave} disabled={saving}
+                  className="flex-1 bg-primary-600 text-white py-3 rounded-xl text-sm font-medium hover:bg-primary-700 disabled:opacity-70 flex items-center justify-center gap-2">
+                  {saving && <RiLoader4Line className="animate-spin" size={14}/>}
+                  {saving ? "Guardando..." : "Guardar"}
+                </button>
               </div>
             </div>
           </div>

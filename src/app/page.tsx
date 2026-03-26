@@ -6,16 +6,15 @@ import OccasionsSection from "@/components/client/OccasionsSection";
 import TestimonialsSection from "@/components/client/TestimonialsSection";
 import Footer from "@/components/client/Footer";
 import CartDrawer from "@/components/client/CartDrawer";
+import WhatsAppButton from "@/components/client/WhatsAppButton";
 
 export default async function HomePage() {
-  // Primero intenta productos destacados
   let featured = await prisma.product.findMany({
     where: { featured: true, inStock: true },
     include: { images: { orderBy: { order: "asc" } }, category: true, flowers: { include: { flower: true } } },
     take: 8,
   }).catch(() => []);
 
-  // Si no hay destacados, trae todos los disponibles
   if (featured.length === 0) {
     featured = await prisma.product.findMany({
       where: { inStock: true },
@@ -36,6 +35,7 @@ export default async function HomePage() {
       <TestimonialsSection />
       <Footer />
       <CartDrawer />
+      <WhatsAppButton />
     </main>
   );
 }

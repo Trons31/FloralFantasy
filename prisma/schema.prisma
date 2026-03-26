@@ -22,7 +22,14 @@ enum Role {
   SUPER_ADMIN
   PREPARADOR
   REPARTIDOR
+  CORREDOR
 }
+
+enum OrderSource {
+  CLIENT
+  ADMIN
+}
+
 
 model Flower {
   id          String          @id @default(cuid())
@@ -115,6 +122,7 @@ model Order {
   addressRef      String?
   total           Float
   deliveryFee     Float                @default(0)
+  source          OrderSource          @default(CLIENT)
   estimatedTime   String               @default("1 dia")
   wompiTxId       String?
   deliveryPhotoUrl String?

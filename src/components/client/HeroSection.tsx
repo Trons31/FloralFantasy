@@ -29,7 +29,7 @@ export default function HeroSection() {
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 pb-20 pt-32">
           <motion.div initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:0.2, duration:0.7}}>
             <span className="inline-flex items-center gap-2 bg-primary-600/20 border border-primary-400/40 text-primary-300 text-xs font-semibold tracking-[0.15em] uppercase px-4 py-2 rounded-full mb-6 backdrop-blur-sm">
-              <RiFlowerLine size={12}/> Floristería artesanal · Sincelejo
+              <RiFlowerLine size={12}/> Diseño floral
             </span>
           </motion.div>
 

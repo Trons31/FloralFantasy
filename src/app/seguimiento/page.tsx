@@ -38,17 +38,17 @@ export default function SeguimientoPage() {
   return (
     <main className="min-h-screen bg-[#fdfcf8]">
       <Header/>
-      <div className="pt-20">
+      <div className="pt-16">
         <div className="bg-gradient-to-r from-primary-800 to-primary-600 text-white py-16 px-4 text-center">
           <h1 className="text-4xl font-display font-semibold mb-2" style={{fontFamily:"var(--font-cormorant),Georgia,serif"}}>
             Seguimiento de pedido
           </h1>
-          <p className="text-primary-200">Ingresa tu token para ver el estado en tiempo real</p>
+          <p className="text-primary-200">Ingresa tu guia para ver el estado en tiempo real</p>
         </div>
 
         <div className="max-w-xl mx-auto px-4 py-12">
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 mb-8">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Token de seguimiento</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Guia de seguimiento</label>
             <div className="flex gap-3">
               <input value={token} onChange={e => setToken(e.target.value.toUpperCase())}
                 onKeyDown={e => e.key==="Enter" && handleSearch()}

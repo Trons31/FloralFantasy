@@ -3,7 +3,7 @@ import EquipoManager from "@/components/admin/EquipoManager";
 
 export default async function EquipoPage() {
   const team = await prisma.user.findMany({
-    where: { role: { in: ["PREPARADOR", "REPARTIDOR"] } },
+    where: { role: { in: ["PREPARADOR", "REPARTIDOR", "CORREDOR"] } },
     select: { id: true, name: true, email: true, role: true, pin: true, createdAt: true },
     orderBy: { createdAt: "desc" },
   }).catch(() => []);
@@ -13,7 +13,7 @@ export default async function EquipoPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Equipo</h1>
         <p className="text-gray-500 text-sm mt-1">
-          Gestiona preparadores y repartidores — acceden con PIN en{" "}
+          Gestiona preparadores, repartidores y corredores — acceden con PIN en{" "}
           <strong className="text-primary-600">/operaciones</strong>
         </p>
       </div>

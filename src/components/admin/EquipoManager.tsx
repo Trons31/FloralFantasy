@@ -1,35 +1,43 @@
 "use client";
 import { useState } from "react";
 import { RiAddLine, RiDeleteBinLine, RiFlowerLine, RiTruckLine, RiShieldKeyholeLine,
-         RiCloseLine, RiLoader4Line, RiExternalLinkLine, RiPencilLine, RiCheckLine } from "react-icons/ri";
+         RiCloseLine, RiLoader4Line, RiExternalLinkLine, RiPencilLine, RiCheckLine,
+         RiRunLine } from "react-icons/ri";
 import { toast } from "sonner";
 
 const ROLES = [
-  { value:"PREPARADOR", label:"Preparador", Icon:RiFlowerLine, color:"text-amber-600 bg-amber-50 border-amber-200" },
-  { value:"REPARTIDOR", label:"Repartidor", Icon:RiTruckLine,  color:"text-blue-600 bg-blue-50 border-blue-200"  },
+  { value: "PREPARADOR", label: "Preparador", Icon: RiFlowerLine, color: "text-amber-600 bg-amber-50 border-amber-200" },
+  { value: "REPARTIDOR", label: "Repartidor", Icon: RiTruckLine,  color: "text-blue-600 bg-blue-50 border-blue-200"   },
+  { value: "CORREDOR",   label: "Corredor",   Icon: RiRunLine,    color: "text-green-600 bg-green-50 border-green-200" },
 ];
 
-type Member = { id:string; name:string; role:string; pin:string | null; email:string };
+type Member = { id: string; name: string; role: string; pin: string | null; email: string };
 
 export default function EquipoManager({ members: init }: { members: Member[] }) {
   const [members,   setMembers]   = useState(init);
   const [showForm,  setShowForm]  = useState(false);
   const [saving,    setSaving]    = useState(false);
   const [editing,   setEditing]   = useState<Member | null>(null);
-  const [editForm,  setEditForm]  = useState({ name:"", pin:"", pinDigits:["","","",""] });
-  const [form,      setForm]      = useState({ name:"", role:"PREPARADOR", pin:"" });
+  const [editForm,  setEditForm]  = useState({ name: "", pin: "", pinDigits: ["","","",""] });
+  const [form,      setForm]      = useState({ name: "", role: "PREPARADOR", pin: "" });
   const [pinDigits, setPinDigits] = useState(["","","",""]);
 
-  /* ── PIN input helpers ── */
-  const handlePinDigit = (i: number, v: string, digits: string[], setDigits: (d:string[])=>void, setPinVal: (p:string)=>void) => {
+  const handlePinDigit = (
+    i: number, v: string,
+    digits: string[], setDigits: (d: string[]) => void,
+    setPinVal: (p: string) => void,
+    prefix = "pin"
+  ) => {
     if (!/^\d?$/.test(v)) return;
     const next = [...digits]; next[i] = v;
     setDigits(next);
     setPinVal(next.join(""));
-    if (v && i < 3) document.getElementById(`pin-${i+1}`)?.focus();
+    if (v && i < 3) document.getElementById(`${prefix}-${i + 1}`)?.focus();
   };
+
   const handlePinKey = (e: React.KeyboardEvent, i: number, digits: string[], prefix = "pin") => {
-    if (e.key === "Backspace" && !digits[i] && i > 0) document.getElementById(`${prefix}-${i-1}`)?.focus();
+    if (e.key === "Backspace" && !digits[i] && i > 0)
+      document.getElementById(`${prefix}-${i - 1}`)?.focus();
   };
 
   /* ── Create ── */
@@ -37,12 +45,12 @@ export default function EquipoManager({ members: init }: { members: Member[] }) 
     if (!form.name.trim()) { toast.error("Nombre requerido"); return; }
     if (form.pin.length !== 4) { toast.error("PIN de 4 dígitos requerido"); return; }
     setSaving(true);
-    const res  = await fetch("/api/equipo", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(form) });
+    const res  = await fetch("/api/equipo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
     const data = await res.json();
     if (!res.ok) { toast.error(data.error); setSaving(false); return; }
     setMembers(p => [data, ...p]);
     setShowForm(false);
-    setForm({ name:"", role:"PREPARADOR", pin:"" });
+    setForm({ name: "", role: "PREPARADOR", pin: "" });
     setPinDigits(["","","",""]);
     toast.success(`${data.name} agregado`);
     setSaving(false);
@@ -51,7 +59,7 @@ export default function EquipoManager({ members: init }: { members: Member[] }) 
   /* ── Edit ── */
   const openEdit = (m: Member) => {
     setEditing(m);
-    setEditForm({ name: m.name, pin:"", pinDigits:["","","",""] });
+    setEditForm({ name: m.name, pin: "", pinDigits: ["","","",""] });
   };
 
   const handleEdit = async () => {
@@ -61,7 +69,7 @@ export default function EquipoManager({ members: init }: { members: Member[] }) 
     setSaving(true);
     const body: any = { name: editForm.name };
     if (editForm.pin.length === 4) body.pin = editForm.pin;
-    const res  = await fetch(`/api/equipo/${editing.id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+    const res  = await fetch(`/api/equipo/${editing.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const data = await res.json();
     if (!res.ok) { toast.error(data.error); setSaving(false); return; }
     setMembers(p => p.map(m => m.id === editing.id ? data : m));
@@ -73,7 +81,7 @@ export default function EquipoManager({ members: init }: { members: Member[] }) 
   /* ── Delete ── */
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`¿Eliminar a ${name}?`)) return;
-    await fetch(`/api/equipo/${id}`, { method:"DELETE" });
+    await fetch(`/api/equipo/${id}`, { method: "DELETE" });
     setMembers(p => p.filter(m => m.id !== id));
     toast.success("Eliminado");
   };
@@ -81,7 +89,7 @@ export default function EquipoManager({ members: init }: { members: Member[] }) 
   return (
     <>
       {/* Operations link */}
-      <div className="bg-primary-50 border border-primary-100 rounded-2xl p-4 mb-5 block space-y-2 md:space-y-0  md:flex items-center justify-between gap-3">
+      <div className="bg-primary-50 border border-primary-100 rounded-2xl p-4 mb-5 block space-y-2 md:space-y-0 md:flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="font-semibold text-primary-800 text-sm">Vista de operaciones</p>
           <p className="text-xs text-primary-600 mt-0.5 truncate">Comparte este enlace con tu equipo</p>
@@ -126,7 +134,7 @@ export default function EquipoManager({ members: init }: { members: Member[] }) 
                 <p className="font-bold text-gray-900 text-base">{m.name}</p>
                 <div className="flex items-center gap-2 mt-2.5">
                   <div className="flex gap-1.5">
-                    {(m.pin ?? "????" ).split("").map((d, i) => (
+                    {(m.pin ?? "????").split("").map((d, i) => (
                       <span key={i} className="w-9 h-9 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center font-mono font-bold text-gray-700 text-base">
                         {d}
                       </span>
@@ -153,19 +161,19 @@ export default function EquipoManager({ members: init }: { members: Member[] }) 
             <div className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Nombre *</label>
-                <input value={form.name} onChange={e => setForm(p=>({...p,name:e.target.value}))}
+                <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
                   placeholder="Ej: Carlos" autoComplete="off"
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-primary-400"/>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Rol *</label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-2">
                   {ROLES.map(r => (
-                    <button key={r.value} type="button" onClick={() => setForm(p=>({...p,role:r.value}))}
-                      className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 text-sm font-semibold transition-all active:scale-95 ${
+                    <button key={r.value} type="button" onClick={() => setForm(p => ({ ...p, role: r.value }))}
+                      className={`flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border-2 text-xs font-semibold transition-all active:scale-95 ${
                         form.role === r.value ? "border-primary-500 bg-primary-50 text-primary-700" : "border-gray-200 text-gray-500"
                       }`}>
-                      <r.Icon size={16}/> {r.label}
+                      <r.Icon size={18}/> {r.label}
                     </button>
                   ))}
                 </div>
@@ -176,7 +184,7 @@ export default function EquipoManager({ members: init }: { members: Member[] }) 
                   {[0,1,2,3].map(i => (
                     <input key={i} id={`pin-${i}`} type="tel" inputMode="numeric" maxLength={1}
                       value={pinDigits[i]}
-                      onChange={e => handlePinDigit(i, e.target.value, pinDigits, setPinDigits, v => setForm(p=>({...p,pin:v})))}
+                      onChange={e => handlePinDigit(i, e.target.value, pinDigits, setPinDigits, v => setForm(p => ({ ...p, pin: v })))}
                       onKeyDown={e => handlePinKey(e, i, pinDigits)}
                       className="w-14 h-14 text-center text-2xl font-bold border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-colors"/>
                   ))}
@@ -208,7 +216,7 @@ export default function EquipoManager({ members: init }: { members: Member[] }) 
             <div className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Nombre *</label>
-                <input value={editForm.name} onChange={e => setEditForm(p=>({...p,name:e.target.value}))}
+                <input value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
                   autoComplete="off"
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-primary-400"/>
               </div>
@@ -222,10 +230,10 @@ export default function EquipoManager({ members: init }: { members: Member[] }) 
                       onChange={e => {
                         if (!/^\d?$/.test(e.target.value)) return;
                         const next = [...editForm.pinDigits]; next[i] = e.target.value;
-                        setEditForm(p => ({...p, pinDigits: next, pin: next.join("")}));
-                        if (e.target.value && i < 3) document.getElementById(`epin-${i+1}`)?.focus();
+                        setEditForm(p => ({ ...p, pinDigits: next, pin: next.join("") }));
+                        if (e.target.value && i < 3) document.getElementById(`epin-${i + 1}`)?.focus();
                       }}
-                      onKeyDown={e => { if (e.key==="Backspace" && !editForm.pinDigits[i] && i>0) document.getElementById(`epin-${i-1}`)?.focus(); }}
+                      onKeyDown={e => { if (e.key === "Backspace" && !editForm.pinDigits[i] && i > 0) document.getElementById(`epin-${i - 1}`)?.focus(); }}
                       className="w-14 h-14 text-center text-2xl font-bold border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-colors"/>
                   ))}
                 </div>

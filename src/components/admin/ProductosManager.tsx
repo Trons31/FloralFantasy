@@ -30,6 +30,11 @@ type Product = {
 type Category = { id: string; name: string; slug: string };
 type Flower   = { id: string; name: string; type: string };
 
+// ✅ Slot de imagen: puede tener un File pendiente (nueva) o una URL ya subida (edición)
+type ImageSlot =
+  | { kind: "pending"; file: File; previewUrl: string }   // aún no subida
+  | { kind: "uploaded"; url: string; publicId: string };  // ya en Cloudinary
+
 export default function ProductosManager({
   products: init, categories, flowers,
 }: { products: any[]; categories: Category[]; flowers: Flower[] }) {
@@ -37,8 +42,9 @@ export default function ProductosManager({
   const [showForm, setShowForm] = useState(false);
   const [editing,  setEditing]  = useState<Product | null>(null);
   const [saving,   setSaving]   = useState(false);
-  const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
-  const [uploadedImages, setUploadedImages] = useState<{ url: string; publicId: string }[]>([]);
+  // ✅ imageSlots reemplaza uploadedImages + uploadingIdx
+  const [imageSlots,      setImageSlots]      = useState<ImageSlot[]>([]);
+  const [uploadingSlots,  setUploadingSlots]  = useState<Set<number>>(new Set());
   const [selectedFlowers, setSelectedFlowers] = useState<string[]>([]);
 
   const [showCatForm, setShowCatForm] = useState(false);
@@ -63,25 +69,59 @@ export default function ProductosManager({
     else toast.error(saved.error);
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, idx: number) => {
-    const file = e.target.files?.[0]; if (!file) return;
-    setUploadingIdx(idx);
-    const fd = new FormData(); fd.append("file", file);
-    const res  = await fetch("/api/upload", { method:"POST", body: fd });
-    const data = await res.json();
-    setUploadedImages(p => { const n = [...p]; n[idx] = data; return n; });
-    toast.success("Imagen subida a Cloudinary");
-    setUploadingIdx(null);
+  // ✅ Solo guarda el archivo localmente con preview, NO sube a Cloudinary
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>, idx: number) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const previewUrl = URL.createObjectURL(file);
+    setImageSlots(prev => {
+      const next = [...prev];
+      // Liberar preview anterior si existía
+      if (next[idx]?.kind === "pending") URL.revokeObjectURL((next[idx] as any).previewUrl);
+      next[idx] = { kind: "pending", file, previewUrl };
+      return next;
+    });
   };
 
-  const addImageSlot = () => setUploadedImages(p => [...p, { url: "", publicId: "" }]);
-  const removeImage  = (i: number) => setUploadedImages(p => p.filter((_,j) => j !== i));
+  const addImageSlot = () =>
+    // Añade un slot vacío — se llenará cuando el usuario seleccione un archivo
+    setImageSlots(p => [...p, { kind: "uploaded", url: "", publicId: "" }]);
+
+  const removeImage = (i: number) => {
+    setImageSlots(prev => {
+      const slot = prev[i];
+      if (slot?.kind === "pending") URL.revokeObjectURL(slot.previewUrl);
+      return prev.filter((_, j) => j !== i);
+    });
+  };
+
+  // ✅ Sube UN slot pendiente a Cloudinary, retorna { url, publicId }
+  const uploadSlot = async (slot: ImageSlot & { kind: "pending" }, idx: number) => {
+    setUploadingSlots(p => new Set(p).add(idx));
+    const fd = new FormData();
+    fd.append("file", slot.file);
+    const res  = await fetch("/api/upload", { method: "POST", body: fd });
+    const data = await res.json();
+    URL.revokeObjectURL(slot.previewUrl); // liberar memoria
+    setUploadingSlots(p => { const s = new Set(p); s.delete(idx); return s; });
+    return { url: data.url as string, publicId: data.publicId as string };
+  };
 
   const onSubmit = async (data: any) => {
-    if (uploadedImages.filter(i => i.url).length === 0) { toast.error("Agrega al menos una imagen"); return; }
+    const filledSlots = imageSlots.filter(s => s.kind === "pending" || (s.kind === "uploaded" && s.url));
+    if (filledSlots.length === 0) { toast.error("Agrega al menos una imagen"); return; }
     if (!data.categoryId) { toast.error("Selecciona una categoría"); return; }
     setSaving(true);
     try {
+      // ✅ Subir solo los slots pendientes en paralelo, justo antes de guardar
+      const resolvedImages = await Promise.all(
+        imageSlots.map(async (slot, idx) => {
+          if (slot.kind === "pending") return uploadSlot(slot, idx);
+          return { url: slot.url, publicId: slot.publicId };
+        })
+      );
+      const validImages = resolvedImages.filter(img => img.url);
+
       const payload = {
         ...data,
         price: parseFloat(data.price),
@@ -89,7 +129,7 @@ export default function ProductosManager({
         requiresSpecialOrder: data.requiresSpecialOrder === true || data.requiresSpecialOrder === "true",
         inStock:  data.inStock  === true || data.inStock  === "true",
         featured: data.featured === true || data.featured === "true",
-        images: uploadedImages.filter(i => i.url),
+        images: validImages,
         flowerIds: selectedFlowers,
       };
       const url    = editing ? `/api/products/${editing.id}` : "/api/products";
@@ -108,18 +148,25 @@ export default function ProductosManager({
   const openCreate = () => {
     setEditing(null);
     reset({ preparationTimeValue:0, preparationTimeUnit:"MINUTES", inStock:true, featured:false, requiresSpecialOrder:false });
-    setUploadedImages([]); setSelectedFlowers([]); setShowForm(true);
+    setImageSlots([]); setSelectedFlowers([]); setShowForm(true);
   };
+
   const openEdit = (p: Product) => {
     setEditing(p);
     reset({ name:p.name, description:p.description, price:p.price, categoryId:p.categoryId,
             occasion:p.occasion, preparationTimeValue:p.preparationTimeValue, preparationTimeUnit:p.preparationTimeUnit,
             requiresSpecialOrder:p.requiresSpecialOrder, inStock:p.inStock, featured:p.featured });
-    setUploadedImages(p.images.map(i => ({ url:i.url, publicId:i.publicId })));
+    // ✅ Imágenes ya subidas se cargan como "uploaded", no como pending
+    setImageSlots(p.images.map(i => ({ kind: "uploaded", url: i.url, publicId: i.publicId })));
     setSelectedFlowers(p.flowers.map(f => f.flower.id));
     setShowForm(true);
   };
-  const closeForm = () => { setShowForm(false); setEditing(null); reset(); setUploadedImages([]); setSelectedFlowers([]); };
+
+  const closeForm = () => {
+    // Liberar todos los object URLs pendientes
+    imageSlots.forEach(s => { if (s.kind === "pending") URL.revokeObjectURL(s.previewUrl); });
+    setShowForm(false); setEditing(null); reset(); setImageSlots([]); setSelectedFlowers([]);
+  };
 
   const handleDelete = async (id: string) => {
     if (!confirm("¿Eliminar este producto?")) return;
@@ -130,6 +177,12 @@ export default function ProductosManager({
 
   const toggleFlower = (id: string) =>
     setSelectedFlowers(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+
+  // ✅ Helper: obtener la URL de display de un slot (preview local o URL de Cloudinary)
+  const slotDisplayUrl = (slot: ImageSlot): string => {
+    if (slot.kind === "pending") return slot.previewUrl;
+    return slot.url;
+  };
 
   const TOGGLES = [
     { name: "requiresSpecialOrder", label: "Encargo previo", Icon: RiBellLine  },
@@ -163,7 +216,7 @@ export default function ProductosManager({
                 <div className="absolute top-2 right-2 flex gap-1">
                   {p.featured && (
                     <span className="bg-white text-yellow-600 text-xs px-2 py-2 rounded-full flex items-center gap-1">
-                      <FaStar   className="h-4 w-4" />
+                      <FaStar className="h-4 w-4" />
                     </span>
                   )}
                   {!p.inStock && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">Agotado</span>}
@@ -212,37 +265,56 @@ export default function ProductosManager({
               {/* Images */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Imágenes <span className="text-gray-400 font-normal text-xs">(Cloudinary / fantasiaFloral)</span>
+                  Imágenes
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {uploadedImages.map((img, i) => (
-                    <div key={i} className="relative group/img">
-                      <div className="w-20 h-20 rounded-xl border-2 border-gray-200 overflow-hidden bg-gray-50">
-                        {img.url ? (
-                          <img src={img.url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:bg-primary-50 transition-colors">
-                            {uploadingIdx === i
-                              ? <RiLoader4Line className="animate-spin text-primary-500 text-xl" />
-                              : <><RiUploadCloud2Line className="text-gray-300 text-xl" /><span className="text-xs text-gray-300 mt-1">Subir</span></>
-                            }
-                            <input type="file" accept="image/*" onChange={e => handleImageUpload(e, i)} className="hidden" disabled={uploadingIdx !== null} />
-                          </label>
+                  {imageSlots.map((slot, i) => {
+                    const displayUrl = slotDisplayUrl(slot);
+                    const isUploading = uploadingSlots.has(i);
+                    return (
+                      <div key={i} className="relative group/img">
+                        <div className="w-20 h-20 rounded-xl border-2 border-gray-200 overflow-hidden bg-gray-50">
+                          {displayUrl ? (
+                            <img src={displayUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            // Slot vacío: muestra selector de archivo
+                            <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:bg-primary-50 transition-colors">
+                              {isUploading
+                                ? <RiLoader4Line className="animate-spin text-primary-500 text-xl" />
+                                : <><RiUploadCloud2Line className="text-gray-300 text-xl" /><span className="text-xs text-gray-300 mt-1">Subir</span></>
+                              }
+                              <input type="file" accept="image/*" onChange={e => handleImageSelect(e, i)} className="hidden" disabled={saving} />
+                            </label>
+                          )}
+                        </div>
+                        {/* Indicador: pending (local) vs uploaded (Cloudinary) */}
+                        {i === 0 && displayUrl && (
+                          <span className="absolute -bottom-1 left-0 right-0 text-center text-xs bg-primary-600 text-white rounded-b-xl py-0.5">
+                            Principal
+                          </span>
                         )}
+                        {slot.kind === "pending" && (
+                          <span className="absolute top-0 left-0 w-2 h-2 bg-amber-400 rounded-full m-1" title="Pendiente de subir" />
+                        )}
+                        <button type="button" onClick={() => removeImage(i)}
+                          className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full items-center justify-center hidden group-hover/img:flex">
+                          <RiCloseLine size={10} />
+                        </button>
                       </div>
-                      {i === 0 && img.url && <span className="absolute -bottom-1 left-0 right-0 text-center text-xs bg-primary-600 text-white rounded-b-xl py-0.5">Principal</span>}
-                      <button type="button" onClick={() => removeImage(i)}
-                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full items-center justify-center hidden group-hover/img:flex">
-                        <RiCloseLine size={10} />
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                   <button type="button" onClick={addImageSlot}
                     className="w-20 h-20 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center hover:border-primary-400 hover:bg-primary-50 transition-colors text-gray-400">
                     <RiAddLine size={20} />
                     <span className="text-xs mt-1">Añadir</span>
                   </button>
                 </div>
+                {imageSlots.some(s => s.kind === "pending") && (
+                  <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
+                    <RiUploadCloud2Line size={12} />
+                    Las imágenes nuevas se subirán al guardar
+                  </p>
+                )}
               </div>
 
               {/* Name */}
@@ -358,7 +430,7 @@ export default function ProductosManager({
                 )}
               </div>
 
-              {/* Toggles — all with react-icons */}
+              {/* Toggles */}
               <div className="grid grid-cols-3 gap-3">
                 {TOGGLES.map(f => (
                   <label key={f.name} className="flex items-center gap-2 bg-gray-50 rounded-xl p-3 cursor-pointer hover:bg-gray-100 transition-colors">
@@ -370,7 +442,10 @@ export default function ProductosManager({
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={closeForm} className="flex-1 border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">Cancelar</button>
+                <button type="button" onClick={closeForm} disabled={saving}
+                  className="flex-1 border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50">
+                  Cancelar
+                </button>
                 <button type="submit" disabled={saving}
                   className="flex-1 bg-primary-600 text-white py-3 rounded-xl text-sm font-medium hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
                   {saving ? <><RiLoader4Line className="animate-spin" /> Guardando...</> : (editing ? "Actualizar" : "Crear producto")}
