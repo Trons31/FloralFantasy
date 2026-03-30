@@ -41,22 +41,6 @@ export default function OperacionesPage() {
           <p className="text-sm text-gray-400 mt-1">Acceso de operaciones</p>
         </div>
 
-        {/* Role hints */}
-        <div className="flex gap-2 mb-6">
-          <div className="flex-1 flex items-center gap-1.5 bg-amber-50 border border-amber-100 rounded-xl p-2.5">
-            <RiFlowerLine className="text-amber-500 flex-shrink-0" size={16}/>
-            <span className="text-xs text-amber-700 font-medium">Preparador</span>
-          </div>
-          <div className="flex-1 flex items-center gap-1.5 bg-blue-50 border border-blue-100 rounded-xl p-2.5">
-            <RiTruckLine className="text-blue-500 flex-shrink-0" size={16}/>
-            <span className="text-xs text-blue-700 font-medium">Repartidor</span>
-          </div>
-          <div className="flex-1 flex items-center gap-1.5 bg-green-50 border border-green-100 rounded-xl p-2.5">
-            <RiRunLine className="text-green-500 flex-shrink-0" size={16}/>
-            <span className="text-xs text-green-700 font-medium">Corredor</span>
-          </div>
-        </div>
-
         {/* PIN dots */}
         <div className="flex justify-center gap-4 mb-6">
           {[0,1,2,3].map(i => (
