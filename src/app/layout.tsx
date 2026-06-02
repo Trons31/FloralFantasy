@@ -9,7 +9,6 @@ export const viewport = {
   maximumScale: 1,
   userScalable: false,
 };
-  
 
 export const metadata: Metadata = {
   title: "Fantasía Floral | Flores con amor",
@@ -19,6 +18,13 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
+      <head>
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <link rel="apple-touch-icon" href="/flowers/logo.png" />
+        <meta name="theme-color" content="#e8185a" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+      </head>
       <body className={fontPoppins.className}>
         {children}
         <Toaster richColors position="top-right" />

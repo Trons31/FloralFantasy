@@ -31,7 +31,7 @@ export default function FloresClient({ products, categories, flowerTypes }: {
       id: nanoid(), productId: p.id, name: p.name, price: p.price,
       image: p.images.find((i: any) => i.isMain)?.url || p.images[0]?.url || "",
       quantity: 1, preparationTimeValue: p.preparationTimeValue,
-      preparationTimeUnit: p.preparationTimeUnit, addons: [],
+      preparationTimeUnit: p.preparationTimeUnit, deliveryLeadDays: p.deliveryLeadDays || 0, addons: [],
     });
     toast.success(`${p.name} agregado al carrito`);
     toggleCart();

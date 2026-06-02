@@ -51,7 +51,9 @@ export default async function TodosPedidosPage({
     prisma.order.count({ where }),
     prisma.order.findMany({
       where,
-      include: { items: { include: { product: { select: { name: true } } } } },
+      include: {
+        items: { include: { product: { select: { name: true } } } },
+      },
       orderBy:  { createdAt: "desc" },
       skip:     (page - 1) * perPage,
       take:     perPage,
@@ -69,12 +71,24 @@ export default async function TodosPedidosPage({
     }),
   ]);
 
+  const paymentMethodIds = Array.from(
+    new Set(orders.map(order => order.paymentMethodId).filter(Boolean))
+  ) as string[];
+  const paymentMethods = paymentMethodIds.length
+    ? await prisma.paymentMethod.findMany({
+        where: { id: { in: paymentMethodIds } },
+        select: { id: true, title: true },
+      }).catch(() => [])
+    : [];
+  const paymentMethodMap = new Map(paymentMethods.map(method => [method.id, method.title]));
+
   return (
     <PedidosListClient
       orders={orders.map(o => ({
         ...o,
         createdAt: o.createdAt.toISOString(),
         updatedAt: o.updatedAt.toISOString(),
+        paymentMethodTitle: o.paymentMethodId ? paymentMethodMap.get(o.paymentMethodId) || null : null,
       }))}
       summary={{ total: summary._sum.total || 0, count: total }}
       statusBreakdown={statusBreakdown.map(s => ({ status: s.status, count: s._count.id }))}

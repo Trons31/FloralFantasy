@@ -5,7 +5,10 @@ import KanbanBoard from "@/components/admin/KanbanBoard";
 export default async function PedidosPage() {
   const orders = await prisma.order
     .findMany({
-      where: { status: { notIn: ["DELIVERED", "CANCELLED"] } },
+      where: {
+        status: { in: ["PENDING_PAYMENT_CONFIRMATION", "PAYMENT_INVALID", "PAID", "PROCESSING", "READY", "OUT_FOR_DELIVERY"] },
+        paymentProofUrl: { not: null },
+      },
       include: {
         items: {
           include: {

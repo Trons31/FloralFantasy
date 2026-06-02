@@ -1,11 +1,13 @@
 "use client";
-import { useState, useEffect } from "react";
-import { 
-  RiWhatsappLine, 
-  RiCustomerService2Line, 
-  RiTruckLine, 
-  RiScissorsCutLine 
+
+import { useEffect, useState } from "react";
+import {
+  RiWhatsappLine,
+  RiCustomerService2Line,
+  RiTruckLine,
+  RiScissorsCutLine,
 } from "react-icons/ri";
+import { useCartStore } from "@/store/cartStore";
 
 const messages = [
   { text: "¿Te ayudamos?", icon: RiCustomerService2Line },
@@ -16,6 +18,7 @@ const messages = [
 export default function WhatsAppButton() {
   const [currentMsg, setCurrentMsg] = useState(0);
   const [visible, setVisible] = useState(true);
+  const isCartOpen = useCartStore((state) => state.isOpen);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -29,26 +32,23 @@ export default function WhatsAppButton() {
     return () => clearInterval(interval);
   }, []);
 
+  if (isCartOpen) return null;
+
   const CurrentIcon = messages[currentMsg].icon;
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-2">
-
-      {/* Mensaje flotante */}
+    <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-2">
       {visible && (
         <div className="fade-in bg-white text-gray-800 text-[12px] px-3 py-2 rounded-xl shadow-md max-w-[180px] border flex items-center gap-2">
           <CurrentIcon size={14} className="text-[#25D366] flex-shrink-0" />
-          
+
           <div>
             <p className="leading-tight">{messages[currentMsg].text}</p>
-            <span className="block text-[10px] text-gray-400 text-right">
-              Fantasía Floral
-            </span>
+            <span className="block text-[10px] text-gray-400 text-right">Fantasía Floral</span>
           </div>
         </div>
       )}
 
-      {/* Botón WhatsApp */}
       <a
         href="https://wa.me/573024128595?text=Hola!%20Quiero%20hacer%20un%20pedido"
         target="_blank"

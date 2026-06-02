@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   RiCloseLine, RiShoppingBagLine, RiAddLine, RiSubtractLine,
@@ -6,15 +7,25 @@ import {
 } from "react-icons/ri";
 import Link from "next/link";
 import { useCartStore } from "@/store/cartStore";
-import { formatPrice } from "@/lib/utils";
-
-const DELIVERY_FEE = 8000;
+import { formatPrice, formatDeliveryLeadDays } from "@/lib/utils";
+import { DEFAULT_DELIVERY_FEE } from "@/lib/site-settings";
 
 export default function CartDrawer() {
-  const { items, isOpen, toggleCart, removeItem, updateQuantity, getTotalPrice, getEstimatedTime } = useCartStore();
+  const { items, isOpen, toggleCart, removeItem, updateQuantity, getTotalPrice, getEstimatedTime, getDeliveryLeadDays } = useCartStore();
+  const [deliveryFee, setDeliveryFee] = useState(DEFAULT_DELIVERY_FEE);
   const subtotal = getTotalPrice();
-  const total    = subtotal + DELIVERY_FEE;
+  const total    = subtotal + deliveryFee;
   const est      = getEstimatedTime();
+  const delivery = getDeliveryLeadDays();
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then(r => r.json())
+      .then(data => {
+        if (typeof data?.deliveryFee === "number") setDeliveryFee(data.deliveryFee);
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <>
@@ -66,6 +77,12 @@ export default function CartDrawer() {
                         {item.preparationTimeValue} {item.preparationTimeUnit === "MINUTES" ? "min" : item.preparationTimeUnit === "HOURS" ? "h" : "d"} prep.
                       </p>
                     )}
+                    {item.deliveryLeadDays > 0 && (
+                      <p className="text-xs text-emerald-600 flex items-center gap-1 mb-1">
+                        <RiTimeLine size={10}/>
+                        {formatDeliveryLeadDays(item.deliveryLeadDays)}
+                      </p>
+                    )}
                     {item.addons.length > 0 && (
                       <p className="text-xs text-gray-400 mb-1">+ {item.addons.map((a: any) => a.name).join(", ")}</p>
                     )}
@@ -98,9 +115,15 @@ export default function CartDrawer() {
                     <span>Entrega estimada: <strong>{est.label}</strong></span>
                   </div>
                 )}
+                {delivery.days > 0 && (
+                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-sm text-emerald-700">
+                    <RiTimeLine size={16}/>
+                    <span>{delivery.label} · <strong>{delivery.dateLabel}</strong></span>
+                  </div>
+                )}
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{formatPrice(subtotal)}</span></div>
-                  <div className="flex justify-between text-gray-600"><span>Domicilio</span><span>{formatPrice(DELIVERY_FEE)}</span></div>
+                  <div className="flex justify-between text-gray-600"><span>Domicilio</span><span>{formatPrice(deliveryFee)}</span></div>
                   <div className="flex justify-between font-bold text-base pt-2 border-t">
                     <span>Total</span><span className="text-primary-600">{formatPrice(total)}</span>
                   </div>

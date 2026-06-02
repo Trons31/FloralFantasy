@@ -10,6 +10,7 @@ import {
   RiWalletLine,
   RiLayoutGridLine,
   RiListCheck,
+  RiSettings4Line,
 } from "react-icons/ri";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -30,6 +31,7 @@ export default function AdminSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
+  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes((session?.user as any)?.role || "");
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -75,6 +77,23 @@ export default function AdminSidebar() {
           );
         })}
       </nav>
+
+      {isAdmin && (
+        <div className="px-3 pb-1">
+          <Link
+            href="/dashboard/ajustes"
+            onClick={() => setOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+              pathname.startsWith("/dashboard/ajustes")
+                ? "bg-primary-600 text-white shadow-sm"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            }`}
+          >
+            <RiSettings4Line size={16} className="flex-shrink-0" />
+            Ajustes
+          </Link>
+        </div>
+      )}
 
       {/* Logout */}
       <div className="p-3 border-t border-gray-100">

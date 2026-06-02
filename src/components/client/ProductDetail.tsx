@@ -41,6 +41,7 @@ export default function ProductDetail({ product, addons }: { product: any; addon
       image: mainImg, quantity: qty,
       preparationTimeValue: product.preparationTimeValue,
       preparationTimeUnit:  product.preparationTimeUnit,
+      deliveryLeadDays: product.deliveryLeadDays || 0,
       addons: selectedAddons.map(a => ({ id: a.id, name: a.name, price: a.price, type: a.type })),
     });
     toast.success(`${product.name} agregado al carrito`);
@@ -102,6 +103,12 @@ export default function ProductDetail({ product, addons }: { product: any; addon
                   <span className="flex items-center gap-1 text-xs bg-amber-50 text-amber-700 px-2.5 py-1.5 rounded-full border border-amber-100">
                     <RiTimeLine size={11}/>
                     {formatPreparationTime(product.preparationTimeValue, product.preparationTimeUnit)}
+                  </span>
+                )}
+                {product.deliveryLeadDays > 0 && (
+                  <span className="flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-full border border-emerald-100">
+                    <RiTimeLine size={11}/>
+                    Entrega en {product.deliveryLeadDays} {product.deliveryLeadDays === 1 ? "día" : "días"}
                   </span>
                 )}
               </div>

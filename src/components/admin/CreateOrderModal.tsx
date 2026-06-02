@@ -1,128 +1,254 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  RiCloseLine,
-  RiUser3Line,
-  RiPhoneLine,
-  RiMailLine,
-  RiMapPinLine,
-  RiSearchLine,
-  RiAddLine,
-  RiSubtractLine,
-  RiShoppingBagLine,
-  RiWhatsappLine,
-  RiTimeLine,
-  RiCheckboxCircleLine,
-  RiLoaderLine,
-} from "react-icons/ri";
+import { useEffect, useMemo, useState } from "react";
+import { RiCloseLine, RiSearchLine, RiAddLine, RiSubtractLine, RiShoppingBagLine, RiWhatsappLine, RiLoaderLine, RiCheckLine, RiLinkM, RiFileCopyLine } from "react-icons/ri";
+import ResponsiveModal from "@/components/ui/ResponsiveModal";
+import { DEFAULT_DELIVERY_FEE } from "@/lib/site-settings";
+import { toast } from "sonner";
+import { formatPrice } from "@/lib/utils";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface ProductImage { url: string; isMain: boolean }
 interface Addon { id: string; name: string; price: number; type: string; inStock: boolean }
+interface Flower { id: string; name: string; type: string; description?: string | null; imageUrl?: string | null }
 interface Product {
   id: string;
   name: string;
   price: number;
   description: string;
   images: ProductImage[];
+  flowers?: { flower: Flower; quantity: number }[];
   occasion?: string;
+  preparationTimeValue?: number;
+  preparationTimeUnit?: string;
 }
+
 interface CartItem {
   product: Product;
   quantity: number;
   price: number;
   addons: Addon[];
+  customization: {
+    bouquetSize: "STANDARD" | "ENLARGED" | "REDUCED";
+    baseFlowers: { id: string; name: string; baseQuantity: number; quantity: number }[];
+    extraFlowers: { id: string; name: string; quantity: number }[];
+  };
 }
+
 interface Props {
   open: boolean;
   onClose: () => void;
-  onCreated?: (order: any) => void; // recibe el pedido completo para inserción optimista
+  onCreated?: (order: any) => void;
 }
 
-const ESTIMATED_OPTIONS = ["1 dia", "2 dias", "3 dias", "Hoy mismo", "2 horas", "4 horas"];
-const DELIVERY_FEE_DEFAULT = 8000;
+const ESTIMATED_OPTIONS = ["Inmediato", "Hoy mismo", "2 horas", "4 horas", "1 día", "2 días", "3 días"];
+const BOUQUET_SIZE_LABELS = {
+  STANDARD: "Normal",
+  ENLARGED: "Agrandado",
+  REDUCED: "Reducido",
+} as const;
 
-// ─── Component ────────────────────────────────────────────────────────────────
+function buildBaseFlowers(product: Product) {
+  return (product.flowers || []).map(({ flower, quantity }) => ({
+    id: flower.id,
+    name: flower.name,
+    baseQuantity: quantity || 1,
+    quantity: quantity || 1,
+  }));
+}
+
+function formatPrepTime(value?: number, unit?: string) {
+  if (!value || !unit) return "Inmediato";
+  const map: Record<string, string> = { MINUTES: "min", HOURS: "h", DAYS: "d" };
+  return `${value} ${map[unit] || unit.toLowerCase()}`;
+}
+
 export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
-  const [step, setStep] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
-
-  // Customer data
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [address, setAddress] = useState("");
-  const [addressRef, setAddressRef] = useState("");
-  const [deliveryFee, setDeliveryFee] = useState(DELIVERY_FEE_DEFAULT);
-  const [estimatedTime, setEstimatedTime] = useState("1 dia");
-
-  // Products / cart
   const [products, setProducts] = useState<Product[]>([]);
   const [addons, setAddons] = useState<Addon[]>([]);
+  const [flowers, setFlowers] = useState<Flower[]>([]);
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [deliveryFee, setDeliveryFee] = useState(DEFAULT_DELIVERY_FEE);
+  const [estimatedTime, setEstimatedTime] = useState("Inmediato");
+  const [adminNote, setAdminNote] = useState("");
+  const [manualAdjustment, setManualAdjustment] = useState("");
+  const [generatedLink, setGeneratedLink] = useState("");
+  const [generatedToken, setGeneratedToken] = useState("");
+  const [clipboardState, setClipboardState] = useState(false);
 
-  // Reset on close
   useEffect(() => {
     if (!open) {
-      setTimeout(() => {
-        setStep(0); setName(""); setPhone(""); setEmail("");
-        setAddress(""); setAddressRef(""); setDeliveryFee(DELIVERY_FEE_DEFAULT);
-        setEstimatedTime("1 dia"); setCart([]); setSearch("");
-        setSuccess(false); setError("");
-      }, 300);
+      const timer = setTimeout(() => {
+        setSuccess(false);
+        setError("");
+        setSearch("");
+        setCart([]);
+        setEstimatedTime("Inmediato");
+        setAdminNote("");
+        setManualAdjustment("");
+        setGeneratedLink("");
+        setGeneratedToken("");
+        setClipboardState(false);
+      }, 250);
+      return () => clearTimeout(timer);
     }
   }, [open]);
 
-  // Load products & addons when reaching step 1
   useEffect(() => {
-    if (open && step === 1 && products.length === 0) {
-      setLoadingProducts(true);
-      Promise.all([
-        fetch("/api/products").then(r => r.json()),
-        fetch("/api/addons").then(r => r.json()),
-      ])
-        .then(([prods, ads]) => {
-          setProducts(Array.isArray(prods) ? prods : (prods.products ?? []));
-          setAddons(Array.isArray(ads) ? ads : (ads.addons ?? []));
-        })
-        .catch(() => {})
-        .finally(() => setLoadingProducts(false));
-    }
-  }, [open, step, products.length]);
+    if (!open) return;
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (typeof data?.deliveryFee === "number") setDeliveryFee(data.deliveryFee);
+      })
+      .catch(() => {});
+  }, [open]);
 
-  const filtered = products.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    (p.occasion ?? "").toLowerCase().includes(search.toLowerCase())
+  useEffect(() => {
+    if (!open) return;
+    setLoadingProducts(true);
+    Promise.all([
+      fetch("/api/products").then((r) => r.json()),
+      fetch("/api/addons").then((r) => r.json()),
+      fetch("/api/flowers").then((r) => r.json()),
+    ])
+      .then(([prods, ads, fls]) => {
+        setProducts(Array.isArray(prods) ? prods : prods.products ?? []);
+        setAddons(Array.isArray(ads) ? ads : ads.addons ?? []);
+        setFlowers(Array.isArray(fls) ? fls : []);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingProducts(false));
+  }, [open]);
+
+  const filtered = useMemo(
+    () =>
+      products.filter(
+        (p) =>
+          p.name.toLowerCase().includes(search.toLowerCase()) ||
+          (p.occasion ?? "").toLowerCase().includes(search.toLowerCase())
+      ),
+    [products, search]
   );
 
   const addToCart = (product: Product) => {
-    setCart(prev => {
-      const existing = prev.find(c => c.product.id === product.id);
-      if (existing) return prev.map(c => c.product.id === product.id ? { ...c, quantity: c.quantity + 1 } : c);
-      return [...prev, { product, quantity: 1, price: product.price, addons: [] }];
+    setCart((prev) => {
+      const existing = prev.find((c) => c.product.id === product.id);
+      if (existing) {
+        return prev.map((c) => (c.product.id === product.id ? { ...c, quantity: c.quantity + 1 } : c));
+      }
+      return [...prev, {
+        product,
+        quantity: 1,
+        price: product.price,
+        addons: [],
+        customization: {
+          bouquetSize: "STANDARD",
+          baseFlowers: buildBaseFlowers(product),
+          extraFlowers: [],
+        },
+      }];
     });
+    if (product.preparationTimeValue && product.preparationTimeUnit) {
+      setEstimatedTime((current) => {
+        if (current !== "Inmediato") return current;
+        return formatPrepTime(product.preparationTimeValue, product.preparationTimeUnit);
+      });
+    }
   };
 
   const updateQty = (productId: string, delta: number) => {
-    setCart(prev =>
+    setCart((prev) =>
       prev
-        .map(c => c.product.id === productId ? { ...c, quantity: c.quantity + delta } : c)
-        .filter(c => c.quantity > 0)
+        .map((c) => (c.product.id === productId ? { ...c, quantity: c.quantity + delta } : c))
+        .filter((c) => c.quantity > 0)
     );
   };
 
   const toggleAddon = (productId: string, addon: Addon) => {
-    setCart(prev =>
-      prev.map(c => {
+    setCart((prev) =>
+      prev.map((c) => {
         if (c.product.id !== productId) return c;
-        const has = c.addons.find(a => a.id === addon.id);
-        return { ...c, addons: has ? c.addons.filter(a => a.id !== addon.id) : [...c.addons, addon] };
+        const has = c.addons.find((a) => a.id === addon.id);
+        return { ...c, addons: has ? c.addons.filter((a) => a.id !== addon.id) : [...c.addons, addon] };
+      })
+    );
+  };
+
+  const setBouquetSize = (productId: string, bouquetSize: "STANDARD" | "ENLARGED" | "REDUCED") => {
+    setCart((prev) =>
+      prev.map((c) => {
+        if (c.product.id !== productId) return c;
+        const nextBaseFlowers = c.customization.baseFlowers.map((flower) => {
+          if (bouquetSize === "STANDARD") {
+            return { ...flower, quantity: flower.baseQuantity };
+          }
+          if (bouquetSize === "REDUCED") {
+            return { ...flower, quantity: Math.min(flower.quantity, flower.baseQuantity) };
+          }
+          return flower;
+        });
+        return {
+          ...c,
+          customization: {
+            ...c.customization,
+            bouquetSize,
+            baseFlowers: nextBaseFlowers,
+            extraFlowers: bouquetSize === "ENLARGED" ? c.customization.extraFlowers : [],
+          },
+        };
+      })
+    );
+  };
+
+  const toggleExtraFlower = (productId: string, flower: Flower) => {
+    setCart((prev) =>
+      prev.map((c) => {
+        if (c.product.id !== productId) return c;
+        if (c.customization.bouquetSize !== "ENLARGED") return c;
+        const exists = c.customization.extraFlowers.find((f) => f.id === flower.id);
+        const nextExtraFlowers = exists
+          ? c.customization.extraFlowers.filter((f) => f.id !== flower.id)
+          : [...c.customization.extraFlowers, { id: flower.id, name: flower.name, quantity: 1 }];
+        return { ...c, customization: { ...c.customization, extraFlowers: nextExtraFlowers } };
+      })
+    );
+  };
+
+  const updateExtraFlowerQty = (productId: string, flowerId: string, delta: number) => {
+    setCart((prev) =>
+      prev.map((c) => {
+        if (c.product.id !== productId) return c;
+        if (c.customization.bouquetSize !== "ENLARGED") return c;
+        const nextExtraFlowers = c.customization.extraFlowers
+          .map((flower) =>
+            flower.id === flowerId ? { ...flower, quantity: flower.quantity + delta } : flower
+          )
+          .filter((flower) => flower.quantity > 0);
+        return { ...c, customization: { ...c.customization, extraFlowers: nextExtraFlowers } };
+      })
+    );
+  };
+
+  const updateBaseFlowerQty = (productId: string, flowerId: string, delta: number) => {
+    setCart((prev) =>
+      prev.map((c) => {
+        if (c.product.id !== productId) return c;
+        const nextBaseFlowers = c.customization.baseFlowers.map((flower) => {
+          if (flower.id !== flowerId) return flower;
+          const proposed = flower.quantity + delta;
+          const maxQuantity =
+            c.customization.bouquetSize === "ENLARGED"
+              ? Math.max(flower.baseQuantity, proposed)
+              : flower.baseQuantity;
+          const nextQuantity = Math.max(0, Math.min(maxQuantity, proposed));
+          return { ...flower, quantity: nextQuantity };
+        });
+        return { ...c, customization: { ...c.customization, baseFlowers: nextBaseFlowers } };
       })
     );
   };
@@ -131,462 +257,437 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
     (acc, c) => acc + c.price * c.quantity + c.addons.reduce((a, ad) => a + ad.price, 0) * c.quantity,
     0
   );
-  const total = subtotal + deliveryFee;
+  const manualAdjustmentValue = Number(manualAdjustment || 0);
+  const total = subtotal + deliveryFee + manualAdjustmentValue;
 
-  const fmt = (n: number) =>
-    new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
-
-  // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    setLoading(true);
+    if (cart.length === 0) {
+      toast.error("Agrega al menos un producto");
+      return;
+    }
+    setSubmitting(true);
     setError("");
     try {
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name,
-          phone,
-          email,
-          address,
-          addressRef,
+          name: "",
+          phone: "",
+          email: "",
+          address: "",
+          addressRef: "",
           total,
           deliveryFee,
+          adminNote,
+          manualAdjustment: manualAdjustmentValue,
           estimatedTime,
           source: "ADMIN",
-          items: cart.map(c => ({
+          items: cart.map((c) => ({
             productId: c.product.id,
             quantity: c.quantity,
             price: c.price,
             addons: c.addons,
+            customization: c.customization,
           })),
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Error al crear pedido");
+      if (!res.ok) throw new Error(data.error || "No fue posible generar el link");
+      setGeneratedLink(`${window.location.origin}${data.checkoutUrl || `/checkout?token=${data.trackingToken}`}`);
+      setGeneratedToken(data.trackingToken || "");
       setSuccess(true);
-      onCreated?.(data); // ← pasa el pedido completo (con items incluidos) para inserción optimista
+      onCreated?.(data);
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message || "No fue posible generar el link");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  // ── Validation ─────────────────────────────────────────────────────────────
-  const step0Valid = !!(name.trim() && phone.trim() && address.trim());
-  const step1Valid = cart.length > 0;
+  const handleCopy = async () => {
+    if (!generatedLink) return;
+    await navigator.clipboard.writeText(generatedLink);
+    setClipboardState(true);
+    setTimeout(() => setClipboardState(false), 1800);
+  };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const handleWhatsApp = () => {
+    if (!generatedLink) return;
+    const text = encodeURIComponent(`Hola, aquí tienes tu link de pago: ${generatedLink}`);
+    window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer");
+  };
+
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
-            onClick={onClose}
-          />
-
-          {/* Sheet */}
-          <motion.div
-            initial={{ y: "100%", opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: "100%", opacity: 0 }}
-            transition={{ type: "spring", damping: 28, stiffness: 280 }}
-            className="fixed inset-x-0 bottom-0 md:inset-0 md:m-auto md:max-w-2xl md:max-h-[90vh] md:rounded-2xl
-                       z-50 bg-white rounded-t-3xl flex flex-col overflow-hidden shadow-2xl"
-            style={{ maxHeight: "92dvh" }}
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
-              <div>
-                <div className="flex items-center gap-2">
-                  <RiWhatsappLine className="text-green-500" size={20} />
-                  <h2 className="text-lg font-bold text-gray-900">Nuevo pedido</h2>
-                </div>
-                <p className="text-xs text-gray-400 mt-0.5">Pedido recibido por WhatsApp u otro canal</p>
+    <ResponsiveModal
+      open={open}
+      onClose={onClose}
+      title={success ? "Link de pago generado" : "Nuevo pedido"}
+      description={success ? "Comparte este enlace con tu cliente por WhatsApp." : "Arma el pedido y genera el enlace de pago."}
+      panelClassName="md:max-w-4xl"
+    >
+      {success ? (
+        <div className="space-y-4">
+          <div className="rounded-3xl bg-green-50 border border-green-100 p-5">
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-green-100 text-green-600 flex items-center justify-center flex-shrink-0">
+                <RiCheckLine size={22} />
               </div>
-              <button
-                onClick={onClose}
-                className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
-              >
-                <RiCloseLine size={20} className="text-gray-600" />
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-green-800">Pedido armado correctamente</p>
+                <p className="text-sm text-green-700 mt-1">
+                  Ya puedes enviar el link al cliente. El checkout abrirá el pedido armado y luego podrá completar sus datos y subir el comprobante.
+                </p>
+                {generatedToken && <p className="text-xs font-mono text-green-600 mt-2">{generatedToken}</p>}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-gray-200 bg-white p-4">
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Link de pago</label>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input value={generatedLink} readOnly className="flex-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm bg-gray-50" />
+              <button onClick={handleCopy} className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-primary-600 text-white font-semibold">
+                {clipboardState ? <RiCheckLine size={16} /> : <RiFileCopyLine size={16} />}
+                {clipboardState ? "Copiado" : "Copiar"}
+              </button>
+              <button onClick={handleWhatsApp} className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-[#25D366] text-white font-semibold">
+                <RiWhatsappLine size={16} />
+                WhatsApp
               </button>
             </div>
+          </div>
 
-            {/* Progress */}
-            {!success && (
-              <div className="flex gap-1 px-5 pt-3 pb-2 flex-shrink-0">
-                {["Cliente", "Productos", "Resumen"].map((label, i) => (
-                  <div key={i} className="flex-1">
-                    <div className={`h-1 rounded-full transition-all duration-300 ${i <= step ? "bg-rose-500" : "bg-gray-200"}`} />
-                    <p className={`text-[10px] mt-1 font-medium ${i === step ? "text-rose-500" : i < step ? "text-gray-500" : "text-gray-300"}`}>
-                      {label}
-                    </p>
-                  </div>
-                ))}
+          <div className="flex justify-end gap-3">
+            <button onClick={onClose} className="px-4 py-3 rounded-2xl border border-gray-200 text-gray-700 font-semibold">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="grid lg:grid-cols-[1.1fr_.9fr] gap-6">
+          <div className="space-y-4">
+            <div className="rounded-3xl bg-gray-50 border border-gray-100 p-4">
+              <div className="relative">
+                <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar productos..."
+                  className="w-full pl-9 pr-4 py-3 bg-white border border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+                />
               </div>
-            )}
+            </div>
 
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto overscroll-contain">
-              <AnimatePresence mode="wait">
-
-                {/* SUCCESS */}
-                {success && (
-                  <motion.div key="success"
-                    initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                    className="flex flex-col items-center justify-center gap-4 py-16 px-6 text-center"
-                  >
-                    <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
-                      <RiCheckboxCircleLine size={44} className="text-green-500" />
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-900">¡Pedido registrado!</h3>
-                    <p className="text-gray-500 text-sm max-w-xs">
-                      El pedido de <strong>{name}</strong> fue ingresado al sistema y ya aparece en el tablero.
-                    </p>
-                    <button
-                      onClick={onClose}
-                      className="mt-2 px-8 py-3 bg-rose-500 text-white rounded-xl font-semibold text-sm hover:bg-rose-600 transition-colors"
-                    >
-                      Cerrar
-                    </button>
-                  </motion.div>
-                )}
-
-                {/* STEP 0 — Cliente */}
-                {!success && step === 0 && (
-                  <motion.div key="step0"
-                    initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-                    className="px-5 py-4 space-y-4"
-                  >
-                    <Field icon={<RiUser3Line />} label="Nombre completo *">
-                      <input
-                        value={name} onChange={e => setName(e.target.value)}
-                        placeholder="Ej: María García"
-                        className={inputCls}
-                      />
-                    </Field>
-
-                    <Field icon={<RiPhoneLine />} label="Teléfono / WhatsApp *">
-                      <input
-                        value={phone} onChange={e => setPhone(e.target.value)}
-                        placeholder="+57 300 000 0000" type="tel"
-                        className={inputCls}
-                      />
-                    </Field>
-
-                    <Field icon={<RiMailLine />} label="Correo electrónico">
-                      <input
-                        value={email} onChange={e => setEmail(e.target.value)}
-                        placeholder="cliente@email.com (opcional)" type="email"
-                        className={inputCls}
-                      />
-                    </Field>
-
-                    <Field icon={<RiMapPinLine />} label="Dirección de entrega *">
-                      <input
-                        value={address} onChange={e => setAddress(e.target.value)}
-                        placeholder="Calle 10 # 5-23, Neiva"
-                        className={inputCls}
-                      />
-                    </Field>
-
-                    <Field icon={<RiMapPinLine />} label="Referencia / indicaciones">
-                      <input
-                        value={addressRef} onChange={e => setAddressRef(e.target.value)}
-                        placeholder="Casa blanca, portón azul…"
-                        className={inputCls}
-                      />
-                    </Field>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field icon={<RiTimeLine />} label="Tiempo estimado">
-                        <select value={estimatedTime} onChange={e => setEstimatedTime(e.target.value)} className={inputCls}>
-                          {ESTIMATED_OPTIONS.map(o => <option key={o}>{o}</option>)}
-                        </select>
-                      </Field>
-                      <Field icon={<RiShoppingBagLine />} label="Domicilio (COP)">
-                        <input
-                          value={deliveryFee} onChange={e => setDeliveryFee(Number(e.target.value))}
-                          type="number" min={0} step={1000}
-                          className={inputCls}
-                        />
-                      </Field>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* STEP 1 — Productos */}
-                {!success && step === 1 && (
-                  <motion.div key="step1"
-                    initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-                    className="flex flex-col"
-                  >
-                    <div className="px-5 pt-4 pb-2 flex-shrink-0">
-                      <div className="relative">
-                        <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                        <input
-                          value={search} onChange={e => setSearch(e.target.value)}
-                          placeholder="Buscar productos…"
-                          className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm
-                                     focus:outline-none focus:ring-2 focus:ring-rose-400"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="px-5 pb-2 space-y-2">
-                      {loadingProducts ? (
-                        <div className="flex items-center justify-center py-12">
-                          <RiLoaderLine size={28} className="text-rose-400 animate-spin" />
+            <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
+              {loadingProducts ? (
+                <div className="flex items-center justify-center py-12">
+                  <RiLoaderLine className="animate-spin text-rose-500" size={26} />
+                </div>
+              ) : filtered.length === 0 ? (
+                <p className="text-center text-gray-400 text-sm py-10">Sin resultados</p>
+              ) : (
+                filtered.map((product) => {
+                  const cartItem = cart.find((c) => c.product.id === product.id);
+                  const img = product.images?.find((i) => i.isMain)?.url ?? product.images?.[0]?.url;
+                  return (
+                    <div key={product.id} className="rounded-2xl border border-gray-100 bg-white p-3 space-y-3">
+                      <div className="flex items-center gap-3">
+                        {img ? (
+                          <img src={img} alt={product.name} className="w-14 h-14 object-cover rounded-xl flex-shrink-0" />
+                        ) : (
+                          <div className="w-14 h-14 bg-rose-50 rounded-xl flex-shrink-0 flex items-center justify-center">
+                            <RiShoppingBagLine className="text-rose-300" size={22} />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900 text-sm leading-tight truncate">{product.name}</p>
+                          {product.occasion && <p className="text-[10px] text-rose-400 uppercase font-bold tracking-wide">{product.occasion}</p>}
+                          <p className="text-rose-600 font-bold text-sm mt-0.5">{formatPrice(product.price)}</p>
                         </div>
-                      ) : filtered.length === 0 ? (
-                        <p className="text-center text-gray-400 text-sm py-10">Sin resultados</p>
-                      ) : (
-                        filtered.map(product => {
-                          const cartItem = cart.find(c => c.product.id === product.id);
-                          const img = product.images?.find(i => i.isMain)?.url ?? product.images?.[0]?.url;
-                          return (
-                            <div key={product.id}
-                              className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-rose-200 transition-colors bg-white"
-                            >
-                              {img ? (
-                                <img src={img} alt={product.name} className="w-14 h-14 object-cover rounded-lg flex-shrink-0" />
-                              ) : (
-                                <div className="w-14 h-14 bg-rose-50 rounded-lg flex-shrink-0 flex items-center justify-center">
-                                  <RiShoppingBagLine className="text-rose-300" size={22} />
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-gray-900 text-sm leading-tight truncate">{product.name}</p>
-                                {product.occasion && (
-                                  <p className="text-[10px] text-rose-400 uppercase font-bold tracking-wide">{product.occasion}</p>
-                                )}
-                                <p className="text-rose-600 font-bold text-sm mt-0.5">{fmt(product.price)}</p>
-                              </div>
-                              {cartItem ? (
-                                <div className="flex items-center gap-1.5 flex-shrink-0">
-                                  <button onClick={() => updateQty(product.id, -1)}
-                                    className="w-7 h-7 rounded-full bg-rose-100 flex items-center justify-center hover:bg-rose-200 transition-colors">
-                                    <RiSubtractLine size={14} className="text-rose-600" />
-                                  </button>
-                                  <span className="w-5 text-center text-sm font-bold text-gray-900">{cartItem.quantity}</span>
-                                  <button onClick={() => updateQty(product.id, 1)}
-                                    className="w-7 h-7 rounded-full bg-rose-500 flex items-center justify-center hover:bg-rose-600 transition-colors">
-                                    <RiAddLine size={14} className="text-white" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <button onClick={() => addToCart(product)}
-                                  className="flex-shrink-0 w-8 h-8 rounded-full bg-rose-500 flex items-center justify-center hover:bg-rose-600 transition-colors shadow-sm shadow-rose-200">
-                                  <RiAddLine size={18} className="text-white" />
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
+                        {cartItem ? (
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <button onClick={() => updateQty(product.id, -1)} className="w-7 h-7 rounded-full bg-rose-100 flex items-center justify-center hover:bg-rose-200 transition-colors">
+                              <RiSubtractLine size={14} className="text-rose-600" />
+                            </button>
+                            <span className="w-5 text-center text-sm font-bold text-gray-900">{cartItem.quantity}</span>
+                            <button onClick={() => updateQty(product.id, 1)} className="w-7 h-7 rounded-full bg-rose-500 flex items-center justify-center hover:bg-rose-600 transition-colors">
+                              <RiAddLine size={14} className="text-white" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button onClick={() => addToCart(product)} className="flex-shrink-0 w-9 h-9 rounded-full bg-rose-500 flex items-center justify-center hover:bg-rose-600 transition-colors shadow-sm shadow-rose-200">
+                            <RiAddLine size={18} className="text-white" />
+                          </button>
+                        )}
+                      </div>
 
-                    {/* Complementos por producto en carrito */}
-                    {cart.length > 0 && addons.length > 0 && (
-                      <div className="px-5 pt-3 pb-2 border-t border-gray-100">
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Complementos por producto</p>
-                        <div className="space-y-3">
-                          {cart.map(c => (
-                            <div key={c.product.id}>
-                              <p className="text-xs font-semibold text-gray-700 mb-1.5">{c.product.name}</p>
+                      {cartItem && (
+                        <div className="rounded-2xl bg-rose-50/40 border border-rose-100 p-3 space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-bold text-rose-700 uppercase tracking-wide">Personalizar ramo</p>
+                            <span className="text-[11px] text-rose-500 font-semibold">
+                              {BOUQUET_SIZE_LABELS[cartItem.customization.bouquetSize]}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2">
+                            {(["REDUCED", "STANDARD", "ENLARGED"] as const).map((size) => (
+                              <button
+                                key={size}
+                                type="button"
+                                onClick={() => setBouquetSize(product.id, size)}
+                                className={`rounded-xl px-3 py-2 text-[11px] font-semibold border transition-all ${
+                                  cartItem.customization.bouquetSize === size
+                                    ? "bg-rose-500 text-white border-rose-500"
+                                    : "bg-white text-gray-600 border-gray-200 hover:border-rose-300"
+                                }`}
+                              >
+                                {BOUQUET_SIZE_LABELS[size]}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className="space-y-2">
+                            <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                              Flores del ramo
+                            </p>
+                            {cartItem.customization.baseFlowers.length > 0 ? (
+                              cartItem.customization.baseFlowers.map((flower) => {
+                                const reducedMode = cartItem.customization.bouquetSize === "REDUCED";
+                                const enlargedMode = cartItem.customization.bouquetSize === "ENLARGED";
+                                return (
+                                  <div key={flower.id} className="flex items-center justify-between gap-2 bg-white rounded-xl border border-gray-200 px-3 py-2">
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-semibold text-gray-900 truncate">{flower.name}</p>
+                                      <p className="text-[11px] text-gray-400">
+                                        Base: {flower.baseQuantity}
+                                        {reducedMode ? " · solo reducción" : enlargedMode ? " · puede aumentar" : ""}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => updateBaseFlowerQty(product.id, flower.id, -1)}
+                                        disabled={cartItem.customization.bouquetSize === "STANDARD" || flower.quantity <= 0}
+                                        className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors disabled:opacity-40"
+                                      >
+                                        <RiSubtractLine size={12} className="text-gray-600" />
+                                      </button>
+                                      <span className="w-5 text-center text-sm font-bold text-gray-900">{flower.quantity}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => updateBaseFlowerQty(product.id, flower.id, 1)}
+                                        disabled={cartItem.customization.bouquetSize !== "ENLARGED"}
+                                        className="w-7 h-7 rounded-full bg-rose-500 flex items-center justify-center hover:bg-rose-600 transition-colors disabled:opacity-40"
+                                      >
+                                        <RiAddLine size={12} className="text-white" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <p className="text-[11px] text-gray-400">Este ramo no tiene flores asociadas registradas.</p>
+                            )}
+                          </div>
+
+                          {cartItem.customization.bouquetSize === "ENLARGED" && flowers.length > 0 && (
+                            <div>
+                              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-2">
+                                Agregar flores registradas
+                              </p>
                               <div className="flex flex-wrap gap-1.5">
-                                {addons.filter(a => a.inStock).map(addon => {
-                                  const selected = c.addons.find(a => a.id === addon.id);
+                                {flowers.map((flower) => {
+                                  const selected = cartItem.customization.extraFlowers.find((f) => f.id === flower.id);
                                   return (
-                                    <button key={addon.id} onClick={() => toggleAddon(c.product.id, addon)}
+                                    <button
+                                      key={flower.id}
+                                      type="button"
+                                      onClick={() => toggleExtraFlower(product.id, flower)}
                                       className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
                                         selected
                                           ? "bg-rose-500 border-rose-500 text-white"
                                           : "bg-white border-gray-200 text-gray-600 hover:border-rose-300"
-                                      }`}>
-                                      {addon.name} +{fmt(addon.price)}
+                                      }`}
+                                    >
+                                      {flower.name}
                                     </button>
                                   );
                                 })}
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-                )}
+                          )}
 
-                {/* STEP 2 — Resumen */}
-                {!success && step === 2 && (
-                  <motion.div key="step2"
-                    initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-                    className="px-5 py-4 space-y-4"
-                  >
-                    <div className="bg-gray-50 rounded-xl p-4 space-y-1.5">
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Cliente</p>
-                      <SummaryRow icon={<RiUser3Line size={14} />} label={name} />
-                      <SummaryRow icon={<RiPhoneLine size={14} />} label={phone} />
-                      {email && <SummaryRow icon={<RiMailLine size={14} />} label={email} />}
-                      <SummaryRow icon={<RiMapPinLine size={14} />} label={address} />
-                      {addressRef && <SummaryRow icon={<RiMapPinLine size={14} />} label={addressRef} sub />}
-                      <SummaryRow icon={<RiTimeLine size={14} />} label={`Entrega: ${estimatedTime}`} />
-                    </div>
-
-                    <div>
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Productos</p>
-                      <div className="space-y-2">
-                        {cart.map(c => (
-                          <div key={c.product.id}
-                            className="flex items-start justify-between gap-3 py-2 border-b border-gray-100 last:border-0"
-                          >
-                            <div className="flex-1">
-                              <p className="text-sm font-semibold text-gray-900">
-                                {c.product.name}{" "}
-                                <span className="text-gray-400 font-normal">×{c.quantity}</span>
-                              </p>
-                              {c.addons.length > 0 && (
-                                <p className="text-xs text-gray-400 mt-0.5">
-                                  + {c.addons.map(a => a.name).join(", ")}
-                                </p>
-                              )}
+                          {cartItem.customization.bouquetSize === "ENLARGED" && cartItem.customization.extraFlowers.length > 0 && (
+                            <div className="space-y-2">
+                              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Flores agregadas</p>
+                              {cartItem.customization.extraFlowers.map((flower) => (
+                                <div key={flower.id} className="flex items-center justify-between gap-2 bg-white rounded-xl border border-gray-200 px-3 py-2">
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-semibold text-gray-900 truncate">{flower.name}</p>
+                                    <p className="text-[11px] text-gray-400">Registro del sistema</p>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => updateExtraFlowerQty(product.id, flower.id, -1)}
+                                      className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
+                                    >
+                                      <RiSubtractLine size={12} className="text-gray-600" />
+                                    </button>
+                                    <span className="w-5 text-center text-sm font-bold text-gray-900">{flower.quantity}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => updateExtraFlowerQty(product.id, flower.id, 1)}
+                                      className="w-7 h-7 rounded-full bg-rose-500 flex items-center justify-center hover:bg-rose-600 transition-colors"
+                                    >
+                                      <RiAddLine size={12} className="text-white" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                            <p className="text-sm font-bold text-gray-900 flex-shrink-0">
-                              {fmt(
-                                c.price * c.quantity +
-                                c.addons.reduce((acc, a) => acc + a.price, 0) * c.quantity
-                              )}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
+                          )}
+
+                          <p className="text-[11px] leading-relaxed text-gray-500">
+                            En normal no se cambia la base del ramo. En reducido solo bajas las flores ya asociadas. En agrandado puedes aumentar esas flores y agregar otras registradas del sistema.
+                          </p>
+                        </div>
+                      )}
                     </div>
-
-                    <div className="bg-rose-50 rounded-xl p-4 space-y-2">
-                      <div className="flex justify-between text-sm text-gray-600">
-                        <span>Subtotal</span>
-                        <span className="font-semibold">{fmt(subtotal)}</span>
-                      </div>
-                      <div className="flex justify-between text-sm text-gray-600">
-                        <span>Domicilio</span>
-                        <span className="font-semibold">{fmt(deliveryFee)}</span>
-                      </div>
-                      <div className="flex justify-between text-base font-bold text-gray-900 pt-1 border-t border-rose-200">
-                        <span>Total</span>
-                        <span className="text-rose-600">{fmt(total)}</span>
-                      </div>
-                    </div>
-
-                    {error && (
-                      <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-600">
-                        {error}
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-
-              </AnimatePresence>
+                  );
+                })
+              )}
             </div>
 
-            {/* Footer */}
-            {!success && (
-              <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 bg-white">
-                <div className="flex gap-3">
-                  {step > 0 && (
-                    <button
-                      onClick={() => setStep(s => s - 1)}
-                      className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
-                    >
-                      Atrás
-                    </button>
-                  )}
-                  {step < 2 ? (
-                    <button
-                      onClick={() => setStep(s => s + 1)}
-                      disabled={step === 0 ? !step0Valid : !step1Valid}
-                      className="flex-1 py-3 rounded-xl bg-rose-500 text-white text-sm font-bold hover:bg-rose-600 transition-colors
-                                 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shadow-rose-200"
-                    >
-                      {step === 0 ? "Agregar productos →" : "Revisar pedido →"}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleSubmit}
-                      disabled={loading}
-                      className="flex-1 py-3 rounded-xl bg-rose-500 text-white text-sm font-bold hover:bg-rose-600 transition-colors
-                                 disabled:opacity-60 flex items-center justify-center gap-2 shadow-sm shadow-rose-200"
-                    >
-                      {loading
-                        ? <><RiLoaderLine className="animate-spin" size={18} /> Guardando…</>
-                        : "✓ Confirmar pedido"
-                      }
-                    </button>
-                  )}
-                </div>
-
-                {step === 1 && cart.length > 0 && (
-                  <div className="mt-3 flex items-center justify-between bg-rose-50 rounded-xl px-4 py-2.5">
-                    <div className="flex items-center gap-2 text-sm text-rose-700">
-                      <RiShoppingBagLine size={16} />
-                      <span className="font-semibold">
-                        {cart.reduce((a, c) => a + c.quantity, 0)} producto(s)
-                      </span>
+            {cart.length > 0 && addons.length > 0 && (
+              <div className="rounded-3xl border border-gray-100 bg-white p-4">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Complementos</p>
+                <div className="space-y-3">
+                  {cart.map((c) => (
+                    <div key={c.product.id}>
+                      <p className="text-xs font-semibold text-gray-700 mb-1.5">{c.product.name}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {addons.filter((a) => a.inStock).map((addon) => {
+                          const selected = c.addons.find((a) => a.id === addon.id);
+                          return (
+                            <button
+                              key={addon.id}
+                              onClick={() => toggleAddon(c.product.id, addon)}
+                              className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
+                                selected
+                                  ? "bg-rose-500 border-rose-500 text-white"
+                                  : "bg-white border-gray-200 text-gray-600 hover:border-rose-300"
+                              }`}
+                            >
+                              {addon.name} +{formatPrice(addon.price)}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <span className="text-sm font-bold text-rose-700">{fmt(subtotal)}</span>
-                  </div>
-                )}
+                  ))}
+                </div>
               </div>
             )}
-          </motion.div>
-        </>
+          </div>
+
+          <div className="space-y-4">
+            <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm">
+              <h3 className="font-semibold text-lg mb-4">Observaciones del pedido</h3>
+              <textarea
+                value={adminNote}
+                onChange={(e) => setAdminNote(e.target.value)}
+                placeholder="Color de rosas, cambios, sustituciones o instrucciones especiales..."
+                className="w-full min-h-[120px] resize-y border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+              />
+              <p className="text-xs text-gray-400 mt-2">
+                Úsalo para dejar indicaciones como color de rosas, reemplazos o cualquier ajuste del pedido.
+              </p>
+            </div>
+
+            <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm">
+              <h3 className="font-semibold text-lg mb-4">Ajuste manual</h3>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">
+                Ajuste al total
+              </label>
+              <input
+                type="number"
+                value={manualAdjustment}
+                onChange={(e) => setManualAdjustment(e.target.value)}
+                placeholder="0"
+                className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+              />
+              <p className="text-xs text-gray-400 mt-2">
+                Usa un valor positivo para aumentar el total o negativo para reducirlo.
+              </p>
+            </div>
+
+            <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm">
+              <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                <RiShoppingBagLine className="text-primary-500" /> Resumen
+              </h3>
+              <div className="space-y-3 mb-5">
+                {cart.map((item) => (
+                  <div key={item.product.id} className="flex gap-3">
+                    <img src={item.product.images?.[0]?.url || ""} alt={item.product.name} className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">{item.product.name}</p>
+                      <p className="text-xs text-gray-400">x{item.quantity}</p>
+                      <p className="text-[11px] text-rose-500 font-semibold mt-0.5">
+                        {BOUQUET_SIZE_LABELS[item.customization.bouquetSize]}
+                        {item.customization.extraFlowers.length > 0
+                          ? ` · ${item.customization.extraFlowers.length} flor${item.customization.extraFlowers.length > 1 ? "es" : ""} extra`
+                          : ""}
+                      </p>
+                    </div>
+                    <p className="font-medium text-sm">
+                      {formatPrice(item.price * item.quantity + item.addons.reduce((s, a) => s + a.price, 0) * item.quantity)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t pt-4 space-y-2 text-sm">
+                <div className="flex justify-between text-gray-500">
+                  <span className="flex items-center gap-1.5"><RiShoppingBagLine size={14} /> Subtotal</span>
+                  <span>{formatPrice(subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-gray-500">
+                  <span className="flex items-center gap-1.5"><RiLinkM size={14} /> Domicilio</span>
+                  <span>{formatPrice(deliveryFee)}</span>
+                </div>
+                {manualAdjustmentValue !== 0 && (
+                  <div className="flex justify-between text-gray-500">
+                    <span className="flex items-center gap-1.5">Ajuste manual</span>
+                    <span className={manualAdjustmentValue > 0 ? "text-green-600" : "text-red-600"}>
+                      {manualAdjustmentValue > 0 ? "+" : ""}
+                      {formatPrice(manualAdjustmentValue)}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-lg pt-2 border-t">
+                  <span>Total</span><span className="text-primary-600">{formatPrice(total)}</span>
+                </div>
+              </div>
+              <div className="mt-4 flex items-center gap-2 text-xs text-gray-400">
+                <RiCheckLine size={14} /> El cliente completará sus datos y subirá el comprobante en checkout
+              </div>
+              {error && <div className="mt-3 rounded-2xl bg-red-50 border border-red-200 p-3 text-sm text-red-600">{error}</div>}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={submitting || cart.length === 0}
+              className="w-full flex items-center justify-center gap-2 bg-primary-600 text-white py-4 rounded-full font-semibold hover:bg-primary-700 disabled:opacity-50 transition-all"
+            >
+              {submitting ? "Generando link..." : "Generar link de pago"}
+              {!submitting && <RiLinkM size={18} />}
+            </button>
+          </div>
+        </div>
       )}
-    </AnimatePresence>
-  );
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-const inputCls =
-  "w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm " +
-  "focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent transition-all";
-
-function Field({
-  icon,
-  label,
-  children,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 mb-1.5">
-        <span className="text-rose-400">{icon}</span>
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-function SummaryRow({
-  icon,
-  label,
-  sub,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  sub?: boolean;
-}) {
-  return (
-    <div className={`flex items-start gap-2 ${sub ? "opacity-60" : ""}`}>
-      <span className="text-gray-400 mt-0.5 flex-shrink-0">{icon}</span>
-      <span className={`text-sm ${sub ? "text-gray-400" : "text-gray-700"}`}>{label}</span>
-    </div>
+    </ResponsiveModal>
   );
 }

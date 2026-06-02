@@ -14,6 +14,11 @@ model User {
   name      String
   role      Role     @default(ADMIN)
   pin       String?
+  notifications Notification[]
+  notificationOutboxes NotificationOutbox[]
+  notificationState UserNotificationState?
+  pushTokens  PushToken[]
+  fcmTokens   FCMToken[]
   createdAt DateTime @default(now())
 }
 
@@ -60,6 +65,7 @@ model Product {
   flowers              ProductFlower[]
   preparationTimeValue Int             @default(0)
   preparationTimeUnit  TimeUnit        @default(MINUTES)
+  deliveryLeadDays     Int             @default(0)
   requiresSpecialOrder Boolean         @default(false)
   inStock              Boolean         @default(true)
   featured             Boolean         @default(false)
@@ -124,23 +130,95 @@ model Order {
   deliveryFee     Float                @default(0)
   source          OrderSource          @default(CLIENT)
   estimatedTime   String               @default("1 dia")
-  wompiTxId       String?
+  paymentMethodId String?
+  paymentMethod   PaymentMethod?       @relation(fields: [paymentMethodId], references: [id])
+  paymentProofUrl String?
+  paymentProofPublicId String?
   deliveryPhotoUrl String?
   deliveryPhotoPublicId String?
+  adminNote       String?
+  manualAdjustment Float               @default(0)
   items           OrderItem[]
   statusHistory   OrderStatusHistory[]
+  notifications   Notification[]
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 }
 
 enum OrderStatus {
   PENDING
+  PENDING_PAYMENT_CONFIRMATION
+  PAYMENT_INVALID
   PAID
   PROCESSING
   READY
   OUT_FOR_DELIVERY
   DELIVERED
   CANCELLED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIAL
+  EXPIRED
+  CANCELLED
+  SUSPENDED
+}
+
+enum NotificationStatus {
+  PENDING
+  QUEUED
+  PROCESSING
+  SENT
+  DELIVERED
+  RETRYING
+  FAILED
+}
+
+enum NotificationQueueStatus {
+  QUEUED
+  PROCESSING
+  SENT
+  RETRYING
+  FAILED
+}
+
+enum NotificationChannel {
+  INBOX_SYNC
+  WEB_PUSH
+  FCM
+  EXPO
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  SKIPPED
+}
+
+enum PaymentMethodType {
+  QR
+  BANK_ACCOUNT
+  INSTRUCTIONS
+}
+
+model PaymentMethod {
+  id                String   @id @default(cuid())
+  title             String
+  provider          String?
+  visibleLabel      String?
+  type              PaymentMethodType
+  details           String?
+  accountNumber     String?
+  imageUrl          String?
+  imagePublicId     String?
+  isActive          Boolean  @default(true)
+  sortOrder         Int      @default(0)
+  orders            Order[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model OrderItem {
@@ -151,6 +229,7 @@ model OrderItem {
   product   Product          @relation(fields: [productId], references: [id])
   quantity  Int
   price     Float
+  customization Json?
   addons    OrderItemAddOn[]
 }
 
@@ -184,10 +263,109 @@ model Expense {
   registeredBy    String?
 }
 
-model PushSubscription {
+model PushToken {
   id        String   @id @default(cuid())
+  userId    String
+  createdAt DateTime @default(now())
+  auth      String
   endpoint  String   @unique
   p256dh    String
-  auth      String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FCMToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model UserNotificationState {
+  userId                String   @id
+  lastSequence          Int      @default(0)
+  lastDeliveredSequence Int      @default(0)
+  lastReadSequence      Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id          String                  @id @default(cuid())
+  userId      String
+  orderId     String?
+  sequence    Int
+  type        String
+  title       String
+  body        String
+  payload     Json?
+  dedupeKey   String?
+  status      NotificationStatus      @default(PENDING)
+  queuedAt    DateTime?
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+  lastError   String?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  deliveries  NotificationDelivery[]
+  outbox      NotificationOutbox?
+  user        User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order       Order?                  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, sequence])
+  @@unique([userId, dedupeKey])
+  @@index([userId, createdAt])
+  @@index([userId, status, sequence])
+}
+
+model NotificationOutbox {
+  id                  String                  @id @default(cuid())
+  notificationId      String                  @unique
+  userId              String
+  status              NotificationQueueStatus @default(QUEUED)
+  attemptCount        Int                     @default(0)
+  nextAttemptAt       DateTime                @default(now())
+  processingStartedAt DateTime?
+  lastAttemptAt       DateTime?
+  sentAt              DateTime?
+  lastError           String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  notification        Notification            @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user                User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([userId, status, nextAttemptAt])
+}
+
+model NotificationDelivery {
+  id                String                     @id @default(cuid())
+  notificationId    String
+  channel           NotificationChannel
+  status            NotificationDeliveryStatus @default(PENDING)
+  attempt           Int                        @default(1)
+  providerMessageId String?
+  lastError         String?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  failedAt          DateTime?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  notification      Notification               @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, channel])
+  @@index([channel, status])
+  @@index([notificationId, status])
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

@@ -5,7 +5,17 @@ function formatCOP(n: number) {
   return new Intl.NumberFormat("es-CO", { style:"currency", currency:"COP", minimumFractionDigits:0 }).format(n);
 }
 function statusLabel(s: string) {
-  const m: Record<string,string> = { PENDING:"Pendiente", PAID:"Pagado", PROCESSING:"Procesando", READY:"Listo", OUT_FOR_DELIVERY:"En camino", DELIVERED:"Entregado", CANCELLED:"Cancelado" };
+  const m: Record<string,string> = {
+    PENDING:"Pendiente",
+    PENDING_PAYMENT_CONFIRMATION:"Pendiente de confirmación",
+    PAYMENT_INVALID:"Pago inválido",
+    PAID:"Pagado",
+    PROCESSING:"Procesando",
+    READY:"Listo",
+    OUT_FOR_DELIVERY:"En camino",
+    DELIVERED:"Entregado",
+    CANCELLED:"Cancelado",
+  };
   return m[s] || s;
 }
 

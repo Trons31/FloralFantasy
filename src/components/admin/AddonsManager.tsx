@@ -19,7 +19,7 @@ const ADDON_ICONS: Record<string, any> = {
 export default function AddonsManager({ addons: init }: { addons: any[] }) {
   const [addons, setAddons] = useState(init);
   const [form,   setForm]   = useState({ name:"", price:"", type:"BEBIDA" });
-  // ✅ Guardamos el archivo y preview localmente, NO se sube aún
+  // Guardamos el archivo y preview localmente; la subida ocurre al guardar.
   const [pendingFile,    setPendingFile]    = useState<File | null>(null);
   const [previewUrl,     setPreviewUrl]     = useState<string>("");
   const [show,           setShow]           = useState(false);
@@ -48,7 +48,7 @@ export default function AddonsManager({ addons: init }: { addons: any[] }) {
     try {
       let imageUrl = "";
 
-      // ✅ Solo subimos a Cloudinary si el usuario eligió una imagen Y presionó Guardar
+      // Solo subimos a Cloudinary si el usuario eligió una imagen y presionó Guardar.
       if (pendingFile) {
         const fd = new FormData();
         fd.append("file", pendingFile);

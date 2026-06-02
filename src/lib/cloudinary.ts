@@ -5,11 +5,17 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-export async function uploadImage(fileBase64: string) {
+export async function uploadImage(
+  fileBase64: string,
+  options: {
+    folder?: string;
+    transformation?: Record<string, any>[];
+  } = {}
+) {
   const result = await cloudinary.uploader.upload(fileBase64, {
-    folder: "fantasiaFloral",
+    folder: options.folder || "fantasiaFloral",
     resource_type: "image",
-    transformation: [
+    transformation: options.transformation || [
       { width: 1000, height: 1000, crop: "limit" },
       { quality: "auto:good" },
       { format: "webp" },

@@ -4,7 +4,7 @@ import { useState } from "react";
 import {
   RiBarChartLine, RiDownloadLine, RiFilterLine, RiArrowLeftLine, RiArrowRightLine,
   RiMoneyDollarCircleLine, RiShoppingBagLine, RiArrowUpLine, RiArrowDownLine,
-  RiCalendarLine, RiLoader4Line, RiCheckLine, RiTimeLine, RiTruckLine, RiFlowerLine,
+  RiCalendarLine, RiLoader4Line, RiCheckLine, RiTimeLine, RiTruckLine, RiFlowerLine, RiAlertLine,
 } from "react-icons/ri";
 import { formatPrice } from "@/lib/utils";
 
@@ -17,6 +17,8 @@ const PERIODOS = [
 ];
 
 const STATUS_CONFIG: Record<string,{label:string;color:string;Icon:any}> = {
+  PENDING_PAYMENT_CONFIRMATION: { label:"Pendiente de confirmación", color:"bg-amber-100 text-amber-700", Icon: RiTimeLine },
+  PAYMENT_INVALID:  { label:"Pago inválido", color:"bg-red-100 text-red-700", Icon: RiAlertLine },
   PAID:             { label:"Pagado",      color:"bg-blue-100 text-blue-700",   Icon: RiMoneyDollarCircleLine },
   PROCESSING:       { label:"Procesando",  color:"bg-amber-100 text-amber-700", Icon: RiFlowerLine },
   READY:            { label:"Listo",       color:"bg-green-100 text-green-700", Icon: RiCheckLine },

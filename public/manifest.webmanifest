@@ -1,0 +1,25 @@
+{
+  "name": "Fantasía Floral",
+  "short_name": "Fantasía Floral",
+  "description": "Pedidos y seguimiento de flores con notificaciones en tiempo real.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "window-controls-overlay"],
+  "background_color": "#fdfcf8",
+  "theme_color": "#e8185a",
+  "icons": [
+    {
+      "src": "/flowers/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/flowers/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -8,7 +8,7 @@ import {
 import { FaStar } from "react-icons/fa6";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { formatPrice, formatPreparationTime } from "@/lib/utils";
+import { formatPrice, formatPreparationTime, formatDeliveryLeadDays, getDeliveryDateLabel } from "@/lib/utils";
 
 const OCCASIONS = ["amor","cumpleanos","bodas","condolencias","graduacion","recuperacion"];
 const TIME_UNITS = [
@@ -21,6 +21,7 @@ type Product = {
   id: string; name: string; description: string; price: number;
   categoryId: string; occasion?: string | null;
   preparationTimeValue: number; preparationTimeUnit: string;
+  deliveryLeadDays: number;
   requiresSpecialOrder: boolean; inStock: boolean; featured: boolean;
   images: { id: string; url: string; publicId: string; isMain: boolean; order: number }[];
   category: { id: string; name: string };
@@ -30,7 +31,7 @@ type Product = {
 type Category = { id: string; name: string; slug: string };
 type Flower   = { id: string; name: string; type: string };
 
-// ✅ Slot de imagen: puede tener un File pendiente (nueva) o una URL ya subida (edición)
+// Slot de imagen: puede tener un File pendiente (nueva) o una URL ya subida (edición)
 type ImageSlot =
   | { kind: "pending"; file: File; previewUrl: string }   // aún no subida
   | { kind: "uploaded"; url: string; publicId: string };  // ya en Cloudinary
@@ -42,7 +43,7 @@ export default function ProductosManager({
   const [showForm, setShowForm] = useState(false);
   const [editing,  setEditing]  = useState<Product | null>(null);
   const [saving,   setSaving]   = useState(false);
-  // ✅ imageSlots reemplaza uploadedImages + uploadingIdx
+  // imageSlots reemplaza uploadedImages + uploadingIdx
   const [imageSlots,      setImageSlots]      = useState<ImageSlot[]>([]);
   const [uploadingSlots,  setUploadingSlots]  = useState<Set<number>>(new Set());
   const [selectedFlowers, setSelectedFlowers] = useState<string[]>([]);
@@ -52,11 +53,12 @@ export default function ProductosManager({
   const [localCats,   setLocalCats]   = useState(categories);
 
   const { register, handleSubmit, reset, watch } = useForm<any>({
-    defaultValues: { preparationTimeValue: 0, preparationTimeUnit: "MINUTES", inStock: true },
+    defaultValues: { preparationTimeValue: 0, preparationTimeUnit: "MINUTES", deliveryLeadDays: 0, inStock: true },
   });
 
   const prepValue = watch("preparationTimeValue", 0);
   const prepUnit  = watch("preparationTimeUnit", "MINUTES");
+  const deliveryDays = watch("deliveryLeadDays", 0);
 
   const slugify = (s: string) =>
     s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g,"-").replace(/[^a-z0-9-]/g,"");
@@ -69,7 +71,7 @@ export default function ProductosManager({
     else toast.error(saved.error);
   };
 
-  // ✅ Solo guarda el archivo localmente con preview, NO sube a Cloudinary
+  // Solo guarda el archivo localmente con preview, no sube a Cloudinary.
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>, idx: number) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -95,7 +97,7 @@ export default function ProductosManager({
     });
   };
 
-  // ✅ Sube UN slot pendiente a Cloudinary, retorna { url, publicId }
+  // Sube un slot pendiente a Cloudinary y retorna { url, publicId }.
   const uploadSlot = async (slot: ImageSlot & { kind: "pending" }, idx: number) => {
     setUploadingSlots(p => new Set(p).add(idx));
     const fd = new FormData();
@@ -113,7 +115,7 @@ export default function ProductosManager({
     if (!data.categoryId) { toast.error("Selecciona una categoría"); return; }
     setSaving(true);
     try {
-      // ✅ Subir solo los slots pendientes en paralelo, justo antes de guardar
+      // Subir solo los slots pendientes en paralelo, justo antes de guardar.
       const resolvedImages = await Promise.all(
         imageSlots.map(async (slot, idx) => {
           if (slot.kind === "pending") return uploadSlot(slot, idx);
@@ -126,6 +128,7 @@ export default function ProductosManager({
         ...data,
         price: parseFloat(data.price),
         preparationTimeValue: parseInt(data.preparationTimeValue || "0"),
+        deliveryLeadDays: parseInt(data.deliveryLeadDays || "0"),
         requiresSpecialOrder: data.requiresSpecialOrder === true || data.requiresSpecialOrder === "true",
         inStock:  data.inStock  === true || data.inStock  === "true",
         featured: data.featured === true || data.featured === "true",
@@ -147,7 +150,7 @@ export default function ProductosManager({
 
   const openCreate = () => {
     setEditing(null);
-    reset({ preparationTimeValue:0, preparationTimeUnit:"MINUTES", inStock:true, featured:false, requiresSpecialOrder:false });
+    reset({ preparationTimeValue:0, preparationTimeUnit:"MINUTES", deliveryLeadDays:0, inStock:true, featured:false, requiresSpecialOrder:false });
     setImageSlots([]); setSelectedFlowers([]); setShowForm(true);
   };
 
@@ -155,8 +158,9 @@ export default function ProductosManager({
     setEditing(p);
     reset({ name:p.name, description:p.description, price:p.price, categoryId:p.categoryId,
             occasion:p.occasion, preparationTimeValue:p.preparationTimeValue, preparationTimeUnit:p.preparationTimeUnit,
+            deliveryLeadDays:p.deliveryLeadDays || 0,
             requiresSpecialOrder:p.requiresSpecialOrder, inStock:p.inStock, featured:p.featured });
-    // ✅ Imágenes ya subidas se cargan como "uploaded", no como pending
+    // Imágenes ya subidas se cargan como "uploaded", no como pending.
     setImageSlots(p.images.map(i => ({ kind: "uploaded", url: i.url, publicId: i.publicId })));
     setSelectedFlowers(p.flowers.map(f => f.flower.id));
     setShowForm(true);
@@ -178,7 +182,7 @@ export default function ProductosManager({
   const toggleFlower = (id: string) =>
     setSelectedFlowers(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
 
-  // ✅ Helper: obtener la URL de display de un slot (preview local o URL de Cloudinary)
+  // Helper: obtener la URL de display de un slot (preview local o URL de Cloudinary)
   const slotDisplayUrl = (slot: ImageSlot): string => {
     if (slot.kind === "pending") return slot.previewUrl;
     return slot.url;
@@ -238,6 +242,12 @@ export default function ProductosManager({
                       <p className="text-xs text-amber-600 flex items-center gap-1 mt-0.5">
                         <RiTimeLine size={11} />
                         {formatPreparationTime(p.preparationTimeValue, p.preparationTimeUnit)}
+                      </p>
+                    )}
+                    {p.deliveryLeadDays > 0 && (
+                      <p className="text-xs text-emerald-600 flex items-center gap-1 mt-0.5">
+                        <RiTimeLine size={11} />
+                        {formatDeliveryLeadDays(p.deliveryLeadDays)}
                       </p>
                     )}
                   </div>
@@ -372,26 +382,47 @@ export default function ProductosManager({
               </div>
 
               {/* Preparation time */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                  <RiTimeLine className="text-amber-500" size={15} />
-                  Tiempo de preparación
-                </label>
-                <div className="flex gap-2 items-center">
-                  <input {...register("preparationTimeValue")} type="number" min="0" defaultValue={0}
-                    className="w-24 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-primary-400 text-center font-mono" />
-                  <select {...register("preparationTimeUnit")}
-                    className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary-400">
-                    {TIME_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
-                  </select>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                    <RiTimeLine className="text-amber-500" size={15} />
+                    Tiempo de preparación
+                  </label>
+                  <div className="flex gap-2 items-center">
+                    <input {...register("preparationTimeValue")} type="number" min="0" defaultValue={0}
+                      className="w-24 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-primary-400 text-center font-mono" />
+                    <select {...register("preparationTimeUnit")}
+                      className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary-400">
+                      {TIME_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                    </select>
+                  </div>
+                  {prepValue > 0 && (
+                    <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
+                      <RiTimeLine size={12} />
+                      Preparación: <strong>{formatPreparationTime(Number(prepValue), prepUnit)}</strong>
+                    </p>
+                  )}
                 </div>
-                {prepValue > 0 && (
-                  <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
-                    <RiTimeLine size={12} />
-                    Entrega estimada: <strong>{formatPreparationTime(Number(prepValue), prepUnit)}</strong>
-                    <span className="text-gray-400 ml-1">El cliente verá esto al pedir</span>
-                  </p>
-                )}
+
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                    <RiTimeLine className="text-emerald-500" size={15} />
+                    Entrega del ramo
+                  </label>
+                  <div className="flex gap-2 items-center">
+                    <input {...register("deliveryLeadDays")} type="number" min="0" defaultValue={0}
+                      className="w-24 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-primary-400 text-center font-mono" />
+                    <div className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 text-gray-500">
+                      Días después del pedido
+                    </div>
+                  </div>
+                  {Number(deliveryDays) > 0 && (
+                    <p className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1">
+                      <RiTimeLine size={12} />
+                      {formatDeliveryLeadDays(Number(deliveryDays))} · <strong>{getDeliveryDateLabel(Number(deliveryDays))}</strong>
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* Flowers selector */}

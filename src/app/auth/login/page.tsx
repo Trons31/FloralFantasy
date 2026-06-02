@@ -2,7 +2,7 @@
 import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { RiLockLine, RiEyeLine, RiEyeOffLine, RiLeafLine } from "react-icons/ri";
+import { RiLockLine, RiEyeLine, RiEyeOffLine, RiFlowerLine, RiCloseLine } from "react-icons/ri";
 
 export default function LoginPage() {
   const [email, setEmail]       = useState("");
@@ -26,12 +26,14 @@ export default function LoginPage() {
       {/* bg blobs */}
       <div className="absolute top-0 left-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
       <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
-      <div className="absolute inset-0 flex items-center justify-center opacity-5 text-[30rem] select-none pointer-events-none">🌸</div>
+      <div className="absolute inset-0 flex items-center justify-center opacity-5 select-none pointer-events-none">
+        <RiFlowerLine size={420} />
+      </div>
 
       <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl relative z-10">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary-200">
-            <RiLeafLine className="text-white text-3xl" />
+            <RiFlowerLine className="text-white text-3xl" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Fantasía Floral</h1>
           <p className="text-gray-400 text-sm mt-1">Panel de administración</p>
@@ -59,7 +61,8 @@ export default function LoginPage() {
 
           {error && (
             <div className="flex items-center gap-2 bg-red-50 border border-red-100 text-red-600 text-sm px-4 py-3 rounded-xl">
-              <span>❌</span><span>{error}</span>
+              <RiCloseLine size={16} />
+              <span>{error}</span>
             </div>
           )}
 

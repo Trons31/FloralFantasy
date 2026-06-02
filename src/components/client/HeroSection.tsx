@@ -95,7 +95,7 @@ export default function HeroSection() {
           >
             {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
               <span key={i} className="flex items-center gap-4 text-white text-xs font-semibold tracking-widest uppercase px-8">
-                {item} <span className="text-primary-300 text-base">✦</span>
+                {item} <RiStarFill className="text-primary-300" size={10} />
               </span>
             ))}
           </motion.div>

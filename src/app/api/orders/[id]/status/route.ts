@@ -9,7 +9,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     where: { id: params.id },
     data: {
       status,
-      statusHistory: { create: { status, note: note || STATUS_LABELS[status] } },
+      statusHistory: {
+        create: {
+          status,
+          note:
+            note ||
+            (status === "PAYMENT_INVALID"
+              ? "Comprobante de pago inválido. Se requiere corrección o reenvío."
+              : STATUS_LABELS[status] || status),
+        },
+      },
     },
   });
   sendStatusUpdate({

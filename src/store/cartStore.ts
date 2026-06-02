@@ -15,6 +15,7 @@ export interface CartItem {
   quantity: number;
   preparationTimeValue: number;
   preparationTimeUnit: string;
+  deliveryLeadDays: number;
   addons: CartAddon[];
   subtotal: number;
 }
@@ -30,6 +31,7 @@ interface CartStore {
   getTotalItems: () => number;
   getTotalPrice: () => number;
   getEstimatedTime: () => { value: number; unit: string; label: string };
+  getDeliveryLeadDays: () => { days: number; label: string; dateLabel: string };
 }
 
 const calcSubtotal = (item: Omit<CartItem, "subtotal">) =>
@@ -77,6 +79,18 @@ export const useCartStore = create<CartStore>()(
             preparationTimeUnit: i.preparationTimeUnit,
           }))
         ),
+      getDeliveryLeadDays: () => {
+        const days = get().items.reduce((max, item) => Math.max(max, item.deliveryLeadDays || 0), 0);
+        const label = days <= 0 ? "Entrega hoy" : days === 1 ? "Entrega en 1 día" : `Entrega en ${days} días`;
+        const date = new Date();
+        date.setDate(date.getDate() + days);
+        const dateLabel = new Intl.DateTimeFormat("es-CO", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        }).format(date);
+        return { days, label, dateLabel };
+      },
     }),
     { name: "fantasia-floral-cart" }
   )

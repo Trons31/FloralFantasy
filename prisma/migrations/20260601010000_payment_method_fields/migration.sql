@@ -1,0 +1,3 @@
+ALTER TABLE "PaymentMethod" ADD COLUMN IF NOT EXISTS "provider" TEXT;
+ALTER TABLE "PaymentMethod" ADD COLUMN IF NOT EXISTS "visibleLabel" TEXT;
+ALTER TABLE "PaymentMethod" ADD COLUMN IF NOT EXISTS "accountNumber" TEXT;

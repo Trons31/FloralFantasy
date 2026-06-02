@@ -1,39 +1,40 @@
-// app/api/orders/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateTrackingToken } from "@/lib/tokens";
 import { sendOrderConfirmation } from "@/lib/email";
 import { sendPushToAdmins } from "@/lib/webpush";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import crypto from "crypto";
-
-function generateWompiSignature(
-  reference: string,
-  amountInCents: number,
-  currency: string,
-  integritySecret: string
-): string {
-  const concatenated = `${reference}${amountInCents}${currency}${integritySecret}`;
-  return crypto.createHash("sha256").update(concatenated).digest("hex");
-}
+import { STATUS_LABELS } from "@/lib/utils";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
-      name, phone, email, address, addressRef,
-      items, total, deliveryFee, estimatedTime,
-      source, // "CLIENT" | "ADMIN" — el frontend lo envía
+      name,
+      phone,
+      email,
+      address,
+      addressRef,
+      items,
+      total,
+      deliveryFee,
+      estimatedTime,
+      source,
+      adminNote,
+      manualAdjustment,
     } = body;
 
-    // Verificar que todos los productos existen
+    const isAdminDraft = source === "ADMIN";
+
+    if ((!isAdminDraft && (!name || !phone || !address)) || !Array.isArray(items) || items.length === 0) {
+      return NextResponse.json({ error: "Faltan datos obligatorios" }, { status: 400 });
+    }
+
     const productIds = items.map((i: any) => i.productId);
     const existingProducts = await prisma.product.findMany({
       where: { id: { in: productIds } },
       select: { id: true },
     });
-    const foundIds = existingProducts.map((p: any) => p.id);
+    const foundIds = existingProducts.map((p) => p.id);
     const missingIds = productIds.filter((id: string) => !foundIds.includes(id));
     if (missingIds.length > 0) {
       return NextResponse.json(
@@ -43,29 +44,30 @@ export async function POST(req: NextRequest) {
     }
 
     const trackingToken = generateTrackingToken();
-
-    // Todos los pedidos arrancan en PENDING — el administrador los mueve manualmente a PROCESSING
-    const initialStatus = "PENDING";
+    const initialStatus = isAdminDraft ? "PENDING" : "PENDING_PAYMENT_CONFIRMATION";
 
     const order = await prisma.order.create({
       data: {
         trackingToken,
-        customerName: name,
-        customerPhone: phone,
+        customerName: isAdminDraft ? (name ?? "") : name,
+        customerPhone: isAdminDraft ? (phone ?? "") : phone,
         customerEmail: email ?? "",
-        address,
-        addressRef,
+        address: isAdminDraft ? (address ?? "") : address,
+        addressRef: addressRef ?? "",
         total,
         deliveryFee,
-        estimatedTime,
+        estimatedTime: estimatedTime || "1 dia",
+        adminNote: typeof adminNote === "string" ? adminNote.trim() || null : null,
+        manualAdjustment: Number(manualAdjustment || 0),
         status: initialStatus,
         source: source === "ADMIN" ? "ADMIN" : "CLIENT",
         statusHistory: {
           create: {
             status: initialStatus,
-            note: source === "ADMIN"
-              ? "Pedido ingresado manualmente por el administrador — pendiente de procesamiento"
-              : "Pedido creado por cliente",
+            note:
+              isAdminDraft
+                ? "Pedido armado por el administrador. En espera de los datos y pago del cliente"
+                : "Pedido creado por cliente y pendiente de validación de pago",
           },
         },
         items: {
@@ -73,6 +75,7 @@ export async function POST(req: NextRequest) {
             productId: item.productId,
             quantity: item.quantity,
             price: item.price,
+            customization: item.customization ?? undefined,
             addons: {
               create: (item.addons || []).map((a: any) => ({
                 addonId: a.id,
@@ -82,7 +85,6 @@ export async function POST(req: NextRequest) {
           })),
         },
       },
-      // Incluir relaciones para devolver el pedido completo al frontend
       include: {
         items: {
           include: {
@@ -93,35 +95,59 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Generar signature de integridad para Wompi (solo para pedidos de cliente)
-    const amountInCents = Math.round(total * 100);
-    const currency = "COP";
-    const integritySecret = process.env.WOMPI_INTEGRITY_SECRET;
-    let signature: string | null = null;
-    if (integritySecret && source !== "ADMIN") {
-      signature = generateWompiSignature(order.id, amountInCents, currency, integritySecret);
-    }
-
-    // Notificaciones — no bloquean la respuesta
     Promise.all([
-      // Solo manda email de confirmación si hay email y es pedido de cliente
-      email && source !== "ADMIN"
-        ? sendOrderConfirmation({ email, customerName: name, trackingToken, total, estimatedTime })
+      email && !isAdminDraft
+        ? sendOrderConfirmation({
+            email,
+            customerName: name,
+            trackingToken,
+            total,
+            estimatedTime,
+          })
         : Promise.resolve(),
       sendPushToAdmins({
-        title: source === "ADMIN" ? "Pedido manual registrado" : "Nuevo pedido",
-        body: `${name} — ${new Intl.NumberFormat("es-CO", {
-          style: "currency", currency: "COP", minimumFractionDigits: 0,
-        }).format(total)}`,
+        type: "ORDER_CREATED",
+        orderId: order.id,
+        title: isAdminDraft ? "Link de pago generado" : "Nuevo pedido",
+        body: isAdminDraft
+          ? "El administrador generó un link de pago para un nuevo pedido."
+          : `${name || "Cliente"} realizó un pedido por ${new Intl.NumberFormat("es-CO", {
+              style: "currency",
+              currency: "COP",
+              minimumFractionDigits: 0,
+            }).format(total)}`,
+        url: "/dashboard/todos-pedidos",
+        data: {
+          trackingToken,
+          source: order.source,
+          status: initialStatus,
+        },
       }),
     ]).catch(console.error);
+
+    const paymentMethods = await prisma.paymentMethod.findMany({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: {
+        id: true,
+        title: true,
+        provider: true,
+        visibleLabel: true,
+        type: true,
+        details: true,
+        accountNumber: true,
+        imageUrl: true,
+        sortOrder: true,
+      },
+    });
 
     return NextResponse.json({
       ...order,
       createdAt: order.createdAt.toISOString(),
       updatedAt: order.updatedAt.toISOString(),
-      wompiSignature: signature,
-      amountInCents,
+      paymentMethods,
+      statusLabel: STATUS_LABELS[initialStatus] || initialStatus,
+      checkoutUrl: `/checkout?token=${trackingToken}`,
     });
   } catch (e: any) {
     console.error("Order create error:", e);
@@ -129,13 +155,19 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const statusParam = req.nextUrl.searchParams.get("status");
+  const statuses = statusParam
+    ? statusParam.split(",").map((s) => s.trim()).filter(Boolean)
+    : undefined;
+
   const orders = await prisma.order.findMany({
     where: {
-      status: { notIn: ["DELIVERED", "CANCELLED"] },
+      status: statuses ? { in: statuses as any } : { notIn: ["DELIVERED", "CANCELLED"] },
     },
     orderBy: { createdAt: "desc" },
     include: {
+      paymentMethod: true,
       items: {
         include: {
           product: { include: { images: true } },
