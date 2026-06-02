@@ -1,81 +1,204 @@
 "use client";
+
 import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { RiLockLine, RiEyeLine, RiEyeOffLine, RiFlowerLine, RiCloseLine } from "react-icons/ri";
+import {
+  RiLockLine,
+  RiEyeLine,
+  RiEyeOffLine,
+  RiCloseLine,
+  RiGoogleFill,
+  RiShieldStarLine,
+  RiFlowerLine,
+  RiArrowRightLine,
+  RiSparklingLine,
+  RiMailLine,
+} from "react-icons/ri";
 
 export default function LoginPage() {
-  const [email, setEmail]       = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPwd, setShowPwd]   = useState(false);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState("");
+  const [showPwd, setShowPwd] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [error, setError] = useState("");
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true); setError("");
-    const res = await signIn("credentials", { email, password, redirect: false });
-    if (res?.ok) { router.push("/dashboard"); router.refresh(); }
-    else { setError("Email o contraseña incorrectos"); setLoading(false); }
+    setLoading(true);
+    setError("");
+
+    const res = await signIn("credentials", { email, password, redirect: false, callbackUrl: "/dashboard" });
+    if (res?.ok) {
+      router.push("/dashboard");
+      router.refresh();
+      return;
+    }
+
+    setError("Email o contraseña incorrectos");
+    setLoading(false);
+  };
+
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    setError("");
+    try {
+      const res = await signIn("google", { callbackUrl: "/dashboard", redirect: false });
+      if (res?.ok) {
+        router.push("/dashboard");
+        router.refresh();
+        return;
+      }
+      if (res?.error) setError("No se pudo iniciar con Google");
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
-         style={{ background: "linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 50%,#2563eb 100%)" }}>
-      {/* bg blobs */}
-      <div className="absolute top-0 left-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
-      <div className="absolute inset-0 flex items-center justify-center opacity-5 select-none pointer-events-none">
-        <RiFlowerLine size={420} />
-      </div>
+    <main className="min-h-screen relative overflow-hidden bg-[#0c0a22] text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.20),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(236,72,153,0.20),transparent_28%),linear-gradient(135deg,#120c2f_0%,#0f1230_38%,#1f2f77_100%)]" />
+      <div className="absolute inset-0 opacity-[0.12] [background-image:linear-gradient(rgba(255,255,255,0.16)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.16)_1px,transparent_1px)] [background-size:64px_64px]" />
+      <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-fuchsia-500/20 blur-3xl" />
+      <div className="absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl" />
 
-      <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl relative z-10">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary-200">
-            <RiFlowerLine className="text-white text-3xl" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Fantasía Floral</h1>
-          <p className="text-gray-400 text-sm mt-1">Panel de administración</p>
-        </div>
+      <div className="relative mx-auto flex min-h-screen max-w-7xl items-center px-4 py-4 sm:px-6 lg:px-8">
+        <div className="grid w-full gap-6 lg:grid-cols-[1.05fr_.95fr] xl:gap-10">
+          <section className="hidden flex-col justify-center lg:flex">
+            <div className="mb-5 inline-flex items-center gap-2 self-start rounded-full border border-white/15 bg-white/8 px-3.5 py-1.5 text-xs sm:text-sm text-white/85 backdrop-blur">
+              <RiSparklingLine size={16} className="text-fuchsia-300" />
+              Acceso seguro para el panel administrativo
+            </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-              placeholder="admin@fantasiafloral.com" required autoComplete="email"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Contraseña</label>
-            <div className="relative">
-              <input type={showPwd ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••" required autoComplete="current-password"
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 pr-11 text-sm focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all" />
-              <button type="button" onClick={() => setShowPwd(!showPwd)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
-                {showPwd ? <RiEyeOffLine size={18} /> : <RiEyeLine size={18} />}
+            <h1 className="max-w-2xl text-4xl font-semibold leading-[0.95] tracking-tight sm:text-5xl lg:text-6xl">
+              Gestiona tu florería
+              <span className="block text-fuchsia-300">con una experiencia más limpia</span>
+            </h1>
+
+            <p className="mt-4 max-w-xl text-sm leading-6 text-white/72 sm:text-base sm:leading-7">
+              Entra con tu cuenta de Google o con tu correo para revisar pedidos, validar pagos y mover todo el flujo del negocio sin fricción.
+            </p>
+
+            <div className="mt-6 flex flex-wrap gap-2 text-xs text-white/72">
+              <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 backdrop-blur">Pedidos claros</span>
+              <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 backdrop-blur">Acceso protegido</span>
+              <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 backdrop-blur">Flujo rápido</span>
+            </div>
+          </section>
+
+          <section className="flex items-center justify-center lg:justify-end">
+            <div className="w-full max-w-md rounded-[2rem] border border-white/10 bg-white p-5 text-slate-900 shadow-[0_30px_80px_rgba(0,0,0,0.35)] sm:max-w-lg sm:p-6">
+              <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                  <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-500 to-rose-500 text-white shadow-lg shadow-fuchsia-500/20">
+                    <RiFlowerLine size={22} />
+                  </div>
+                  <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Iniciar sesión</h2>
+                  <p className="mt-1.5 max-w-sm text-sm leading-5 text-slate-500">
+                    Usa Google o entra con tu correo para acceder al panel.
+                  </p>
+                </div>
+                <div className="hidden rounded-2xl bg-fuchsia-50 p-2.5 text-fuchsia-500 sm:block">
+                  <RiShieldStarLine size={18} />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={googleLoading || loading}
+                className="flex w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {googleLoading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900" />
+                    Continuando...
+                  </span>
+                ) : (
+                  <>
+                    <RiGoogleFill size={19} className="text-[#4285F4]" />
+                    Continuar con Google
+                  </>
+                )}
               </button>
-            </div>
-          </div>
 
-          {error && (
-            <div className="flex items-center gap-2 bg-red-50 border border-red-100 text-red-600 text-sm px-4 py-3 rounded-xl">
-              <RiCloseLine size={16} />
-              <span>{error}</span>
-            </div>
-          )}
+              <div className="my-5 flex items-center gap-4">
+                <div className="h-px flex-1 bg-slate-200" />
+                <span className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-400">O con correo</span>
+                <div className="h-px flex-1 bg-slate-200" />
+              </div>
 
-          <button type="submit" disabled={loading}
-            className="w-full flex items-center justify-center gap-2 bg-primary-600 text-white py-3.5 rounded-xl font-semibold hover:bg-primary-700 disabled:opacity-60 transition-all hover:shadow-lg hover:shadow-primary-200 mt-2">
-            {loading ? (
-              <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Entrando...</span>
-            ) : (
-              <span className="flex items-center gap-2"><RiLockLine size={18} /> Iniciar sesión</span>
-            )}
-          </button>
-        </form>
+              <form onSubmit={handleSubmit} className="space-y-3.5">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Correo</label>
+                  <div className="relative">
+                    <RiMailLine className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="tu@correo.com"
+                      required
+                      autoComplete="email"
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-11 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-fuchsia-400 focus:bg-white focus:ring-4 focus:ring-fuchsia-100"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Contraseña</label>
+                  <div className="relative">
+                    <RiLockLine className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input
+                      type={showPwd ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      required
+                      autoComplete="current-password"
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-11 py-3 pr-12 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-fuchsia-400 focus:bg-white focus:ring-4 focus:ring-fuchsia-100"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPwd(!showPwd)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
+                    >
+                      {showPwd ? <RiEyeOffLine size={18} /> : <RiEyeLine size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    <RiCloseLine size={16} />
+                    <span>{error}</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading || googleLoading}
+                  className="mt-1.5 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-rose-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-fuchsia-500/20 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      Entrando...
+                    </span>
+                  ) : (
+                    <>
+                      <RiLockLine size={18} />
+                      Iniciar sesión
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+          </section>
+        </div>
       </div>
-    </div>
+    </main>
   );
 }

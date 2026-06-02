@@ -1,14 +1,14 @@
 "use client";
 import { useState } from "react";
 import {
-  RiAddLine, RiPencilLine, RiDeleteBinLine, RiLoader4Line, RiUploadCloud2Line,
+  RiAddLine, RiSubtractLine, RiPencilLine, RiDeleteBinLine, RiLoader4Line, RiUploadCloud2Line,
   RiCloseLine, RiLeafLine, RiTimeLine, RiBellLine, RiCheckLine, RiStarLine,
   RiFlowerLine, RiAlertLine,
 } from "react-icons/ri";
 import { FaStar } from "react-icons/fa6";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { formatPrice, formatPreparationTime, formatDeliveryLeadDays, getDeliveryDateLabel } from "@/lib/utils";
+import { formatPrice, formatDeliveryLeadDays, getDeliveryDateLabel } from "@/lib/utils";
 
 const OCCASIONS = ["amor","cumpleanos","bodas","condolencias","graduacion","recuperacion"];
 const TIME_UNITS = [
@@ -30,6 +30,7 @@ type Product = {
 
 type Category = { id: string; name: string; slug: string };
 type Flower   = { id: string; name: string; type: string };
+type SelectedFlower = { flowerId: string; quantity: number };
 
 // Slot de imagen: puede tener un File pendiente (nueva) o una URL ya subida (edición)
 type ImageSlot =
@@ -46,18 +47,16 @@ export default function ProductosManager({
   // imageSlots reemplaza uploadedImages + uploadingIdx
   const [imageSlots,      setImageSlots]      = useState<ImageSlot[]>([]);
   const [uploadingSlots,  setUploadingSlots]  = useState<Set<number>>(new Set());
-  const [selectedFlowers, setSelectedFlowers] = useState<string[]>([]);
+  const [selectedFlowers, setSelectedFlowers] = useState<SelectedFlower[]>([]);
 
   const [showCatForm, setShowCatForm] = useState(false);
   const [newCatName,  setNewCatName]  = useState("");
   const [localCats,   setLocalCats]   = useState(categories);
 
-  const { register, handleSubmit, reset, watch } = useForm<any>({
+  const { register, handleSubmit, reset, watch, setValue } = useForm<any>({
     defaultValues: { preparationTimeValue: 0, preparationTimeUnit: "MINUTES", deliveryLeadDays: 0, inStock: true },
   });
 
-  const prepValue = watch("preparationTimeValue", 0);
-  const prepUnit  = watch("preparationTimeUnit", "MINUTES");
   const deliveryDays = watch("deliveryLeadDays", 0);
 
   const slugify = (s: string) =>
@@ -127,13 +126,14 @@ export default function ProductosManager({
       const payload = {
         ...data,
         price: parseFloat(data.price),
-        preparationTimeValue: parseInt(data.preparationTimeValue || "0"),
+        preparationTimeValue: 0,
+        preparationTimeUnit: "MINUTES",
         deliveryLeadDays: parseInt(data.deliveryLeadDays || "0"),
         requiresSpecialOrder: data.requiresSpecialOrder === true || data.requiresSpecialOrder === "true",
         inStock:  data.inStock  === true || data.inStock  === "true",
         featured: data.featured === true || data.featured === "true",
         images: validImages,
-        flowerIds: selectedFlowers,
+        flowerRelations: selectedFlowers,
       };
       const url    = editing ? `/api/products/${editing.id}` : "/api/products";
       const method = editing ? "PUT" : "POST";
@@ -162,7 +162,7 @@ export default function ProductosManager({
             requiresSpecialOrder:p.requiresSpecialOrder, inStock:p.inStock, featured:p.featured });
     // Imágenes ya subidas se cargan como "uploaded", no como pending.
     setImageSlots(p.images.map(i => ({ kind: "uploaded", url: i.url, publicId: i.publicId })));
-    setSelectedFlowers(p.flowers.map(f => f.flower.id));
+    setSelectedFlowers(p.flowers.map(f => ({ flowerId: f.flower.id, quantity: f.quantity || 1 })));
     setShowForm(true);
   };
 
@@ -180,7 +180,21 @@ export default function ProductosManager({
   };
 
   const toggleFlower = (id: string) =>
-    setSelectedFlowers(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+    setSelectedFlowers(prev => {
+      const exists = prev.find(item => item.flowerId === id);
+      return exists ? prev.filter(item => item.flowerId !== id) : [...prev, { flowerId: id, quantity: 1 }];
+    });
+
+  const updateFlowerQty = (id: string, quantity: number) =>
+    setSelectedFlowers(prev =>
+      prev
+        .map(item =>
+          item.flowerId === id ? { ...item, quantity: Math.max(1, quantity) } : item
+        )
+        .filter(item => item.quantity > 0)
+    );
+
+  const selectedFlowerQty = (id: string) => selectedFlowers.find(item => item.flowerId === id)?.quantity || 0;
 
   // Helper: obtener la URL de display de un slot (preview local o URL de Cloudinary)
   const slotDisplayUrl = (slot: ImageSlot): string => {
@@ -237,19 +251,11 @@ export default function ProductosManager({
                 )}
                 <div className="flex items-center justify-between mt-3">
                   <div>
-                    <p className="font-bold text-gray-900">{formatPrice(p.price)}</p>
-                    {p.preparationTimeValue > 0 && (
-                      <p className="text-xs text-amber-600 flex items-center gap-1 mt-0.5">
-                        <RiTimeLine size={11} />
-                        {formatPreparationTime(p.preparationTimeValue, p.preparationTimeUnit)}
-                      </p>
-                    )}
-                    {p.deliveryLeadDays > 0 && (
+                      <p className="font-bold text-gray-900">{formatPrice(p.price)}</p>
                       <p className="text-xs text-emerald-600 flex items-center gap-1 mt-0.5">
                         <RiTimeLine size={11} />
                         {formatDeliveryLeadDays(p.deliveryLeadDays)}
                       </p>
-                    )}
                   </div>
                   <div className="flex gap-1">
                     <button onClick={() => openEdit(p)} className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"><RiPencilLine size={15} /></button>
@@ -381,48 +387,49 @@ export default function ProductosManager({
                 </select>
               </div>
 
-              {/* Preparation time */}
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                    <RiTimeLine className="text-amber-500" size={15} />
-                    Tiempo de preparación
-                  </label>
-                  <div className="flex gap-2 items-center">
-                    <input {...register("preparationTimeValue")} type="number" min="0" defaultValue={0}
-                      className="w-24 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-primary-400 text-center font-mono" />
-                    <select {...register("preparationTimeUnit")}
-                      className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary-400">
-                      {TIME_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
-                    </select>
-                  </div>
-                  {prepValue > 0 && (
-                    <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
-                      <RiTimeLine size={12} />
-                      Preparación: <strong>{formatPreparationTime(Number(prepValue), prepUnit)}</strong>
-                    </p>
-                  )}
+              {/* Delivery time */}
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                  <RiTimeLine className="text-emerald-500" size={15} />
+                  Tiempo de entrega
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setValue("deliveryLeadDays", 0, { shouldDirty: true, shouldTouch: true })}
+                    className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors ${
+                      Number(deliveryDays) <= 0
+                        ? "border-primary-600 bg-primary-600 text-white"
+                        : "border-gray-200 bg-white text-gray-700 hover:border-primary-300"
+                    }`}
+                  >
+                    Mismo día
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setValue("deliveryLeadDays", Math.max(1, Number(deliveryDays) || 1), { shouldDirty: true, shouldTouch: true })}
+                    className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors ${
+                      Number(deliveryDays) > 0
+                        ? "border-primary-600 bg-primary-600 text-white"
+                        : "border-gray-200 bg-white text-gray-700 hover:border-primary-300"
+                    }`}
+                  >
+                    Días después
+                  </button>
                 </div>
-
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                    <RiTimeLine className="text-emerald-500" size={15} />
-                    Entrega del ramo
-                  </label>
-                  <div className="flex gap-2 items-center">
-                    <input {...register("deliveryLeadDays")} type="number" min="0" defaultValue={0}
+                {Number(deliveryDays) > 0 && (
+                  <div className="flex gap-2 items-center mt-3">
+                    <input {...register("deliveryLeadDays")} type="number" min="1" defaultValue={0}
                       className="w-24 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-primary-400 text-center font-mono" />
                     <div className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 text-gray-500">
                       Días después del pedido
                     </div>
                   </div>
-                  {Number(deliveryDays) > 0 && (
-                    <p className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1">
-                      <RiTimeLine size={12} />
-                      {formatDeliveryLeadDays(Number(deliveryDays))} · <strong>{getDeliveryDateLabel(Number(deliveryDays))}</strong>
-                    </p>
-                  )}
-                </div>
+                )}
+                <p className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1">
+                  <RiTimeLine size={12} />
+                  {formatDeliveryLeadDays(Number(deliveryDays))} · <strong>{getDeliveryDateLabel(Number(deliveryDays))}</strong>
+                </p>
               </div>
 
               {/* Flowers selector */}
@@ -438,18 +445,54 @@ export default function ProductosManager({
                     No hay flores registradas. Ve a <strong>Gestión de Flores</strong> primero.
                   </div>
                 ) : (
-                  <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-xl border border-gray-100 max-h-36 overflow-y-auto">
+                  <div className="space-y-2 p-3 bg-gray-50 rounded-xl border border-gray-100 max-h-56 overflow-y-auto">
                     {flowers.map(f => {
-                      const selected = selectedFlowers.includes(f.id);
+                      const selected = selectedFlowerQty(f.id) > 0;
+                      const qty = selectedFlowerQty(f.id) || 1;
                       return (
-                        <button key={f.id} type="button" onClick={() => toggleFlower(f.id)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border-2 transition-all ${
-                            selected ? "bg-primary-600 text-white border-primary-600" : "bg-white text-gray-600 border-gray-200 hover:border-primary-300"
-                          }`}>
-                          <RiFlowerLine size={11} />
-                          {f.name}
-                          <span className="opacity-60">({f.type})</span>
-                        </button>
+                        <div
+                          key={f.id}
+                          className={`rounded-2xl border p-3 transition-all ${selected ? "bg-primary-50 border-primary-200" : "bg-white border-gray-200"}`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <button
+                              type="button"
+                              onClick={() => toggleFlower(f.id)}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border-2 transition-all ${
+                                selected ? "bg-primary-600 text-white border-primary-600" : "bg-white text-gray-600 border-gray-200 hover:border-primary-300"
+                              }`}
+                            >
+                              <RiFlowerLine size={11} />
+                              {f.name}
+                              <span className="opacity-70">({f.type})</span>
+                            </button>
+                            {selected && (
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => updateFlowerQty(f.id, qty - 1)}
+                                  className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-600 flex items-center justify-center hover:border-primary-300"
+                                >
+                                  <RiSubtractLine size={12} />
+                                </button>
+                                <span className="min-w-6 text-center text-sm font-semibold text-gray-900">{qty}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateFlowerQty(f.id, qty + 1)}
+                                  className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-600 flex items-center justify-center hover:border-primary-300"
+                                >
+                                  <RiAddLine size={12} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {selected && (
+                            <p className="mt-2 text-[11px] text-gray-500 flex items-center gap-1">
+                              <RiCheckLine size={11} className="text-primary-500" />
+                              {qty} flor{qty === 1 ? "" : "es"} de {f.name}
+                            </p>
+                          )}
+                        </div>
                       );
                     })}
                   </div>

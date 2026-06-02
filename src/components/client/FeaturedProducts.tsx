@@ -1,8 +1,8 @@
 "use client";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { RiShoppingBagLine, RiTimeLine, RiFlowerLine, RiStarLine, RiArrowRightLine } from "react-icons/ri";
-import { formatPrice, formatPreparationTime } from "@/lib/utils";
+import { RiShoppingBagLine, RiFlowerLine, RiStarLine, RiArrowRightLine } from "react-icons/ri";
+import { formatPrice } from "@/lib/utils";
 import { useCartStore } from "@/store/cartStore";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
@@ -16,8 +16,8 @@ export default function FeaturedProducts({ products }: { products: any[] }) {
     addItem({
       id: nanoid(), productId: p.id, name: p.name, price: p.price,
       image: p.images?.find((i: any) => i.isMain)?.url || p.images?.[0]?.url || "",
-      quantity: 1, preparationTimeValue: p.preparationTimeValue,
-      preparationTimeUnit: p.preparationTimeUnit, deliveryLeadDays: p.deliveryLeadDays || 0, addons: [],
+      quantity: 1, preparationTimeValue: 0,
+      preparationTimeUnit: "MINUTES", deliveryLeadDays: p.deliveryLeadDays || 0, addons: [],
     });
     toast.success(`${p.name} agregado al carrito`);
     toggleCart();

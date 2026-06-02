@@ -7,7 +7,7 @@ import {
   RiGobletLine, RiGlassesLine, RiBearSmileLine, RiCakeLine, RiShoppingBasketLine,
 } from "react-icons/ri";
 import Link from "next/link";
-import { formatPrice, formatPreparationTime } from "@/lib/utils";
+import { formatPrice, formatDeliveryLeadDays } from "@/lib/utils";
 import { useCartStore } from "@/store/cartStore";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
@@ -39,9 +39,15 @@ export default function ProductDetail({ product, addons }: { product: any; addon
     addItem({
       id: nanoid(), productId: product.id, name: product.name, price: product.price,
       image: mainImg, quantity: qty,
-      preparationTimeValue: product.preparationTimeValue,
-      preparationTimeUnit:  product.preparationTimeUnit,
+      preparationTimeValue: 0,
+      preparationTimeUnit: "MINUTES",
       deliveryLeadDays: product.deliveryLeadDays || 0,
+      flowers: (product.flowers || []).map((f: any) => ({
+        id: f.flower.id,
+        name: f.flower.name,
+        type: f.flower.type,
+        quantity: f.quantity || 1,
+      })),
       addons: selectedAddons.map(a => ({ id: a.id, name: a.name, price: a.price, type: a.type })),
     });
     toast.success(`${product.name} agregado al carrito`);
@@ -92,25 +98,17 @@ export default function ProductDetail({ product, addons }: { product: any; addon
 
             <p className="text-3xl font-bold text-gray-900">{formatPrice(product.price)}</p>
 
-            {(product.flowers.length > 0 || product.preparationTimeValue > 0) && (
+            {(product.flowers.length > 0 || product.deliveryLeadDays >= 0) && (
               <div className="flex flex-wrap gap-2">
                 {product.flowers.map((f: any) => (
                   <span key={f.id} className="flex items-center gap-1 text-xs bg-primary-50 text-primary-700 px-2.5 py-1.5 rounded-full border border-primary-100">
-                    <RiFlowerLine size={11}/> {f.flower.name}
+                    <RiFlowerLine size={11}/> {f.flower.name} x{f.quantity || 1}
                   </span>
                 ))}
-                {product.preparationTimeValue > 0 && (
-                  <span className="flex items-center gap-1 text-xs bg-amber-50 text-amber-700 px-2.5 py-1.5 rounded-full border border-amber-100">
-                    <RiTimeLine size={11}/>
-                    {formatPreparationTime(product.preparationTimeValue, product.preparationTimeUnit)}
-                  </span>
-                )}
-                {product.deliveryLeadDays > 0 && (
-                  <span className="flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-full border border-emerald-100">
-                    <RiTimeLine size={11}/>
-                    Entrega en {product.deliveryLeadDays} {product.deliveryLeadDays === 1 ? "día" : "días"}
-                  </span>
-                )}
+                <span className="flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-full border border-emerald-100">
+                  <RiTimeLine size={11}/>
+                  {formatDeliveryLeadDays(product.deliveryLeadDays || 0)}
+                </span>
               </div>
             )}
 
@@ -285,6 +283,20 @@ export default function ProductDetail({ product, addons }: { product: any; addon
                     <RiCloseLine size={20}/>
                   </button>
                 </div>
+
+                {product.flowers.length > 0 && (
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Composición del ramo</p>
+                    <div className="flex flex-wrap gap-2">
+                      {product.flowers.map((f: any) => (
+                        <span key={f.id} className="inline-flex items-center gap-1 rounded-full border border-primary-100 bg-white px-3 py-1.5 text-xs font-medium text-primary-700">
+                          <RiFlowerLine size={11} />
+                          {f.flower.name} x{f.quantity || 1}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <button
                   onClick={() => { toggleAddon(previewAddon); setPreviewAddon(null); }}

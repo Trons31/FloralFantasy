@@ -6,6 +6,13 @@ export interface CartAddon {
   id: string; name: string; price: number; type: string;
 }
 
+export interface CartFlower {
+  id: string;
+  name: string;
+  type: string;
+  quantity: number;
+}
+
 export interface CartItem {
   id: string;
   productId: string;
@@ -17,6 +24,7 @@ export interface CartItem {
   preparationTimeUnit: string;
   deliveryLeadDays: number;
   addons: CartAddon[];
+  flowers?: CartFlower[];
   subtotal: number;
 }
 

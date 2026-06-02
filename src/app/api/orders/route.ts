@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateTrackingToken } from "@/lib/tokens";
-import { sendOrderConfirmation } from "@/lib/email";
 import { sendPushToAdmins } from "@/lib/webpush";
 import { STATUS_LABELS } from "@/lib/utils";
 
@@ -88,7 +87,7 @@ export async function POST(req: NextRequest) {
       include: {
         items: {
           include: {
-            product: { include: { images: true } },
+            product: { include: { images: true, flowers: { include: { flower: true } } } },
             addons: { include: { addon: true } },
           },
         },
@@ -96,15 +95,6 @@ export async function POST(req: NextRequest) {
     });
 
     Promise.all([
-      email && !isAdminDraft
-        ? sendOrderConfirmation({
-            email,
-            customerName: name,
-            trackingToken,
-            total,
-            estimatedTime,
-          })
-        : Promise.resolve(),
       sendPushToAdmins({
         type: "ORDER_CREATED",
         orderId: order.id,
@@ -170,7 +160,7 @@ export async function GET(req: NextRequest) {
       paymentMethod: true,
       items: {
         include: {
-          product: { include: { images: true } },
+          product: { include: { images: true, flowers: { include: { flower: true } } } },
           addons: { include: { addon: true } },
         },
       },

@@ -18,7 +18,7 @@ export function formatPreparationTime(value: number, unit: string): string {
 }
 
 export function formatDeliveryLeadDays(days: number): string {
-  if (!days || days <= 0) return "Entrega hoy";
+  if (!days || days <= 0) return "Mismo día";
   return days === 1 ? "Entrega en 1 día" : `Entrega en ${days} días`;
 }
 

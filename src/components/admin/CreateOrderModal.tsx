@@ -5,7 +5,7 @@ import { RiCloseLine, RiSearchLine, RiAddLine, RiSubtractLine, RiShoppingBagLine
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import { DEFAULT_DELIVERY_FEE } from "@/lib/site-settings";
 import { toast } from "sonner";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatDeliveryLeadDays, getDeliveryDateLabel } from "@/lib/utils";
 
 interface ProductImage { url: string; isMain: boolean }
 interface Addon { id: string; name: string; price: number; type: string; inStock: boolean }
@@ -18,8 +18,7 @@ interface Product {
   images: ProductImage[];
   flowers?: { flower: Flower; quantity: number }[];
   occasion?: string;
-  preparationTimeValue?: number;
-  preparationTimeUnit?: string;
+  deliveryLeadDays?: number;
 }
 
 interface CartItem {
@@ -40,7 +39,6 @@ interface Props {
   onCreated?: (order: any) => void;
 }
 
-const ESTIMATED_OPTIONS = ["Inmediato", "Hoy mismo", "2 horas", "4 horas", "1 día", "2 días", "3 días"];
 const BOUQUET_SIZE_LABELS = {
   STANDARD: "Normal",
   ENLARGED: "Agrandado",
@@ -56,12 +54,6 @@ function buildBaseFlowers(product: Product) {
   }));
 }
 
-function formatPrepTime(value?: number, unit?: string) {
-  if (!value || !unit) return "Inmediato";
-  const map: Record<string, string> = { MINUTES: "min", HOURS: "h", DAYS: "d" };
-  return `${value} ${map[unit] || unit.toLowerCase()}`;
-}
-
 export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -73,7 +65,6 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [deliveryFee, setDeliveryFee] = useState(DEFAULT_DELIVERY_FEE);
-  const [estimatedTime, setEstimatedTime] = useState("Inmediato");
   const [adminNote, setAdminNote] = useState("");
   const [manualAdjustment, setManualAdjustment] = useState("");
   const [generatedLink, setGeneratedLink] = useState("");
@@ -87,7 +78,6 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
         setError("");
         setSearch("");
         setCart([]);
-        setEstimatedTime("Inmediato");
         setAdminNote("");
         setManualAdjustment("");
         setGeneratedLink("");
@@ -153,12 +143,6 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
         },
       }];
     });
-    if (product.preparationTimeValue && product.preparationTimeUnit) {
-      setEstimatedTime((current) => {
-        if (current !== "Inmediato") return current;
-        return formatPrepTime(product.preparationTimeValue, product.preparationTimeUnit);
-      });
-    }
   };
 
   const updateQty = (productId: string, delta: number) => {
@@ -257,6 +241,7 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
     (acc, c) => acc + c.price * c.quantity + c.addons.reduce((a, ad) => a + ad.price, 0) * c.quantity,
     0
   );
+  const maxDeliveryDays = cart.reduce((max, item) => Math.max(max, item.product.deliveryLeadDays || 0), 0);
   const manualAdjustmentValue = Number(manualAdjustment || 0);
   const total = subtotal + deliveryFee + manualAdjustmentValue;
 
@@ -281,7 +266,7 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
           deliveryFee,
           adminNote,
           manualAdjustment: manualAdjustmentValue,
-          estimatedTime,
+          estimatedTime: formatDeliveryLeadDays(maxDeliveryDays),
           source: "ADMIN",
           items: cart.map((c) => ({
             productId: c.product.id,
@@ -640,6 +625,10 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                         {item.customization.extraFlowers.length > 0
                           ? ` · ${item.customization.extraFlowers.length} flor${item.customization.extraFlowers.length > 1 ? "es" : ""} extra`
                           : ""}
+                      </p>
+                      <p className="text-[11px] text-emerald-600 mt-0.5">
+                        {formatDeliveryLeadDays(item.product.deliveryLeadDays || 0)}
+                        {(item.product.deliveryLeadDays || 0) > 0 ? ` · ${getDeliveryDateLabel(item.product.deliveryLeadDays || 0)}` : ""}
                       </p>
                     </div>
                     <p className="font-medium text-sm">

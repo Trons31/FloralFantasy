@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
       statusHistory: { orderBy: { createdAt: "asc" } },
       items: {
         include: {
-          product: { include: { images: true } },
+          product: { include: { images: true, flowers: { include: { flower: true } } } },
           addons: { include: { addon: true } },
         },
       },

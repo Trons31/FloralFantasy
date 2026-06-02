@@ -66,21 +66,26 @@ export default function CartDrawer() {
                 </div>
               ) : items.map(item => (
                 <div key={item.id} className="flex gap-3 bg-gray-50 rounded-2xl p-3">
-                  <img
+                    <img
                     src={item.image || "https://images.unsplash.com/photo-1487530811015-780a34f1e98d?w=100"}
                     alt={item.name} className="w-20 h-20 object-cover rounded-xl flex-shrink-0"/>
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium text-sm leading-tight mb-0.5 truncate">{item.name}</h4>
-                    {item.preparationTimeValue > 0 && (
-                      <p className="text-xs text-amber-600 flex items-center gap-1 mb-1">
-                        <RiTimeLine size={10}/>
-                        {item.preparationTimeValue} {item.preparationTimeUnit === "MINUTES" ? "min" : item.preparationTimeUnit === "HOURS" ? "h" : "d"} prep.
-                      </p>
-                    )}
                     {item.deliveryLeadDays > 0 && (
                       <p className="text-xs text-emerald-600 flex items-center gap-1 mb-1">
                         <RiTimeLine size={10}/>
                         {formatDeliveryLeadDays(item.deliveryLeadDays)}
+                      </p>
+                    )}
+                    {item.deliveryLeadDays <= 0 && (
+                      <p className="text-xs text-emerald-600 flex items-center gap-1 mb-1">
+                        <RiTimeLine size={10}/>
+                        {formatDeliveryLeadDays(0)}
+                      </p>
+                    )}
+                    {Array.isArray(item.flowers) && item.flowers.length > 0 && (
+                      <p className="text-xs text-gray-400 mb-1">
+                        {item.flowers.map((flower: any) => `${flower.name} x${flower.quantity || 1}`).join(", ")}
                       </p>
                     )}
                     {item.addons.length > 0 && (

@@ -73,14 +73,13 @@ export default function CheckoutPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const checkoutToken = searchParams.get("token") || "";
-  const { items, getTotalPrice, getEstimatedTime, getDeliveryLeadDays, clearCart } = useCartStore();
+  const { items, getTotalPrice, getDeliveryLeadDays, clearCart } = useCartStore();
   const [loading, setLoading] = useState(false);
   const [creatingOrder, setCreatingOrder] = useState(false);
   const [submittingProof, setSubmittingProof] = useState(false);
   const [createdOrder, setCreatedOrder] = useState<any>(null);
   const [orderItems, setOrderItems] = useState<any[]>([]);
   const [orderTotal, setOrderTotal] = useState(0);
-  const [orderEstimatedTime, setOrderEstimatedTime] = useState("");
   const [orderDeliveryLeadDays, setOrderDeliveryLeadDays] = useState(0);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [selectedMethodId, setSelectedMethodId] = useState("");
@@ -105,7 +104,6 @@ export default function CheckoutPageClient() {
 
   const subtotal = getTotalPrice();
   const total = subtotal + deliveryFee;
-  const est = getEstimatedTime();
   const cartDelivery = getDeliveryLeadDays();
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({ resolver: zodResolver(schema) });
@@ -143,19 +141,29 @@ export default function CheckoutPageClient() {
       .then((r) => r.json())
       .then((order) => {
         if (!order?.id) throw new Error("Pedido no encontrado");
+        const orderDeliveryDays = Array.isArray(order.items)
+          ? order.items.reduce((max: number, item: any) => Math.max(max, item.product?.deliveryLeadDays || 0), 0)
+          : 0;
         setCreatedOrder(order);
         setOrderItems(Array.isArray(order.items) ? order.items.map((item: any) => ({
           id: item.id,
           name: item.product?.name || "Producto",
           image: item.product?.images?.find((img: any) => img.isMain)?.url || item.product?.images?.[0]?.url || "",
           quantity: item.quantity,
+          flowers: Array.isArray(item.product?.flowers)
+            ? item.product.flowers.map((pf: any) => ({
+                id: pf.flower?.id || pf.id,
+                name: pf.flower?.name || "Flor",
+                type: pf.flower?.type || "",
+                quantity: pf.quantity || 1,
+              }))
+            : [],
           customization: item.customization || null,
           deliveryLeadDays: item.product?.deliveryLeadDays || 0,
           subtotal: item.price * item.quantity + (item.addons || []).reduce((sum: number, a: any) => sum + (a.price || 0), 0) * item.quantity,
         })) : []);
         setOrderTotal(typeof order.total === "number" ? order.total : 0);
-        setOrderEstimatedTime(order.estimatedTime || "");
-        setOrderDeliveryLeadDays(Array.isArray(order.items) ? order.items.reduce((max: number, item: any) => Math.max(max, item.product?.deliveryLeadDays || 0), 0) : 0);
+        setOrderDeliveryLeadDays(orderDeliveryDays);
         setCustomerName(order.customerName || "");
         setCustomerPhone(order.customerPhone || "");
         setCustomerEmail(order.customerEmail || "");
@@ -177,7 +185,7 @@ export default function CheckoutPageClient() {
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, items, total, deliveryFee, estimatedTime: est.label }),
+        body: JSON.stringify({ ...data, items, total, deliveryFee, estimatedTime: cartDelivery.label }),
       });
       const order = await res.json();
       if (!res.ok) throw new Error(order.error);
@@ -188,12 +196,14 @@ export default function CheckoutPageClient() {
         name: item.name,
         image: item.image,
         quantity: item.quantity,
+        flowers: Array.isArray((item as any).flowers)
+          ? (item as any).flowers
+          : [],
         customization: (item as any).customization || null,
         deliveryLeadDays: (item as any).deliveryLeadDays || 0,
         subtotal: item.subtotal,
       })));
       setOrderTotal(total);
-      setOrderEstimatedTime(est.label);
       setOrderDeliveryLeadDays(cartDelivery.days);
       setCustomerName(data.name);
       setCustomerPhone(data.phone);
@@ -420,22 +430,20 @@ export default function CheckoutPageClient() {
                               .join(", ")}
                           </p>
                         )}
+                        {Array.isArray(item.flowers) && item.flowers.length > 0 && (
+                          <p className="text-[11px] text-gray-400 mt-1">
+                            {item.flowers.map((flower: any) => `${flower.name} x${flower.quantity || 1}`).join(", ")}
+                          </p>
+                        )}
                       </div>
                       <p className="font-medium text-sm">{formatPrice(item.subtotal)}</p>
                     </div>
                   ))}
                 </div>
-                {orderEstimatedTime && (
-                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3 mb-4 text-sm text-amber-700">
-                    <RiTimeLine size={15} /> Entrega estimada: <strong>{orderEstimatedTime}</strong>
-                  </div>
-                )}
-                {orderDeliveryLeadDays > 0 && (
-                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-4 text-sm text-emerald-700">
-                    <RiTimeLine size={15} /> <strong>{formatDeliveryLeadDays(orderDeliveryLeadDays)}</strong>
-                    <span className="text-emerald-600">· {getDeliveryDateLabel(orderDeliveryLeadDays)}</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-4 text-sm text-emerald-700">
+                  <RiTimeLine size={15} /> <strong>{formatDeliveryLeadDays(orderDeliveryLeadDays)}</strong>
+                  <span className="text-emerald-600">· {getDeliveryDateLabel(orderDeliveryLeadDays)}</span>
+                </div>
                 <div className="border-t pt-4 space-y-2 text-sm">
                   <div className="flex justify-between text-gray-500">
                     <span className="flex items-center gap-1.5"><RiTruckLine size={14} /> Domicilio</span>
@@ -599,16 +607,20 @@ export default function CheckoutPageClient() {
                     <div className="flex-1">
                       <p className="font-medium text-sm">{item.name}</p>
                       <p className="text-xs text-gray-400">x{item.quantity}</p>
+                      {Array.isArray(item.flowers) && item.flowers.length > 0 && (
+                        <p className="text-[11px] text-gray-400 mt-1">
+                          {item.flowers.map((flower: any) => `${flower.name} x${flower.quantity || 1}`).join(", ")}
+                        </p>
+                      )}
                     </div>
                     <p className="font-medium text-sm">{formatPrice(item.subtotal)}</p>
                   </div>
                 ))}
               </div>
-              {orderEstimatedTime && (
-                <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3 mb-4 text-sm text-amber-700">
-                  <RiTimeLine size={15} /> Entrega estimada: <strong>{orderEstimatedTime}</strong>
-                </div>
-              )}
+              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-4 text-sm text-emerald-700">
+                <RiTimeLine size={15} /> <strong>{formatDeliveryLeadDays(cartDelivery.days)}</strong>
+                <span className="text-emerald-600">· {cartDelivery.dateLabel}</span>
+              </div>
               <div className="border-t pt-4 space-y-2 text-sm">
                 <div className="flex justify-between text-gray-500">
                   <span className="flex items-center gap-1.5"><RiTruckLine size={14} /> Domicilio</span>

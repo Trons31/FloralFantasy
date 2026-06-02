@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { uploadImage, deleteImage } from "@/lib/cloudinary";
+import { sendOrderConfirmation } from "@/lib/email";
 import { sendPushToAdmins } from "@/lib/webpush";
 
 function isValidImage(file: File) {
@@ -105,6 +106,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         status: updated.status,
       },
     }).catch(console.error);
+
+    if (updated.customerEmail) {
+      sendOrderConfirmation({
+        email: updated.customerEmail,
+        customerName: updated.customerName,
+        trackingToken: updated.trackingToken,
+        total: updated.total,
+        estimatedTime: updated.estimatedTime,
+      }).catch(console.error);
+    }
 
     return NextResponse.json({
       ...updated,
