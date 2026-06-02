@@ -5,7 +5,7 @@ import { RiCloseLine, RiSearchLine, RiAddLine, RiSubtractLine, RiShoppingBagLine
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import { DEFAULT_DELIVERY_FEE } from "@/lib/site-settings";
 import { toast } from "sonner";
-import { formatPrice, formatDeliveryLeadDays, getDeliveryDateLabel } from "@/lib/utils";
+import { formatPrice, formatDeliveryLeadDays } from "@/lib/utils";
 
 interface ProductImage { url: string; isMain: boolean }
 interface Addon { id: string; name: string; price: number; type: string; inStock: boolean }
@@ -328,20 +328,20 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-gray-200 bg-white p-4">
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Link de pago</label>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <input value={generatedLink} readOnly className="flex-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm bg-gray-50" />
-              <button onClick={handleCopy} className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-primary-600 text-white font-semibold">
-                {clipboardState ? <RiCheckLine size={16} /> : <RiFileCopyLine size={16} />}
-                {clipboardState ? "Copiado" : "Copiar"}
-              </button>
-              <button onClick={handleWhatsApp} className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-[#25D366] text-white font-semibold">
-                <RiWhatsappLine size={16} />
-                WhatsApp
-              </button>
+            <div className="rounded-3xl border border-gray-200 bg-white p-4">
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Link de pago</label>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input value={generatedLink} readOnly className="flex-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm bg-gray-50" />
+                <button onClick={handleCopy} className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-primary-600 text-white font-semibold">
+                  {clipboardState ? <RiCheckLine size={16} /> : <RiFileCopyLine size={16} />}
+                  {clipboardState ? "Copiado" : "Copiar"}
+                </button>
+                <button onClick={handleWhatsApp} className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-[#25D366] text-white font-semibold">
+                  <RiWhatsappLine size={16} />
+                  WhatsApp
+                </button>
+              </div>
             </div>
-          </div>
 
           <div className="flex justify-end gap-3">
             <button onClick={onClose} className="px-4 py-3 rounded-2xl border border-gray-200 text-gray-700 font-semibold">
@@ -627,8 +627,7 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                           : ""}
                       </p>
                       <p className="text-[11px] text-emerald-600 mt-0.5">
-                        {formatDeliveryLeadDays(item.product.deliveryLeadDays || 0)}
-                        {(item.product.deliveryLeadDays || 0) > 0 ? ` · ${getDeliveryDateLabel(item.product.deliveryLeadDays || 0)}` : ""}
+                        Entrega: {formatDeliveryLeadDays(item.product.deliveryLeadDays || 0)}
                       </p>
                     </div>
                     <p className="font-medium text-sm">

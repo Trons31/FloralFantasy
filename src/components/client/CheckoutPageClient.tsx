@@ -24,7 +24,7 @@ import {
 } from "react-icons/ri";
 import { toast } from "sonner";
 import { DEFAULT_DELIVERY_FEE } from "@/lib/site-settings";
-import { formatDeliveryLeadDays, getDeliveryDateLabel } from "@/lib/utils";
+import { formatDeliveryLeadDays } from "@/lib/utils";
 
 const schema = z.object({
   name: z.string().min(2, "Nombre muy corto"),
@@ -440,10 +440,11 @@ export default function CheckoutPageClient() {
                     </div>
                   ))}
                 </div>
-                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-4 text-sm text-emerald-700">
-                  <RiTimeLine size={15} /> <strong>{formatDeliveryLeadDays(orderDeliveryLeadDays)}</strong>
-                  <span className="text-emerald-600">· {getDeliveryDateLabel(orderDeliveryLeadDays)}</span>
-                </div>
+                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-4 text-sm text-emerald-700">
+                    <RiTimeLine size={15} />
+                    <span className="font-semibold">Entrega</span>
+                    <span>· {formatDeliveryLeadDays(orderDeliveryLeadDays)}</span>
+                  </div>
                 <div className="border-t pt-4 space-y-2 text-sm">
                   <div className="flex justify-between text-gray-500">
                     <span className="flex items-center gap-1.5"><RiTruckLine size={14} /> Domicilio</span>
@@ -453,7 +454,7 @@ export default function CheckoutPageClient() {
                     <div className="flex justify-between text-gray-500">
                       <span>Entrega</span>
                       <span className="text-emerald-600 font-medium">
-                        {getDeliveryDateLabel(orderDeliveryLeadDays)}
+                        {formatDeliveryLeadDays(orderDeliveryLeadDays)}
                       </span>
                     </div>
                   )}
@@ -590,7 +591,7 @@ export default function CheckoutPageClient() {
                 disabled={creatingOrder || loading}
                 className="w-full flex items-center justify-center gap-2 bg-primary-600 text-white py-4 rounded-full font-semibold hover:bg-primary-700 disabled:opacity-50 transition-all mt-2"
               >
-                {creatingOrder ? "Creando pedido..." : <><span>Crear pedido y ver métodos</span><RiArrowRightLine size={18} /></>}
+                {creatingOrder ? "Creando pedido..." : <><span>Continuar con el pedido</span><RiArrowRightLine size={18} /></>}
               </button>
             </form>
           </div>
@@ -617,10 +618,11 @@ export default function CheckoutPageClient() {
                   </div>
                 ))}
               </div>
-              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-4 text-sm text-emerald-700">
-                <RiTimeLine size={15} /> <strong>{formatDeliveryLeadDays(cartDelivery.days)}</strong>
-                <span className="text-emerald-600">· {cartDelivery.dateLabel}</span>
-              </div>
+                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-4 text-sm text-emerald-700">
+                  <RiTimeLine size={15} />
+                  <span className="font-semibold">Entrega</span>
+                  <span>· {formatDeliveryLeadDays(cartDelivery.days)}</span>
+                </div>
               <div className="border-t pt-4 space-y-2 text-sm">
                 <div className="flex justify-between text-gray-500">
                   <span className="flex items-center gap-1.5"><RiTruckLine size={14} /> Domicilio</span>
