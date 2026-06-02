@@ -10,6 +10,7 @@ export async function POST(req: NextRequest) {
     const {
       name,
       phone,
+      email,
       address,
       addressRef,
       items,
