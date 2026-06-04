@@ -29,6 +29,7 @@ const COLS = [
   { id: "PROCESSING", label: "Procesando", dot: "bg-amber-500", bg: "bg-amber-50/70 border-amber-200" },
   { id: "READY", label: "Listo", dot: "bg-green-500", bg: "bg-green-50/70 border-green-200" },
   { id: "OUT_FOR_DELIVERY", label: "En camino", dot: "bg-purple-500", bg: "bg-purple-50/70 border-purple-200" },
+  { id: "DELIVERED", label: "Entregado", dot: "bg-emerald-500", bg: "bg-emerald-50/70 border-emerald-200" },
 ];
 
 const ACTIVE_STATUSES = COLS.map((col) => col.id);
@@ -142,7 +143,10 @@ export default function KanbanBoard({ initialOrders }: { initialOrders: any[] })
           style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}
         >
           {COLS.map((col) => (
-            <div key={col.id} className={`rounded-2xl border-2 ${col.bg} flex flex-col min-h-[280px] min-w-0`}>
+            <div
+              key={col.id}
+              className={`rounded-2xl border-2 ${col.bg} flex flex-col h-[calc(100vh-240px)] min-h-[520px] min-w-0 overflow-hidden`}
+            >
               <div className="px-4 py-3 border-b border-current border-opacity-10 flex items-center gap-2 min-h-[56px]">
                 <span className={`w-2.5 h-2.5 rounded-full ${col.dot}`} />
                 <span className="font-semibold text-gray-800 text-sm leading-tight">{col.label}</span>
@@ -156,7 +160,7 @@ export default function KanbanBoard({ initialOrders }: { initialOrders: any[] })
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className={`flex-1 p-3 space-y-2.5 transition-colors ${snapshot.isDraggingOver ? "bg-white/50" : ""}`}
+                    className={`flex-1 min-h-0 p-3 space-y-2.5 overflow-y-auto transition-colors ${snapshot.isDraggingOver ? "bg-white/50" : ""}`}
                   >
                     {byStatus(col.id).map((order, i) => (
                       <Draggable key={order.id} draggableId={order.id} index={i}>

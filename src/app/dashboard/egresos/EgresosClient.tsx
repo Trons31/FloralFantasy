@@ -1,16 +1,17 @@
-"use client";
+﻿"use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import PhotoViewer from "@/components/client/PhotoViewer";
+import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import {
-  RiArrowDownLine, RiAddLine, RiDeleteBinLine, RiLoader4Line, RiCloseLine,
+  RiArrowDownLine, RiAddLine, RiDeleteBinLine, RiLoader4Line,
   RiArrowLeftLine, RiArrowRightLine, RiFilterLine, RiCalendarLine,
   RiCheckLine, RiZoomInLine, RiReceiptLine, RiDownloadLine,
 } from "react-icons/ri";
 import { formatPrice } from "@/lib/utils";
 import { toast } from "sonner";
 
-const CATS     = ["Flores","Transporte","Decoración","Empaque","Personal","Servicios","Otro"];
+const CATS = ["Flores", "Transporte", "Decoracion", "Empaque", "Personal", "Servicios", "Otro"];
 const PERIODOS = [
   { value:"hoy",        label:"Hoy"           },
   { value:"semana",     label:"7 días"        },
@@ -20,10 +21,14 @@ const PERIODOS = [
 ];
 const CAT_COLORS: Record<string,string> = {
   Flores:"bg-pink-100 text-pink-700", Transporte:"bg-blue-100 text-blue-700",
-  Decoración:"bg-purple-100 text-purple-700", Empaque:"bg-amber-100 text-amber-700",
+  Decoracion:"bg-purple-100 text-purple-700", Empaque:"bg-amber-100 text-amber-700",
   Personal:"bg-teal-100 text-teal-700", Servicios:"bg-indigo-100 text-indigo-700",
   Otro:"bg-gray-100 text-gray-600", Insumos:"bg-orange-100 text-orange-700",
 };
+
+function normalizeCategory(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
 
 function formatDate(iso: string) {
   const d = new Date(iso);
@@ -76,7 +81,7 @@ export default function EgresosClient({ expenses, summary, categories, paginatio
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("¿Eliminar este egreso?")) return;
+    if (!confirm("Â¿Eliminar este egreso?")) return;
     setDeleting(id);
     const res = await fetch(`/api/expenses/${id}`, { method:"DELETE" });
     if (res.ok) { toast.success("Eliminado"); router.refresh(); }
@@ -96,7 +101,7 @@ export default function EgresosClient({ expenses, summary, categories, paginatio
           <p className="text-gray-400 text-sm mt-1">Gestiona todos los gastos del negocio</p>
         </div>
         <button onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 bg-primary-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-700 transition-colors active:scale-95">
+          className="inline-flex w-fit items-center gap-2 bg-primary-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-700 transition-colors active:scale-95">
           <RiAddLine size={16}/> Registrar egreso
         </button>
       </div>
@@ -114,7 +119,7 @@ export default function EgresosClient({ expenses, summary, categories, paginatio
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 col-span-2 sm:col-span-1">
           <p className="text-xs text-gray-400 mb-1">Promedio por egreso</p>
           <p className="text-xl font-bold text-amber-600">
-            {summary.count > 0 ? formatPrice(summary.total / summary.count) : "—"}
+            {summary.count > 0 ? formatPrice(summary.total / summary.count) : "â€”"}
           </p>
         </div>
       </div>
@@ -158,7 +163,7 @@ export default function EgresosClient({ expenses, summary, categories, paginatio
                   ? "bg-gray-800 text-white"
                   : `${CAT_COLORS[c.category] || "bg-gray-100 text-gray-600"} opacity-80 hover:opacity-100`
               }`}>
-              {c.category} · {formatPrice(c.amount)}
+              {c.category} Â· {formatPrice(c.amount)}
             </button>
           ))}
         </div>
@@ -188,14 +193,14 @@ export default function EgresosClient({ expenses, summary, categories, paginatio
         <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
           <p className="font-semibold text-gray-900 text-sm">Registros ({pagination.total})</p>
           {pagination.total > 0 && (
-            <p className="text-xs text-gray-400">pág. {pagination.page}/{Math.max(1, totalPages)}</p>
+            <p className="text-xs text-gray-400">pÃ¡g. {pagination.page}/{Math.max(1, totalPages)}</p>
           )}
         </div>
 
         {expenses.length === 0 ? (
           <div className="text-center py-16">
             <RiArrowDownLine className="text-gray-200 mx-auto mb-3" size={48}/>
-            <p className="text-gray-400 text-sm">Sin egresos en este período</p>
+            <p className="text-gray-400 text-sm">Sin egresos en este perÃ­odo</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
@@ -223,7 +228,7 @@ export default function EgresosClient({ expenses, summary, categories, paginatio
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm text-gray-900">{e.description}</p>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CAT_COLORS[e.category] || "bg-gray-100 text-gray-600"}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CAT_COLORS[normalizeCategory(e.category)] || "bg-gray-100 text-gray-600"}`}>
                       {e.category}
                     </span>
                     <span className="text-xs text-gray-400">{formatDate(e.date)}</span>
@@ -271,67 +276,84 @@ export default function EgresosClient({ expenses, summary, categories, paginatio
       )}
 
       {/* Create modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center backdrop-blur-sm">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md shadow-2xl p-6 pb-8">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="font-bold text-lg">Registrar egreso</h2>
-              <button onClick={() => setShowForm(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400">
-                <RiCloseLine size={20}/>
-              </button>
+      <ResponsiveModal
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        title="Registrar egreso"
+        panelClassName="sm:max-w-lg"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">Descripción *</label>
+            <input
+              value={form.description}
+              onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+              placeholder="Ej: Compra de rosas rojas"
+              autoComplete="off"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base focus:border-primary-400 focus:outline-none"
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">Monto (COP) *</label>
+              <input
+                value={form.amount}
+                onChange={e => setForm(p => ({ ...p, amount: e.target.value }))}
+                type="number"
+                placeholder="50000"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base focus:border-primary-400 focus:outline-none"
+              />
             </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Descripción *</label>
-                <input value={form.description} onChange={e => setForm(p=>({...p,description:e.target.value}))}
-                  placeholder="Ej: Compra de rosas rojas" autoComplete="off"
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-primary-400"/>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Monto (COP) *</label>
-                  <input value={form.amount} onChange={e => setForm(p=>({...p,amount:e.target.value}))}
-                    type="number" placeholder="50000"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-primary-400"/>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Fecha</label>
-                  <input value={form.date} onChange={e => setForm(p=>({...p,date:e.target.value}))}
-                    type="date"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-primary-400"/>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Categoría</label>
-                <div className="flex flex-wrap gap-2">
-                  {CATS.map(c => (
-                    <button key={c} type="button" onClick={() => setForm(p=>({...p,category:c}))}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                        form.category === c ? "bg-primary-600 text-white" : `${CAT_COLORS[c]||"bg-gray-100 text-gray-600"}`
-                      }`}>
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowForm(false)} className="flex-1 border border-gray-200 text-gray-600 py-3.5 rounded-xl text-sm font-medium">
-                  Cancelar
-                </button>
-                <button onClick={handleSave} disabled={saving}
-                  className="flex-1 bg-primary-600 text-white py-3.5 rounded-xl text-sm font-semibold hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 active:scale-95">
-                  {saving ? <RiLoader4Line className="animate-spin" size={15}/> : <RiCheckLine size={15}/>}
-                  {saving ? "Guardando..." : "Guardar"}
-                </button>
-              </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">Fecha</label>
+              <input
+                value={form.date}
+                onChange={e => setForm(p => ({ ...p, date: e.target.value }))}
+                type="date"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base focus:border-primary-400 focus:outline-none"
+              />
             </div>
           </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700">Categoría</label>
+            <div className="flex flex-wrap gap-2">
+              {CATS.map(c => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setForm(p => ({ ...p, category: c }))}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                    form.category === c ? "bg-primary-600 text-white" : `${CAT_COLORS[normalizeCategory(c)] || "bg-gray-100 text-gray-600"}`
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={() => setShowForm(false)}
+              className="flex-1 rounded-xl border border-gray-200 py-3.5 text-sm font-medium text-gray-600"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary-600 py-3.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50 active:scale-95"
+            >
+              {saving ? <RiLoader4Line className="animate-spin" size={15} /> : <RiCheckLine size={15} />}
+              {saving ? "Guardando..." : "Guardar"}
+            </button>
+          </div>
         </div>
-      )}
+      </ResponsiveModal>
 
-      {/* Photo viewer — portal renders directly in document.body */}
+      {/* Photo viewer â€” portal renders directly in document.body */}
       {viewPhoto && <PhotoViewer url={viewPhoto} onClose={() => setViewPhoto(null)}/>}
 
     </div>
   );
 }
+

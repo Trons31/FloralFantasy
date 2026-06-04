@@ -351,7 +351,7 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
         </div>
       ) : (
         <div className="grid lg:grid-cols-[1.1fr_.9fr] gap-6">
-          <div className="space-y-4">
+          <div className="space-y-4 pb-28 sm:pb-0">
             <div className="rounded-3xl bg-gray-50 border border-gray-100 p-4">
               <div className="relative">
                 <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -664,15 +664,17 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
               {error && <div className="mt-3 rounded-2xl bg-red-50 border border-red-200 p-3 text-sm text-red-600">{error}</div>}
             </div>
 
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={submitting || cart.length === 0}
-              className="w-full flex items-center justify-center gap-2 bg-primary-600 text-white py-4 rounded-full font-semibold hover:bg-primary-700 disabled:opacity-50 transition-all"
-            >
-              {submitting ? "Generando link..." : "Generar link de pago"}
-              {!submitting && <RiLinkM size={18} />}
-            </button>
+            <div className="sticky bottom-0 -mx-0 bg-white pt-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:static sm:bg-transparent sm:pt-0 sm:pb-0">
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={submitting || cart.length === 0}
+                className="w-full flex items-center justify-center gap-2 bg-primary-600 text-white py-4 rounded-full font-semibold hover:bg-primary-700 disabled:opacity-50 transition-all shadow-lg shadow-primary-600/20"
+              >
+                {submitting ? "Generando link..." : "Generar link de pago"}
+                {!submitting && <RiLinkM size={18} />}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -84,10 +84,10 @@ export default function FeaturedProducts({ products }: { products: any[] }) {
                   </div>
 
                   {/* Hover overlay with cart button */}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-all duration-300 flex items-end justify-center pb-5 opacity-0 group-hover:opacity-100">
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-all duration-300 flex items-end justify-center pb-4 opacity-0 group-hover:opacity-100">
                     <button
                       onClick={(e) => handleAdd(e, p)}
-                      className="flex items-center gap-2 bg-white text-gray-900 text-xs font-semibold px-5 py-2.5 rounded-full shadow-lg hover:bg-primary-600 hover:text-white transition-all duration-200 translate-y-3 group-hover:translate-y-0"
+                      className="inline-flex w-auto max-w-[calc(100%-1.25rem)] items-center gap-2 whitespace-nowrap bg-white text-gray-900 text-[11px] font-semibold px-4 py-2.5 rounded-full shadow-lg hover:bg-primary-600 hover:text-white transition-all duration-200 translate-y-3 group-hover:translate-y-0"
                     >
                       <RiShoppingBagLine size={13}/> Añadir al carrito
                     </button>

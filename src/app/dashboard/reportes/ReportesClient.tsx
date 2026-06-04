@@ -154,12 +154,14 @@ export default function ReportesClient({
           { label:"Egresos",      value: formatPrice(summary.totalExpenses), icon: RiArrowDownLine, color:"text-red-500",     bg:"bg-red-50",     sub:"gastos registrados" },
           { label:"Ganancia neta",value: formatPrice(ganancia),              icon: RiBarChartLine,  color: ganancia>=0?"text-primary-600":"text-red-600", bg: ganancia>=0?"bg-primary-50":"bg-red-50", sub: ganancia>=0?"utilidad":"pérdida" },
         ].map(s => (
-          <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div key={s.label} className="min-w-0 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <div className={`w-9 h-9 ${s.bg} rounded-xl flex items-center justify-center mb-3`}>
               <s.icon className={s.color} size={18}/>
             </div>
             <p className="text-xs text-gray-400 mb-1">{s.label}</p>
-            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+            <p className={`min-w-0 truncate text-[clamp(1.15rem,4.2vw,2rem)] font-bold leading-none tracking-tight ${s.color}`} title={s.value}>
+              {s.value}
+            </p>
             <p className="text-xs text-gray-400 mt-1">{s.sub}</p>
           </div>
         ))}

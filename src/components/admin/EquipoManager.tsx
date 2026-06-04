@@ -149,7 +149,7 @@ export default function EquipoManager({ members: init }: { members: Member[] }) 
         <a
           href="/operaciones"
           target="_blank"
-          className="flex-shrink-0 flex items-center gap-1.5 bg-primary-600 text-white px-3 py-2 rounded-xl text-sm font-medium hover:bg-primary-700 transition-colors"
+          className="inline-flex w-fit flex-shrink-0 items-center gap-1.5 bg-primary-600 text-white px-3 py-2 rounded-xl text-sm font-medium hover:bg-primary-700 transition-colors"
         >
           <RiExternalLinkLine size={14} /> operaciones
         </a>

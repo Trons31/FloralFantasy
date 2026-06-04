@@ -81,25 +81,25 @@ export default function ProductDetail({ product, addons }: { product: any; addon
           </div>
 
           {/* ── Panel derecho ── */}
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-3 sm:gap-4">
 
             <div>
-              <p className="text-xs font-semibold text-primary-500 uppercase tracking-widest mb-1.5">
+              <p className="text-xs font-semibold text-primary-500 uppercase tracking-widest mb-1">
                 {product.category?.name}
               </p>
-              <h1 className="text-4xl md:text-5xl font-semibold text-gray-900 leading-tight mb-3"
+              <h1 className="text-4xl md:text-5xl font-semibold text-gray-900 leading-tight mb-1.5"
                   style={{ fontFamily: "var(--font-cormorant), Georgia, serif" }}>
                 {product.name}
               </h1>
               {product.description && (
-                <p className="text-gray-400 text-sm leading-relaxed">{product.description}</p>
+                <p className="text-gray-400 text-sm leading-snug">{product.description}</p>
               )}
             </div>
 
-            <p className="text-3xl font-bold text-gray-900">{formatPrice(product.price)}</p>
+            <p className="text-3xl font-bold text-gray-900 leading-none">{formatPrice(product.price)}</p>
 
             {(product.flowers.length > 0 || product.deliveryLeadDays >= 0) && (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 mt-[-2px]">
                 {product.flowers.map((f: any) => (
                   <span key={f.id} className="flex items-center gap-1 text-xs bg-primary-50 text-primary-700 px-2.5 py-1.5 rounded-full border border-primary-100">
                     <RiFlowerLine size={11}/> {f.flower.name} x{f.quantity || 1}
@@ -111,8 +111,6 @@ export default function ProductDetail({ product, addons }: { product: any; addon
                 </span>
               </div>
             )}
-
-            <hr className="border-gray-100" />
 
             {/* ── Addons con foto grande ── */}
             {addons.length > 0 && (
@@ -182,8 +180,6 @@ export default function ProductDetail({ product, addons }: { product: any; addon
                 </div>
               </div>
             )}
-
-            <hr className="border-gray-100" />
 
             {/* Cantidad + botón desktop */}
             <div className="hidden lg:block space-y-3">

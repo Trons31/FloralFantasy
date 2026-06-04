@@ -7,6 +7,7 @@ import {
 } from "react-icons/ri";
 import { formatPrice } from "@/lib/utils";
 import { toast } from "sonner";
+import ResponsiveModal from "@/components/ui/ResponsiveModal";
 
 type Addon     = { id:string; addon:{ name:string } };
 type OrderItem = { id:string; quantity:number; addons:Addon[]; product:{ name:string; images:{url:string;isMain:boolean}[] } };
@@ -20,6 +21,7 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
   const [orders,       setOrders]       = useState<Order[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [updating,     setUpdating]     = useState<string|null>(null);
+  const [activeTab,    setActiveTab]    = useState<"READY"|"DELIVERED">("READY");
   const [photoOrder,   setPhotoOrder]   = useState<Order|null>(null);
   const [photoFile,    setPhotoFile]    = useState<File|null>(null);
   const [photoPreview, setPhotoPreview] = useState<string|null>(null);
@@ -40,7 +42,7 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
     setLoading(true);
     const res  = await fetch("/api/orders");
     const data = await res.json();
-    setOrders(Array.isArray(data) ? data.filter((o:any) => ["READY","OUT_FOR_DELIVERY"].includes(o.status)) : []);
+    setOrders(Array.isArray(data) ? data.filter((o:any) => ["READY","OUT_FOR_DELIVERY","DELIVERED"].includes(o.status)) : []);
     setLoading(false);
   };
 
@@ -80,7 +82,12 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
     fd.append("orderId", photoOrder.id);
     const res = await fetch("/api/orders/delivery-photo", { method:"POST", body: fd });
     if (res.ok) {
-      setOrders(p => p.filter(o => o.id !== photoOrder.id));
+      await fetch(`/api/orders/${photoOrder.id}/status`, {
+        method:"PATCH",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ status:"DELIVERED", note:"Entrega confirmada con foto" }),
+      }).catch(() => {});
+      setOrders(p => p.map(o => o.id === photoOrder.id ? { ...o, status:"DELIVERED" } : o));
       toast.success("Entrega confirmada con foto");
       setPhotoOrder(null);
       setPhotoError(false);
@@ -126,7 +133,11 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
   };
 
   const ready          = orders.filter(o => o.status === "READY");
-  const outForDelivery = orders.filter(o => o.status === "OUT_FOR_DELIVERY");
+  const delivered      = orders.filter(o => ["OUT_FOR_DELIVERY","DELIVERED"].includes(o.status));
+  const activeOrders   = activeTab === "READY" ? ready : delivered;
+  const activeConfig   = activeTab === "READY"
+    ? { title:"Listos para recoger", count: ready.length, dot:"bg-green-500" }
+    : { title:"Entregados", count: delivered.length, dot:"bg-purple-500" };
 
   return (
     <div className="min-h-screen bg-blue-50">
@@ -163,7 +174,49 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+      <div className="max-w-2xl mx-auto px-4 py-6 pb-28 space-y-6">
+        {!loading && orders.length > 0 && (
+          <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-gray-100 bg-white/95 px-2 py-2.5 backdrop-blur-md shadow-[0_-10px_30px_rgba(0,0,0,0.06)]">
+            <div className="max-w-2xl mx-auto">
+              <div className="grid grid-cols-2 gap-1.5 rounded-3xl bg-gray-50 p-1.5">
+                <button
+                  onClick={() => setActiveTab("READY")}
+                  className={`flex min-w-0 items-center justify-between gap-1.5 rounded-2xl px-2.5 py-2.5 text-[11px] font-semibold transition-all ${
+                    activeTab === "READY"
+                      ? "bg-white text-blue-700 shadow-sm ring-1 ring-blue-100"
+                      : "text-gray-500 hover:bg-white/70"
+                  }`}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${activeTab === "READY" ? "bg-green-500" : "bg-green-400/70"}`} />
+                    <span className="truncate">Listos para recoger</span>
+                  </span>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${activeTab === "READY" ? "bg-green-50 text-green-700" : "bg-white text-gray-500"}`}>
+                    {ready.length}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab("DELIVERED")}
+                  className={`flex min-w-0 items-center justify-between gap-1.5 rounded-2xl px-2.5 py-2.5 text-[11px] font-semibold transition-all ${
+                    activeTab === "DELIVERED"
+                      ? "bg-white text-purple-700 shadow-sm ring-1 ring-purple-100"
+                      : "text-gray-500 hover:bg-white/70"
+                  }`}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${activeTab === "DELIVERED" ? "bg-purple-500" : "bg-purple-400/70"}`} />
+                    <span className="truncate">Entregados</span>
+                  </span>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${activeTab === "DELIVERED" ? "bg-purple-50 text-purple-700" : "bg-white text-gray-500"}`}>
+                    {delivered.length}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex justify-center py-20"><RiLoader4Line className="animate-spin text-blue-500" size={32}/></div>
         ) : orders.length === 0 ? (
@@ -173,52 +226,52 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
             <p className="text-gray-300 text-sm mt-1">Toca actualizar para revisar</p>
           </div>
         ) : (
-          <>
-            {ready.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="w-2.5 h-2.5 rounded-full bg-green-500"/>
-                  <h2 className="font-bold text-gray-700 text-sm uppercase tracking-wide">Listos para recoger ({ready.length})</h2>
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className={`w-2.5 h-2.5 rounded-full ${activeConfig.dot}`} />
+              <h2 className="font-bold text-gray-700 text-sm uppercase tracking-wide">
+                {activeConfig.title} ({activeConfig.count})
+              </h2>
+            </div>
+            <div className="space-y-3">
+              {activeOrders.length > 0 ? (
+                activeOrders.map(order => (
+                  <DeliveryCard
+                    key={order.id}
+                    order={order}
+                    updating={updating}
+                    action={
+                      activeTab === "READY"
+                        ? { label:"Recoger y salir", color:"bg-blue-500 hover:bg-blue-600" }
+                        : { label: order.status === "DELIVERED" ? "Entregado" : "Subir foto de entrega", color:"bg-green-500 hover:bg-green-600" }
+                    }
+                    onAction={activeTab === "READY" ? () => markOutForDelivery(order.id) : null}
+                    onDeliver={activeTab === "DELIVERED" && order.status !== "DELIVERED" ? () => { setPhotoOrder(order); setPhotoFile(null); setPhotoPreview(null); setPhotoError(false); } : null}
+                  />
+                ))
+              ) : (
+                <div className="text-center py-20">
+                  <RiTruckLine className="text-gray-200 mx-auto mb-3" size={56}/>
+                  <p className="text-gray-400 font-medium">Sin pedidos en esta sección</p>
+                  <p className="text-gray-300 text-sm mt-1">Toca actualizar para revisar</p>
                 </div>
-                <div className="space-y-3">
-                  {ready.map(order => (
-                    <DeliveryCard key={order.id} order={order} updating={updating}
-                      action={{ label:"Recoger y salir", color:"bg-blue-500 hover:bg-blue-600" }}
-                      onAction={() => markOutForDelivery(order.id)}
-                      onDeliver={null}/>
-                  ))}
-                </div>
-              </div>
-            )}
-            {outForDelivery.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse"/>
-                  <h2 className="font-bold text-gray-700 text-sm uppercase tracking-wide">En camino ({outForDelivery.length})</h2>
-                </div>
-                <div className="space-y-3">
-                  {outForDelivery.map(order => (
-                    <DeliveryCard key={order.id} order={order} updating={updating}
-                      action={{ label:"Confirmar entrega con foto", color:"bg-green-500 hover:bg-green-600" }}
-                      onAction={null}
-                      onDeliver={() => { setPhotoOrder(order); setPhotoFile(null); setPhotoPreview(null); setPhotoError(false); }}/>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
+              )}
+            </div>
+          </div>
         )}
       </div>
 
       {/* ── Delivery photo modal ── */}
-      {photoOrder && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6">
-            <h2 className="font-bold text-lg mb-1">Confirmar entrega</h2>
-            <p className="text-sm text-gray-500 mb-4">
-              La foto de evidencia es <span className="font-semibold text-red-500">obligatoria</span> para confirmar
-            </p>
-            <div className="bg-gray-50 rounded-xl p-3 mb-4 text-sm">
+      <ResponsiveModal
+        open={!!photoOrder}
+        onClose={() => { setPhotoOrder(null); setPhotoError(false); }}
+        title="Confirmar entrega"
+        description="La foto de evidencia es obligatoria para confirmar."
+        panelClassName="sm:max-w-md"
+      >
+        {photoOrder && (
+          <div className="space-y-4">
+            <div className="rounded-2xl bg-gray-50 p-3 text-sm">
               <p className="font-bold text-gray-900">
                 {photoOrder.items.map(i => `${i.quantity>1?`x${i.quantity} `:""}${i.product.name}`).join(", ")}
               </p>
@@ -227,63 +280,88 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
                 <RiMapPin2Line size={11}/> {photoOrder.address}
               </p>
             </div>
-            <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleDeliveryPhoto} className="hidden"/>
 
-            {/* Label with required indicator */}
-            <p className="text-sm font-medium text-gray-700 mb-2">
-              Foto de entrega <span className="text-red-500">*</span>
-            </p>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleDeliveryPhoto}
+              className="hidden"
+            />
 
-            {photoPreview ? (
-              <div className="relative mb-4">
-                <img src={photoPreview} alt="Evidencia" className="w-full h-48 object-cover rounded-2xl"/>
-                <button onClick={() => { setPhotoFile(null); setPhotoPreview(null); setPhotoError(false); }}
-                  className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center">
-                  <RiCloseLine size={16}/>
-                </button>
-                <div className="absolute bottom-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-lg flex items-center gap-1">
-                  <RiCheckLine size={11}/> Foto lista
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
+                Foto de entrega <span className="text-red-500">*</span>
+              </label>
+
+              {photoPreview ? (
+                <div className="relative">
+                  <img src={photoPreview} alt="Evidencia" className="w-full h-52 object-cover rounded-2xl" />
+                  <button
+                    onClick={() => {
+                      setPhotoFile(null);
+                      setPhotoPreview(null);
+                      setPhotoError(false);
+                    }}
+                    className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center"
+                  >
+                    <RiCloseLine size={16} />
+                  </button>
+                  <div className="absolute bottom-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-lg flex items-center gap-1">
+                    <RiCheckLine size={11} /> Foto lista
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <>
-                <button onClick={() => { fileRef.current?.click(); setPhotoError(false); }}
-                  className={`w-full h-36 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-2 transition-colors mb-1 ${
+              ) : (
+                <button
+                  onClick={() => {
+                    fileRef.current?.click();
+                    setPhotoError(false);
+                  }}
+                  className={`w-full h-40 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-2 transition-colors ${
                     photoError
                       ? "border-red-400 bg-red-50 hover:border-red-500"
                       : "border-gray-200 hover:border-primary-400 hover:bg-primary-50"
-                  }`}>
-                  <RiCameraLine className={photoError ? "text-red-400" : "text-gray-300"} size={36}/>
+                  }`}
+                >
+                  <RiCameraLine className={photoError ? "text-red-400" : "text-gray-300"} size={36} />
                   <span className={`text-sm font-medium ${photoError ? "text-red-500" : "text-gray-400"}`}>
                     Tomar foto de entrega
                   </span>
-                  {photoError && (
-                    <span className="text-xs text-red-400">Debes tomar la foto para continuar</span>
-                  )}
+                  {photoError && <span className="text-xs text-red-400">Debes tomar la foto para continuar</span>}
                 </button>
-                {photoError && (
-                  <div className="flex items-center gap-1.5 text-red-500 text-xs mb-3 px-1">
-                    <RiErrorWarningLine size={13}/>
-                    <span>La foto es obligatoria para confirmar la entrega</span>
-                  </div>
-                )}
-              </>
-            )}
+              )}
 
-            <div className="flex gap-3 mt-4">
-              <button onClick={() => { setPhotoOrder(null); setPhotoError(false); }}
-                className="flex-1 py-3 border border-gray-200 rounded-xl text-gray-600 text-sm font-medium">
+              {photoError && (
+                <div className="flex items-center gap-1.5 text-red-500 text-xs mt-3 px-1">
+                  <RiErrorWarningLine size={13} />
+                  <span>La foto es obligatoria para confirmar la entrega</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => {
+                  setPhotoOrder(null);
+                  setPhotoError(false);
+                }}
+                className="flex-1 py-3 border border-gray-200 rounded-xl text-gray-600 text-sm font-medium"
+              >
                 Cancelar
               </button>
-              <button onClick={confirmDelivery} disabled={uploading}
-                className="flex-1 py-3 bg-green-500 text-white rounded-xl text-sm font-semibold hover:bg-green-600 disabled:opacity-40 flex items-center justify-center gap-2">
-                {uploading ? <RiLoader4Line className="animate-spin" size={16}/> : <RiCheckLine size={16}/>}
+              <button
+                onClick={confirmDelivery}
+                disabled={uploading}
+                className="flex-1 py-3 bg-green-500 text-white rounded-xl text-sm font-semibold hover:bg-green-600 disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {uploading ? <RiLoader4Line className="animate-spin" size={16} /> : <RiCheckLine size={16} />}
                 {uploading ? "Subiendo..." : "Confirmar"}
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </ResponsiveModal>
 
       {/* ── Egreso / gasto modal ── */}
       {showEgreso && (
@@ -390,6 +468,7 @@ function DeliveryCard({ order, updating, action, onAction, onDeliver }: {
 }) {
   const mainImg  = order.items[0]?.product?.images?.find(i=>i.isMain)?.url || order.items[0]?.product?.images?.[0]?.url;
   const isUpdating = updating === order.id;
+  const disabled = !onAction && !onDeliver;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
@@ -427,12 +506,15 @@ function DeliveryCard({ order, updating, action, onAction, onDeliver }: {
       <div className="px-4 pb-4">
         <button
           onClick={onAction ?? onDeliver ?? undefined}
-          disabled={isUpdating}
+          disabled={isUpdating || disabled}
           className={`w-full py-3 rounded-xl text-white font-semibold text-sm flex items-center justify-center gap-2 transition-all ${action.color} disabled:opacity-50`}>
           {isUpdating ? <RiLoader4Line className="animate-spin" size={16}/> :
            onDeliver  ? <RiCameraLine size={16}/> : <RiTruckLine size={16}/>}
           {isUpdating ? "Actualizando..." : action.label}
         </button>
+        {order.deliveryPhotoUrl && (
+          <p className="text-[11px] text-emerald-600 mt-2 text-center">Foto de entrega registrada</p>
+        )}
       </div>
     </div>
   );

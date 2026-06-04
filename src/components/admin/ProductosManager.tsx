@@ -8,6 +8,7 @@ import {
 import { FaStar } from "react-icons/fa6";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import { formatPrice, formatDeliveryLeadDays, getDeliveryDateLabel } from "@/lib/utils";
 
 const OCCASIONS = ["amor","cumpleanos","bodas","condolencias","graduacion","recuperacion"];
@@ -269,14 +270,14 @@ export default function ProductosManager({
       )}
 
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10 rounded-t-3xl">
-              <h2 className="font-bold text-lg">{editing ? "Editar producto" : "Nuevo producto"}</h2>
-              <button onClick={closeForm} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors"><RiCloseLine size={20} /></button>
-            </div>
-
-            <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-5">
+        <ResponsiveModal
+          open={showForm}
+          onClose={closeForm}
+          title={editing ? "Editar producto" : "Nuevo producto"}
+          description={editing ? "Actualiza la información del producto y su composición." : "Registra el producto y define su composición."}
+          panelClassName="sm:max-w-3xl lg:max-w-4xl"
+        >
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
 
               {/* Images */}
               <div>
@@ -526,8 +527,7 @@ export default function ProductosManager({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </ResponsiveModal>
       )}
     </>
   );
