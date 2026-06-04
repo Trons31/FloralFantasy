@@ -367,8 +367,8 @@ export default function PedidosListClient({ orders, summary, statusBreakdown, pa
       <ResponsiveModal
         open={!!selectedOrder}
         onClose={() => setSelectedOrder(null)}
-        title={selectedOrder ? "Detalle del pedido" : undefined}
-        description={selectedOrder ? selectedOrder.trackingToken : undefined}
+        title="Detalle del pedido"
+        description={selectedOrder?.trackingToken || ""}
         panelClassName="md:max-w-4xl"
       >
         {selectedOrder && (
