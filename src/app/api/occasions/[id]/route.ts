@@ -72,7 +72,7 @@ async function replaceImages(occasionId: string, nextImages: ReturnType<typeof n
 }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  if (!(await requireAdminUser(req))) {
+  if (!(await requireAdminUser())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
@@ -126,8 +126,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  if (!(await requireAdminUser(req))) {
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  if (!(await requireAdminUser())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
@@ -150,4 +150,3 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
   return NextResponse.json({ ok: true });
 }
-

@@ -16,6 +16,8 @@ import {
   RiTruckLine,
 } from "react-icons/ri";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardPage() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);

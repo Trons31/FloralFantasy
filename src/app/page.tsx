@@ -8,13 +8,33 @@ import Footer from "@/components/client/Footer";
 import CartDrawer from "@/components/client/CartDrawer";
 import WhatsAppButton from "@/components/client/WhatsAppButton";
 
-export default async function HomePage() {
-  let featured = await prisma.product.findMany({
-    where: { featured: true, inStock: true },
-    include: { images: { orderBy: { order: "asc" } }, category: true, flowers: { include: { flower: true } } },
-    take: 8,
-  }).catch(() => []);
+export const dynamic = "force-dynamic";
 
+export default async function HomePage() {
+  const [occasionsRaw, featuredRaw] = await Promise.all([
+    prisma.occasion.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        subtitle: true,
+        advanceOrderDays: true,
+        images: {
+          select: { url: true, isMain: true, order: true },
+          orderBy: { order: "asc" },
+        },
+      },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    }).catch(() => []),
+    prisma.product.findMany({
+      where: { featured: true, inStock: true },
+      include: { images: { orderBy: { order: "asc" } }, category: true, flowers: { include: { flower: true } } },
+      take: 8,
+    }).catch(() => []),
+  ]);
+
+  let featured = featuredRaw;
   if (featured.length === 0) {
     featured = await prisma.product.findMany({
       where: { inStock: true },
@@ -24,14 +44,15 @@ export default async function HomePage() {
     }).catch(() => []);
   }
 
-  const serialized = featured.map(p => ({ ...p, createdAt: p.createdAt.toISOString() }));
+  const serialized = featured.map((p) => ({ ...p, createdAt: p.createdAt.toISOString() }));
+  const occasions = occasionsRaw;
 
   return (
     <main className="min-h-screen bg-[#fdfcf8]">
       <Header />
       <HeroSection />
       <FeaturedProducts products={serialized} />
-      <OccasionsSection />
+      <OccasionsSection occasions={occasions} />
       <TestimonialsSection />
       <Footer />
       <CartDrawer />

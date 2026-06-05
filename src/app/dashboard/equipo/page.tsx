@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import EquipoManager from "@/components/admin/EquipoManager";
 
+export const dynamic = "force-dynamic";
+
 export default async function EquipoPage() {
   const team = await prisma.user.findMany({
     where: { role: { in: ["PREPARADOR", "REPARTIDOR", "CORREDOR"] } },

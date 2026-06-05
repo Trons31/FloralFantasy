@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import AjustesClient from "@/components/admin/AjustesClient";
 
+export const dynamic = "force-dynamic";
+
 export default async function AjustesPage() {
   const deliveryFeeSetting = await prisma.appSetting.findUnique({ where: { key: "deliveryFee" } }).catch(() => null);
   const methods = await prisma.paymentMethod.findMany({

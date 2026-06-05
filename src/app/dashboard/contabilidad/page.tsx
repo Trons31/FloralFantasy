@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay } from "date-fns";
 import ContabilidadDashboard from "./ContabilidadDashboard";
 
+export const dynamic = "force-dynamic";
+
 export default async function ContabilidadPage() {
   const now   = new Date();
   const mesStart  = startOfMonth(now);

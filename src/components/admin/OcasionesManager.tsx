@@ -7,8 +7,6 @@ import {
   RiEditLine,
   RiImageAddLine,
   RiLoader4Line,
-  RiCheckboxCircleLine,
-  RiCloseLine,
   RiCalendar2Line,
   RiShieldCheckLine,
   RiEyeLine,

@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import PedidosListClient from "./PedidosListClient";
 import { startOfDay, endOfDay, startOfMonth, endOfMonth, subMonths } from "date-fns";
 
+export const dynamic = "force-dynamic";
+
 export default async function TodosPedidosPage({
   searchParams,
 }: {

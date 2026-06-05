@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdminUser } from "@/lib/route-auth";
-import { deleteImage } from "@/lib/cloudinary";
 
 type OccasionImageInput = {
   url?: string;
@@ -44,42 +43,8 @@ function normalizeImages(images: OccasionImageInput[] | undefined) {
     }));
 }
 
-async function syncImages(occasionId: string, nextImages: ReturnType<typeof normalizeImages>) {
-  const current = await prisma.occasionImage.findMany({
-    where: { occasionId },
-    select: { id: true, url: true, publicId: true },
-  });
-
-  const nextKeys = new Set(nextImages.map((img) => img.publicId || img.url));
-  const toDelete = current.filter((img) => !nextKeys.has(img.publicId || img.url));
-
-  await Promise.all(
-    toDelete
-      .filter((img) => img.publicId)
-      .map((img) => deleteImage(img.publicId!))
-  );
-
-  await prisma.occasionImage.deleteMany({ where: { occasionId } });
-  await prisma.occasionImage.createMany({
-    data: nextImages.map((img) => ({
-      occasionId,
-      url: img.url,
-      publicId: img.publicId || null,
-      isMain: img.isMain,
-      order: img.order,
-    })),
-  });
-}
-
-async function serializeOccasion(id: string) {
-  return prisma.occasion.findUnique({
-    where: { id },
-    include: { images: { orderBy: { order: "asc" } } },
-  });
-}
-
-export async function GET(req: NextRequest) {
-  if (!(await requireAdminUser(req))) {
+export async function GET(_req: NextRequest) {
+  if (!(await requireAdminUser())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
@@ -92,7 +57,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!(await requireAdminUser(req))) {
+  if (!(await requireAdminUser())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
@@ -139,4 +104,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-

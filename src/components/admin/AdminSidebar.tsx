@@ -11,6 +11,7 @@ import {
   RiLayoutGridLine,
   RiListCheck,
   RiSettings4Line,
+  RiCalendarEventLine,
 } from "react-icons/ri";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -20,6 +21,7 @@ const NAV = [
   { href: "/dashboard/todos-pedidos", icon: RiListCheck, label: "Pedidos" },
   { href: "/dashboard/flores", icon: RiFlowerLine, label: "Flores" },
   { href: "/dashboard/productos", icon: RiLeafLine, label: "Productos" },
+  { href: "/dashboard/ocasiones", icon: RiCalendarEventLine, label: "Ocasiones" },
   { href: "/dashboard/addons", icon: RiGiftLine, label: "Adicionales" },
   { href: "/dashboard/contabilidad", icon: RiCalculatorLine, label: "Contabilidad" },
   { href: "/dashboard/egresos", icon: RiWalletLine, label: "Egresos" },

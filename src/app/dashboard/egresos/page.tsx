@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import EgresosClient from "./EgresosClient";
 import { startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay } from "date-fns";
 
+export const dynamic = "force-dynamic";
+
 export default async function EgresosPage({
   searchParams,
 }: {

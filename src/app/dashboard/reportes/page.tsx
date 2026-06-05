@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { startOfDay, startOfWeek, startOfMonth, subMonths, endOfDay } from "date-fns";
 import ReportesClient from "./ReportesClient";
 
+export const dynamic = "force-dynamic";
+
 export default async function ReportesPage({
   searchParams,
 }: {

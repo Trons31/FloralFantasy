@@ -5,6 +5,8 @@ import Footer from "@/components/client/Footer";
 import CartDrawer from "@/components/client/CartDrawer";
 import ProductDetail from "@/components/client/ProductDetail";
 
+export const dynamic = "force-dynamic";
+
 export default async function ProductPage({ params }: { params: { id: string } }) {
   const product = await prisma.product.findUnique({
     where: { id: params.id },

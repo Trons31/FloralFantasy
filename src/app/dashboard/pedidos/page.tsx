@@ -2,6 +2,8 @@
 import { prisma } from "@/lib/prisma";
 import KanbanBoard from "@/components/admin/KanbanBoard";
 
+export const dynamic = "force-dynamic";
+
 export default async function PedidosPage() {
   const orders = await prisma.order
     .findMany({
