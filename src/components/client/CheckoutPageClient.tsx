@@ -66,6 +66,28 @@ function paymentMethodGuide(method: PaymentMethod) {
   return method.details || "Sigue estas instrucciones para completar el pago.";
 }
 
+function getBouquetSummary(customization: any) {
+  const baseFlowers = Array.isArray(customization?.baseFlowers) ? customization.baseFlowers : [];
+  const extraFlowers = Array.isArray(customization?.extraFlowers) ? customization.extraFlowers : [];
+  const sizeModes = customization?.sizeModes || {};
+  const hasIncrease = Boolean(sizeModes.enlarged) || baseFlowers.some((flower: any) => (flower.quantity ?? 0) > (flower.baseQuantity ?? flower.quantity ?? 0));
+  const hasDecrease = Boolean(sizeModes.reduced) || baseFlowers.some((flower: any) => (flower.quantity ?? 0) < (flower.baseQuantity ?? flower.quantity ?? 0));
+  const hasExtras = extraFlowers.length > 0;
+  const isMixed = ((hasIncrease || hasExtras) && hasDecrease) || (hasIncrease && hasExtras && hasDecrease);
+
+  if (isMixed) return { label: "Mixto", detail: "flores aumentadas, reducidas y agregadas" };
+  if (hasIncrease || hasExtras) {
+    return {
+      label: "Agrandado",
+      detail: hasExtras
+        ? `${extraFlowers.length} flor${extraFlowers.length !== 1 ? "es" : ""} extra`
+        : "flores base aumentadas",
+    };
+  }
+  if (hasDecrease) return { label: "Reducido", detail: "flores base reducidas" };
+  return { label: "Normal", detail: "sin cambios" };
+}
+
 const inputCls =
   "w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-primary-400 text-sm";
 
@@ -413,13 +435,9 @@ export default function CheckoutPageClient() {
                         <p className="text-xs text-gray-400">x{item.quantity}</p>
                         {item.customization?.bouquetSize && (
                           <p className="text-[11px] text-rose-500 font-semibold mt-0.5">
-                            {item.customization.bouquetSize === "ENLARGED"
-                              ? "Agrandado"
-                              : item.customization.bouquetSize === "REDUCED"
-                                ? "Reducido"
-                                : "Normal"}
-                            {Array.isArray(item.customization.extraFlowers) && item.customization.extraFlowers.length > 0
-                              ? ` · ${item.customization.extraFlowers.length} flor${item.customization.extraFlowers.length > 1 ? "es" : ""} extra`
+                            {getBouquetSummary(item.customization).label}
+                            {getBouquetSummary(item.customization).detail !== "sin cambios"
+                              ? ` · ${getBouquetSummary(item.customization).detail}`
                               : ""}
                           </p>
                         )}

@@ -46,6 +46,29 @@ model Flower {
   products    ProductFlower[]
 }
 
+model Occasion {
+  id               String           @id @default(cuid())
+  name             String
+  slug             String           @unique
+  subtitle         String?
+  advanceOrderDays Int              @default(0)
+  sortOrder        Int              @default(0)
+  isActive         Boolean          @default(true)
+  images           OccasionImage[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+}
+
+model OccasionImage {
+  id         String   @id @default(cuid())
+  occasionId String
+  occasion   Occasion  @relation(fields: [occasionId], references: [id], onDelete: Cascade)
+  url        String
+  publicId   String?
+  isMain     Boolean  @default(false)
+  order      Int      @default(0)
+}
+
 model Category {
   id       String    @id @default(cuid())
   name     String

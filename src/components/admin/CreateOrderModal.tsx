@@ -28,6 +28,10 @@ interface CartItem {
   addons: Addon[];
   customization: {
     bouquetSize: "STANDARD" | "ENLARGED" | "REDUCED";
+    sizeModes: {
+      reduced: boolean;
+      enlarged: boolean;
+    };
     baseFlowers: { id: string; name: string; baseQuantity: number; quantity: number }[];
     extraFlowers: { id: string; name: string; quantity: number }[];
   };
@@ -39,12 +43,6 @@ interface Props {
   onCreated?: (order: any) => void;
 }
 
-const BOUQUET_SIZE_LABELS = {
-  STANDARD: "Normal",
-  ENLARGED: "Agrandado",
-  REDUCED: "Reducido",
-} as const;
-
 function buildBaseFlowers(product: Product) {
   return (product.flowers || []).map(({ flower, quantity }) => ({
     id: flower.id,
@@ -52,6 +50,87 @@ function buildBaseFlowers(product: Product) {
     baseQuantity: quantity || 1,
     quantity: quantity || 1,
   }));
+}
+
+function formatNames(items: { name: string }[]) {
+  if (items.length === 0) return "";
+  const names = items.map((item) => item.name);
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} y ${names[1]}`;
+  return `${names[0]}, ${names[1]} y ${names.length - 2} más`;
+}
+
+function getBouquetSummary(customization: CartItem["customization"]) {
+  const reducedMode = customization.sizeModes?.reduced || false;
+  const enlargedMode = customization.sizeModes?.enlarged || false;
+  const increased = customization.baseFlowers.filter((flower) => flower.quantity > flower.baseQuantity);
+  const decreased = customization.baseFlowers.filter((flower) => flower.quantity < flower.baseQuantity);
+  const added = customization.extraFlowers;
+  const hasIncrease = increased.length > 0;
+  const hasDecrease = decreased.length > 0;
+  const hasExtraFlowers = added.length > 0;
+  const isMixed = (reducedMode && enlargedMode) || ((hasIncrease || hasExtraFlowers) && hasDecrease) || (hasIncrease && hasExtraFlowers && hasDecrease);
+  const detailParts: string[] = [];
+
+  if (hasIncrease) {
+    detailParts.push(`agrandaste ${formatNames(increased)}`);
+  }
+  if (hasDecrease) {
+    detailParts.push(`redujiste ${formatNames(decreased)}`);
+  }
+  if (hasExtraFlowers) {
+    detailParts.push(`agregaste ${formatNames(added)}`);
+  }
+
+  if (isMixed) {
+    return {
+      label: "Mixto",
+      detail: detailParts.join(" · "),
+      chips: {
+        increased,
+        decreased,
+        added,
+      },
+      storedSize: "STANDARD" as const,
+    };
+  }
+
+  if (hasIncrease || hasExtraFlowers) {
+    return {
+      label: "Agrandado",
+      detail: detailParts.join(" · "),
+      chips: {
+        increased,
+        decreased,
+        added,
+      },
+      storedSize: "ENLARGED" as const,
+    };
+  }
+
+  if (hasDecrease) {
+    return {
+      label: "Reducido",
+      detail: detailParts.join(" · "),
+      chips: {
+        increased,
+        decreased,
+        added,
+      },
+      storedSize: "REDUCED" as const,
+    };
+  }
+
+  return {
+    label: "Normal",
+    detail: "Sin cambios",
+    chips: {
+      increased,
+      decreased,
+      added,
+    },
+    storedSize: "STANDARD" as const,
+  };
 }
 
 export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
@@ -138,6 +217,10 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
         addons: [],
         customization: {
           bouquetSize: "STANDARD",
+          sizeModes: {
+            reduced: false,
+            enlarged: false,
+          },
           baseFlowers: buildBaseFlowers(product),
           extraFlowers: [],
         },
@@ -165,24 +248,34 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
 
   const setBouquetSize = (productId: string, bouquetSize: "STANDARD" | "ENLARGED" | "REDUCED") => {
     setCart((prev) =>
-      prev.map((c) => {
-        if (c.product.id !== productId) return c;
-        const nextBaseFlowers = c.customization.baseFlowers.map((flower) => {
-          if (bouquetSize === "STANDARD") {
-            return { ...flower, quantity: flower.baseQuantity };
-          }
-          if (bouquetSize === "REDUCED") {
-            return { ...flower, quantity: Math.min(flower.quantity, flower.baseQuantity) };
-          }
-          return flower;
-        });
+      prev.map((item) => {
+        if (item.product.id !== productId) return item;
+
+        const nextSizeModes = { ...item.customization.sizeModes };
+        if (bouquetSize === "STANDARD") {
+          nextSizeModes.reduced = false;
+          nextSizeModes.enlarged = false;
+        } else if (bouquetSize === "REDUCED") {
+          nextSizeModes.reduced = !nextSizeModes.reduced;
+        } else if (bouquetSize === "ENLARGED") {
+          nextSizeModes.enlarged = !nextSizeModes.enlarged;
+        }
+
+        const nextBouquetSize =
+          nextSizeModes.reduced && nextSizeModes.enlarged
+            ? "STANDARD"
+            : nextSizeModes.enlarged
+              ? "ENLARGED"
+              : nextSizeModes.reduced
+                ? "REDUCED"
+                : "STANDARD";
+
         return {
-          ...c,
+          ...item,
           customization: {
-            ...c.customization,
-            bouquetSize,
-            baseFlowers: nextBaseFlowers,
-            extraFlowers: bouquetSize === "ENLARGED" ? c.customization.extraFlowers : [],
+            ...item.customization,
+            bouquetSize: nextBouquetSize,
+            sizeModes: nextSizeModes,
           },
         };
       })
@@ -193,7 +286,6 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
     setCart((prev) =>
       prev.map((c) => {
         if (c.product.id !== productId) return c;
-        if (c.customization.bouquetSize !== "ENLARGED") return c;
         const exists = c.customization.extraFlowers.find((f) => f.id === flower.id);
         const nextExtraFlowers = exists
           ? c.customization.extraFlowers.filter((f) => f.id !== flower.id)
@@ -207,7 +299,6 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
     setCart((prev) =>
       prev.map((c) => {
         if (c.product.id !== productId) return c;
-        if (c.customization.bouquetSize !== "ENLARGED") return c;
         const nextExtraFlowers = c.customization.extraFlowers
           .map((flower) =>
             flower.id === flowerId ? { ...flower, quantity: flower.quantity + delta } : flower
@@ -225,11 +316,7 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
         const nextBaseFlowers = c.customization.baseFlowers.map((flower) => {
           if (flower.id !== flowerId) return flower;
           const proposed = flower.quantity + delta;
-          const maxQuantity =
-            c.customization.bouquetSize === "ENLARGED"
-              ? Math.max(flower.baseQuantity, proposed)
-              : flower.baseQuantity;
-          const nextQuantity = Math.max(0, Math.min(maxQuantity, proposed));
+          const nextQuantity = Math.max(0, proposed);
           return { ...flower, quantity: nextQuantity };
         });
         return { ...c, customization: { ...c.customization, baseFlowers: nextBaseFlowers } };
@@ -273,7 +360,10 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
             quantity: c.quantity,
             price: c.price,
             addons: c.addons,
-            customization: c.customization,
+            customization: {
+              ...c.customization,
+              bouquetSize: getBouquetSummary(c.customization).storedSize,
+            },
           })),
         }),
       });
@@ -310,6 +400,7 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
       title={success ? "Link de pago generado" : "Nuevo pedido"}
       description={success ? "Comparte este enlace con tu cliente por WhatsApp." : "Arma el pedido y genera el enlace de pago."}
       panelClassName="md:max-w-4xl"
+      contentClassName="p-0 overflow-hidden"
     >
       {success ? (
         <div className="space-y-4">
@@ -350,8 +441,10 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
           </div>
         </div>
       ) : (
-        <div className="grid lg:grid-cols-[1.1fr_.9fr] gap-6">
-          <div className="space-y-4 pb-28 sm:pb-0">
+        <div className="relative h-full min-h-0 flex flex-col overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6 pb-32">
+            <div className="grid lg:grid-cols-[1.1fr_.9fr] gap-6">
+          <div className="space-y-4">
             <div className="rounded-3xl bg-gray-50 border border-gray-100 p-4">
               <div className="relative">
                 <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -412,7 +505,7 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-xs font-bold text-rose-700 uppercase tracking-wide">Personalizar ramo</p>
                             <span className="text-[11px] text-rose-500 font-semibold">
-                              {BOUQUET_SIZE_LABELS[cartItem.customization.bouquetSize]}
+                              {getBouquetSummary(cartItem.customization).label}
                             </span>
                           </div>
 
@@ -423,14 +516,70 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                                 type="button"
                                 onClick={() => setBouquetSize(product.id, size)}
                                 className={`rounded-xl px-3 py-2 text-[11px] font-semibold border transition-all ${
-                                  cartItem.customization.bouquetSize === size
+                                  (size === "REDUCED" && cartItem.customization.sizeModes.reduced) ||
+                                  (size === "ENLARGED" && cartItem.customization.sizeModes.enlarged) ||
+                                  (size === "STANDARD" && !cartItem.customization.sizeModes.reduced && !cartItem.customization.sizeModes.enlarged)
                                     ? "bg-rose-500 text-white border-rose-500"
                                     : "bg-white text-gray-600 border-gray-200 hover:border-rose-300"
                                 }`}
                               >
-                                {BOUQUET_SIZE_LABELS[size]}
+                                {size === "REDUCED" ? "Reducido" : size === "STANDARD" ? "Normal" : "Agrandado"}
                               </button>
                             ))}
+                          </div>
+
+                          <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-3 py-2">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-rose-500">Detalle</p>
+                            {getBouquetSummary(cartItem.customization).chips.decreased.length > 0 ? (
+                              <div className="mt-2 rounded-xl border border-rose-100 bg-white/80 px-3 py-1.5">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-rose-500">Reducido</p>
+                                <p className="mt-1 text-[13px] font-semibold leading-snug text-gray-900">
+                                  {`Quitaste ${formatNames(getBouquetSummary(cartItem.customization).chips.decreased)}`}
+                                </p>
+                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                  {getBouquetSummary(cartItem.customization).chips.decreased.map((flower) => (
+                                    <span key={flower.id} className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-600">
+                                      - {flower.name} x{flower.baseQuantity - flower.quantity}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                            {getBouquetSummary(cartItem.customization).chips.increased.length > 0 ? (
+                              <div className="mt-2 rounded-xl border border-green-100 bg-white/80 px-3 py-1.5">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-green-600">Agrandado</p>
+                                <p className="mt-1 text-[13px] font-semibold leading-snug text-gray-900">
+                                  {`Aumentaste ${formatNames(getBouquetSummary(cartItem.customization).chips.increased)}`}
+                                </p>
+                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                  {getBouquetSummary(cartItem.customization).chips.increased.map((flower) => (
+                                    <span key={flower.id} className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">
+                                      + {flower.name} x{flower.quantity - flower.baseQuantity}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                            {getBouquetSummary(cartItem.customization).chips.added.length > 0 ? (
+                              <div className="mt-2 rounded-xl border border-primary-100 bg-white/80 px-3 py-1.5">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-primary-600">Flores nuevas</p>
+                                <p className="mt-1 text-[13px] font-semibold leading-snug text-gray-900">
+                                  {`Agregaste ${formatNames(getBouquetSummary(cartItem.customization).chips.added)}`}
+                                </p>
+                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                  {getBouquetSummary(cartItem.customization).chips.added.map((flower) => (
+                                    <span key={flower.id} className="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-semibold text-primary-700">
+                                      + {flower.name} x{flower.quantity}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                            {getBouquetSummary(cartItem.customization).chips.increased.length === 0 &&
+                              getBouquetSummary(cartItem.customization).chips.decreased.length === 0 &&
+                              getBouquetSummary(cartItem.customization).chips.added.length === 0 && (
+                                <p className="mt-2 text-[12px] font-medium leading-snug text-gray-500">Sin cambios todavía. Usa los chips para editar el ramo.</p>
+                              )}
                           </div>
 
                           <div className="space-y-2">
@@ -439,22 +588,24 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                             </p>
                             {cartItem.customization.baseFlowers.length > 0 ? (
                               cartItem.customization.baseFlowers.map((flower) => {
-                                const reducedMode = cartItem.customization.bouquetSize === "REDUCED";
-                                const enlargedMode = cartItem.customization.bouquetSize === "ENLARGED";
                                 return (
                                   <div key={flower.id} className="flex items-center justify-between gap-2 bg-white rounded-xl border border-gray-200 px-3 py-2">
                                     <div className="min-w-0">
                                       <p className="text-sm font-semibold text-gray-900 truncate">{flower.name}</p>
                                       <p className="text-[11px] text-gray-400">
                                         Base: {flower.baseQuantity}
-                                        {reducedMode ? " · solo reducción" : enlargedMode ? " · puede aumentar" : ""}
+                                        {flower.quantity > flower.baseQuantity
+                                          ? " · aumentada"
+                                          : flower.quantity < flower.baseQuantity
+                                            ? " · reducida"
+                                            : " · ajustable"}
                                       </p>
                                     </div>
                                     <div className="flex items-center gap-1.5 flex-shrink-0">
                                       <button
                                         type="button"
                                         onClick={() => updateBaseFlowerQty(product.id, flower.id, -1)}
-                                        disabled={cartItem.customization.bouquetSize === "STANDARD" || flower.quantity <= 0}
+                                        disabled={flower.quantity <= 0}
                                         className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors disabled:opacity-40"
                                       >
                                         <RiSubtractLine size={12} className="text-gray-600" />
@@ -463,7 +614,6 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                                       <button
                                         type="button"
                                         onClick={() => updateBaseFlowerQty(product.id, flower.id, 1)}
-                                        disabled={cartItem.customization.bouquetSize !== "ENLARGED"}
                                         className="w-7 h-7 rounded-full bg-rose-500 flex items-center justify-center hover:bg-rose-600 transition-colors disabled:opacity-40"
                                       >
                                         <RiAddLine size={12} className="text-white" />
@@ -477,7 +627,7 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                             )}
                           </div>
 
-                          {cartItem.customization.bouquetSize === "ENLARGED" && flowers.length > 0 && (
+                          {cartItem.customization.sizeModes.enlarged && flowers.length > 0 && (
                             <div>
                               <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-2">
                                 Agregar flores registradas
@@ -504,7 +654,7 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                             </div>
                           )}
 
-                          {cartItem.customization.bouquetSize === "ENLARGED" && cartItem.customization.extraFlowers.length > 0 && (
+                          {cartItem.customization.extraFlowers.length > 0 && (
                             <div className="space-y-2">
                               <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Flores agregadas</p>
                               {cartItem.customization.extraFlowers.map((flower) => (
@@ -536,7 +686,7 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                           )}
 
                           <p className="text-[11px] leading-relaxed text-gray-500">
-                            En normal no se cambia la base del ramo. En reducido solo bajas las flores ya asociadas. En agrandado puedes aumentar esas flores y agregar otras registradas del sistema.
+                            Ahora puedes hacer ajustes mixtos: aumentar unas flores, reducir otras y agregar flores nuevas en el mismo ramo.
                           </p>
                         </div>
                       )}
@@ -621,9 +771,9 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                       <p className="font-medium text-sm">{item.product.name}</p>
                       <p className="text-xs text-gray-400">x{item.quantity}</p>
                       <p className="text-[11px] text-rose-500 font-semibold mt-0.5">
-                        {BOUQUET_SIZE_LABELS[item.customization.bouquetSize]}
-                        {item.customization.extraFlowers.length > 0
-                          ? ` · ${item.customization.extraFlowers.length} flor${item.customization.extraFlowers.length > 1 ? "es" : ""} extra`
+                        {getBouquetSummary(item.customization).label}
+                        {getBouquetSummary(item.customization).detail !== "Sin cambios"
+                          ? ` · ${getBouquetSummary(item.customization).detail}`
                           : ""}
                       </p>
                       <p className="text-[11px] text-emerald-600 mt-0.5">
@@ -663,20 +813,22 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
               </div>
               {error && <div className="mt-3 rounded-2xl bg-red-50 border border-red-200 p-3 text-sm text-red-600">{error}</div>}
             </div>
-
-            <div className="sticky bottom-0 -mx-0 bg-white pt-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:static sm:bg-transparent sm:pt-0 sm:pb-0">
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={submitting || cart.length === 0}
-                className="w-full flex items-center justify-center gap-2 bg-primary-600 text-white py-4 rounded-full font-semibold hover:bg-primary-700 disabled:opacity-50 transition-all shadow-lg shadow-primary-600/20"
-              >
-                {submitting ? "Generando link..." : "Generar link de pago"}
-                {!submitting && <RiLinkM size={18} />}
-              </button>
-            </div>
           </div>
         </div>
+      </div>
+
+        <div className="absolute inset-x-0 bottom-0 z-20 bg-white border-t border-gray-100 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_24px_rgba(15,23,42,0.04)] sm:px-6 sm:pt-4">
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting || cart.length === 0}
+            className="w-full flex items-center justify-center gap-2 bg-primary-600 text-white py-4 rounded-full font-semibold hover:bg-primary-700 disabled:opacity-50 transition-all shadow-lg shadow-primary-600/20"
+          >
+            {submitting ? "Generando link..." : "Generar link de pago"}
+            {!submitting && <RiLinkM size={18} />}
+          </button>
+        </div>
+      </div>
       )}
     </ResponsiveModal>
   );

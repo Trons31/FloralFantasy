@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { v2 as cloudinary } from "cloudinary";
+import { requireOrderManagementUser } from "@/lib/route-auth";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -9,6 +10,14 @@ cloudinary.config({
 });
 
 export async function POST(req: NextRequest) {
+  const access = await requireOrderManagementUser(req);
+  if (!access) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+  if (access.kind === "operations" && !["CORREDOR", "REPARTIDOR"].includes(access.user.role)) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+
   const formData    = await req.formData();
   const file        = formData.get("file")        as File | null;
   const description = formData.get("description") as string;

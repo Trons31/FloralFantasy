@@ -3,16 +3,15 @@ import { useEffect, useRef, useState } from "react";
 import {
   RiTruckLine, RiCheckLine, RiLoader4Line, RiLogoutBoxLine, RiMapPin2Line,
   RiCameraLine, RiRefreshLine, RiFlowerLine, RiAddLine, RiCloseLine,
-  RiReceiptLine, RiArrowDownLine, RiErrorWarningLine,
+  RiReceiptLine, RiArrowDownLine, RiErrorWarningLine, RiPhoneLine, RiWhatsappLine,
 } from "react-icons/ri";
-import { formatPrice } from "@/lib/utils";
 import { toast } from "sonner";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 
 type Addon     = { id:string; addon:{ name:string } };
 type OrderItem = { id:string; quantity:number; addons:Addon[]; product:{ name:string; images:{url:string;isMain:boolean}[] } };
 type Order     = { id:string; trackingToken:string; customerName:string; address:string;
-  addressRef?:string; estimatedTime:string; total:number; status:string;
+  customerPhone?:string; addressRef?:string; estimatedTime:string; total:number; status:string;
   deliveryPhotoUrl?:string; items:OrderItem[] };
 
 const EXPENSE_CATS = ["Insumos","Flores","Transporte","Empaque","Otro"];
@@ -466,43 +465,141 @@ function DeliveryCard({ order, updating, action, onAction, onDeliver }: {
   onAction: (() => void) | null;
   onDeliver: (() => void) | null;
 }) {
+  const [activeInfoTab, setActiveInfoTab] = useState<"CLIENT"|"ADDRESS">("CLIENT");
   const mainImg  = order.items[0]?.product?.images?.find(i=>i.isMain)?.url || order.items[0]?.product?.images?.[0]?.url;
   const isUpdating = updating === order.id;
   const disabled = !onAction && !onDeliver;
+  const phoneDigits = (order.customerPhone || "").replace(/\D/g, "");
+  const whatsappPhone =
+    phoneDigits.length === 10 && phoneDigits.startsWith("3")
+      ? `57${phoneDigits}`
+      : phoneDigits;
+  const whatsappText = encodeURIComponent(`Hola ${order.customerName}, te escribo por tu pedido ${order.trackingToken}.`);
+  const whatsappUrl = whatsappPhone ? `https://wa.me/${whatsappPhone}?text=${whatsappText}` : "";
+  const telUrl = phoneDigits ? `tel:${phoneDigits}` : "";
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
       <div className="flex gap-4 p-4">
-        <div className="w-20 h-20 rounded-xl overflow-hidden bg-gray-50 flex-shrink-0">
+        <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-xl overflow-hidden bg-gray-50 flex-shrink-0">
           {mainImg
             ? <img src={mainImg} alt="" className="w-full h-full object-cover"/>
             : <div className="w-full h-full flex items-center justify-center"><RiFlowerLine className="text-gray-200" size={32}/></div>
           }
         </div>
         <div className="flex-1 min-w-0">
-          <div className="mb-1.5">
-            {order.items.map((item,i) => (
-              <div key={i} className="mb-0.5 last:mb-0">
-                <p className="font-bold text-gray-900 text-base leading-tight">
-                  {item.quantity > 1 && <span className="text-primary-600">x{item.quantity} </span>}
-                  {item.product.name}
-                </p>
-                {item.addons?.length > 0 && (
-                  <p className="text-xs text-gray-400">+ {item.addons.map((a:any) => a.addon?.name).filter(Boolean).join(", ")}</p>
-                )}
-              </div>
-            ))}
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              {order.items.map((item,i) => (
+                <div key={i} className="mb-0.5 last:mb-0">
+                  <p className="font-bold text-gray-900 text-base leading-tight">
+                    {item.quantity > 1 && <span className="text-primary-600">x{item.quantity} </span>}
+                    {item.product.name}
+                  </p>
+                  {item.addons?.length > 0 && (
+                    <p className="text-xs text-gray-400">+ {item.addons.map((a:any) => a.addon?.name).filter(Boolean).join(", ")}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-gray-400 font-semibold">Guía</p>
+              <p className="text-xs font-mono text-primary-600 font-bold mt-0.5">{order.trackingToken}</p>
+            </div>
           </div>
-          <p className="text-xs text-gray-500 font-medium">{order.customerName}</p>
-          <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5 line-clamp-1">
-            <RiMapPin2Line size={10}/> {order.address}
-          </p>
-        </div>
-        <div className="text-right flex-shrink-0">
-          <p className="font-bold text-sm text-gray-900">{formatPrice(order.total)}</p>
-          <p className="text-xs font-mono text-primary-500 mt-0.5">{order.trackingToken}</p>
         </div>
       </div>
+
+      <div className="px-4 pb-3">
+        <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-gray-50 p-1.5">
+          <button
+            type="button"
+            onClick={() => setActiveInfoTab("CLIENT")}
+            className={`rounded-xl px-3 py-2 text-sm font-semibold transition-all ${
+              activeInfoTab === "CLIENT"
+                ? "bg-white text-blue-700 shadow-sm ring-1 ring-blue-100"
+                : "text-gray-500 hover:bg-white/70"
+            }`}
+          >
+            Cliente
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveInfoTab("ADDRESS")}
+            className={`rounded-xl px-3 py-2 text-sm font-semibold transition-all ${
+              activeInfoTab === "ADDRESS"
+                ? "bg-white text-blue-700 shadow-sm ring-1 ring-blue-100"
+                : "text-gray-500 hover:bg-white/70"
+            }`}
+          >
+            Dirección
+          </button>
+        </div>
+      </div>
+
+      <div className="px-4 pb-4">
+        {activeInfoTab === "CLIENT" ? (
+          <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4">
+            <p className="text-sm font-bold text-gray-900">{order.customerName}</p>
+            <p className="text-xs text-gray-500 mt-1">{order.customerPhone || "Sin número registrado"}</p>
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <a
+                href={whatsappUrl || undefined}
+                target={whatsappUrl ? "_blank" : undefined}
+                rel={whatsappUrl ? "noreferrer" : undefined}
+                aria-disabled={!whatsappUrl}
+                className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-all ${
+                  whatsappUrl
+                    ? "bg-green-500 text-white hover:bg-green-600"
+                    : "bg-gray-200 text-gray-400 pointer-events-none"
+                }`}
+              >
+                <RiWhatsappLine size={16} />
+                WhatsApp
+              </a>
+              <a
+                href={telUrl || undefined}
+                aria-disabled={!telUrl}
+                className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-all ${
+                  telUrl
+                    ? "bg-blue-500 text-white hover:bg-blue-600"
+                    : "bg-gray-200 text-gray-400 pointer-events-none"
+                }`}
+              >
+                <RiPhoneLine size={16} />
+                Llamar
+              </a>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-gray-400 font-semibold">Dirección completa</p>
+            <p className="text-sm font-bold text-gray-900 mt-1 leading-snug">{order.address}</p>
+            <div className="mt-3 space-y-2">
+              <div className="flex items-start gap-2 text-xs text-gray-500">
+                <RiMapPin2Line className="mt-0.5 shrink-0 text-gray-400" size={12} />
+                <span>{order.address}</span>
+              </div>
+              {order.addressRef ? (
+                <div className="flex items-start gap-2 text-xs text-gray-500">
+                  <RiAddLine className="mt-0.5 shrink-0 text-gray-400" size={12} />
+                  <span>{order.addressRef}</span>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2 text-xs text-gray-400">
+                  <RiAddLine className="mt-0.5 shrink-0 text-gray-300" size={12} />
+                  <span>Sin referencia adicional</span>
+                </div>
+              )}
+              <div className="flex items-start gap-2 text-xs text-gray-500">
+                <RiTruckLine className="mt-0.5 shrink-0 text-gray-400" size={12} />
+                <span>Entrega estimada: {order.estimatedTime}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="px-4 pb-4">
         <button
           onClick={onAction ?? onDeliver ?? undefined}

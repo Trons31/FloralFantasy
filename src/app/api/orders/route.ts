@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { generateTrackingToken } from "@/lib/tokens";
 import { sendPushToAdmins } from "@/lib/webpush";
 import { STATUS_LABELS } from "@/lib/utils";
+import { requireAdminUser, requireOrderManagementUser } from "@/lib/route-auth";
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,6 +24,9 @@ export async function POST(req: NextRequest) {
     } = body;
 
     const isAdminDraft = source === "ADMIN";
+    if (isAdminDraft && !(await requireAdminUser())) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
 
     if ((!isAdminDraft && (!name || !phone || !address)) || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "Faltan datos obligatorios" }, { status: 400 });
@@ -146,6 +150,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  if (!(await requireOrderManagementUser(req))) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
   const statusParam = req.nextUrl.searchParams.get("status");
   const statuses = statusParam
     ? statusParam.split(",").map((s) => s.trim()).filter(Boolean)

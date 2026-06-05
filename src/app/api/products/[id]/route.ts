@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAdminUser } from "@/lib/route-auth";
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  if (!(await requireAdminUser())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
   const { images, flowerIds, flowerRelations, ...data } = await req.json();
   const flowerData = Array.isArray(flowerRelations) && flowerRelations.length > 0
     ? flowerRelations
@@ -19,6 +23,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json(product);
 }
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  if (!(await requireAdminUser())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
   await prisma.product.delete({ where: { id: params.id } });
   return NextResponse.json({ ok: true });
 }

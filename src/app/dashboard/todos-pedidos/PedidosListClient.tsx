@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import PhotoViewer from "@/components/client/PhotoViewer";
 import CreateOrderModal from "@/components/admin/CreateOrderModal";
+import EditOrderModal from "@/components/admin/EditOrderModal";
 import {
   RiShoppingBagLine, RiArrowLeftLine, RiArrowRightLine, RiFilterLine,
   RiCalendarLine, RiSearchLine, RiCloseLine, RiTimeLine, RiMapPin2Line,
@@ -43,6 +44,28 @@ function formatDate(iso: string) {
   return `${d.getDate()} ${months[d.getMonth()]}, ${h % 12 || 12}:${m} ${ampm}`;
 }
 
+function getBouquetSummary(customization: any) {
+  const baseFlowers = Array.isArray(customization?.baseFlowers) ? customization.baseFlowers : [];
+  const extraFlowers = Array.isArray(customization?.extraFlowers) ? customization.extraFlowers : [];
+  const sizeModes = customization?.sizeModes || {};
+  const hasIncrease = Boolean(sizeModes.enlarged) || baseFlowers.some((flower: any) => (flower.quantity ?? 0) > (flower.baseQuantity ?? flower.quantity ?? 0));
+  const hasDecrease = Boolean(sizeModes.reduced) || baseFlowers.some((flower: any) => (flower.quantity ?? 0) < (flower.baseQuantity ?? flower.quantity ?? 0));
+  const hasExtras = extraFlowers.length > 0;
+  const isMixed = ((hasIncrease || hasExtras) && hasDecrease) || (hasIncrease && hasExtras && hasDecrease);
+
+  if (isMixed) return { label: "Mixto", detail: "flores aumentadas, reducidas y agregadas" };
+  if (hasIncrease || hasExtras) {
+    return {
+      label: "Agrandado",
+      detail: hasExtras
+        ? `${extraFlowers.length} flor${extraFlowers.length !== 1 ? "es" : ""} extra`
+        : "flores base aumentadas",
+    };
+  }
+  if (hasDecrease) return { label: "Reducido", detail: "flores base reducidas" };
+  return { label: "Normal", detail: "sin cambios" };
+}
+
 export default function PedidosListClient({ orders, summary, statusBreakdown, pagination, filters }: {
   orders:          any[];
   summary:         { total:number; count:number };
@@ -60,6 +83,7 @@ export default function PedidosListClient({ orders, summary, statusBreakdown, pa
   const [viewPhoto,  setViewPhoto]  = useState<string|null>(null);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
 
   const totalPages = Math.ceil(pagination.total / pagination.perPage);
 
@@ -89,16 +113,6 @@ export default function PedidosListClient({ orders, summary, statusBreakdown, pa
       toast.error("Error al actualizar");
     }
     setUpdating(null);
-  };
-
-  const STATUS_FLOW: Record<string, string|null> = {
-    PENDING_PAYMENT_CONFIRMATION: "PAID",
-    PAYMENT_INVALID: "PAID",
-    PENDING: "PAID",
-    PAID: "PROCESSING",
-    PROCESSING: "READY",
-    READY: "OUT_FOR_DELIVERY", OUT_FOR_DELIVERY: "DELIVERED",
-    DELIVERED: null, CANCELLED: null,
   };
 
   return (
@@ -254,9 +268,6 @@ export default function PedidosListClient({ orders, summary, statusBreakdown, pa
           <div className="divide-y divide-gray-50">
             {orders.map(order => {
               const cfg    = STATUS_CONFIG[order.status] || STATUS_CONFIG.PENDING;
-              const next   = STATUS_FLOW[order.status];
-              const nextCfg = next ? STATUS_CONFIG[next] : null;
-              const isUpd  = updating === order.id;
 
               return (
                 <div key={order.id} className="p-4 lg:p-5 hover:bg-gray-50/50 transition-colors">
@@ -322,19 +333,14 @@ export default function PedidosListClient({ orders, summary, statusBreakdown, pa
                           onClick={() => setSelectedOrder(order)}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all bg-gray-100 text-gray-700 hover:bg-gray-200"
                         >
-                          Detalle
+                          Validar pago
                         </button>
-                        {next && nextCfg && (
-                          <button
-                            onClick={() => handleStatusChange(order.id, next)}
-                            disabled={isUpd}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-50 ${nextCfg.color} hover:opacity-80`}>
-                            {isUpd
-                              ? <RiLoader4Line className="animate-spin" size={11}/>
-                              : <RiCheckLine size={11}/>}
-                            {nextCfg.label}
-                          </button>
-                        )}
+                        <button
+                          onClick={() => setEditingOrderId(order.id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all bg-amber-100 text-amber-700 hover:bg-amber-200"
+                        >
+                          Editar pedido
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -367,7 +373,7 @@ export default function PedidosListClient({ orders, summary, statusBreakdown, pa
       <ResponsiveModal
         open={!!selectedOrder}
         onClose={() => setSelectedOrder(null)}
-        title="Detalle del pedido"
+        title="Validar pago"
         description={selectedOrder?.trackingToken || ""}
         panelClassName="md:max-w-4xl"
       >
@@ -409,13 +415,9 @@ export default function PedidosListClient({ orders, summary, statusBreakdown, pa
                         {i.addons?.length > 0 && <p className="text-xs text-gray-400">+ {i.addons.map((a: any) => a.addon?.name).filter(Boolean).join(", ")}</p>}
                         {i.customization?.bouquetSize && (
                           <p className="text-xs text-rose-500 mt-1 font-semibold">
-                            {i.customization.bouquetSize === "ENLARGED"
-                              ? "Agrandado"
-                              : i.customization.bouquetSize === "REDUCED"
-                                ? "Reducido"
-                                : "Normal"}
-                            {Array.isArray(i.customization.extraFlowers) && i.customization.extraFlowers.length > 0
-                              ? ` · ${i.customization.extraFlowers.length} flor${i.customization.extraFlowers.length > 1 ? "es" : ""} extra`
+                            {getBouquetSummary(i.customization).label}
+                            {getBouquetSummary(i.customization).detail !== "sin cambios"
+                              ? ` · ${getBouquetSummary(i.customization).detail}`
                               : ""}
                           </p>
                         )}
@@ -460,7 +462,7 @@ export default function PedidosListClient({ orders, summary, statusBreakdown, pa
                         disabled={updating === selectedOrder.id}
                         className="w-full px-4 py-3 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-50"
                       >
-                        Pago válido
+                        Validar pago
                       </button>
                       <button
                         onClick={() => handleStatusChange(selectedOrder.id, "PAYMENT_INVALID")}
@@ -518,6 +520,16 @@ export default function PedidosListClient({ orders, summary, statusBreakdown, pa
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreated={() => router.refresh()}
+      />
+      <EditOrderModal
+        open={!!editingOrderId}
+        orderId={editingOrderId}
+        onClose={() => setEditingOrderId(null)}
+        onSaved={() => {
+          setSelectedOrder(null);
+          setEditingOrderId(null);
+          router.refresh();
+        }}
       />
 
     </div>

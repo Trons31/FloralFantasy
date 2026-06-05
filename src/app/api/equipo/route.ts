@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { requireAdminUser } from "@/lib/route-auth";
 
 export async function POST(req: NextRequest) {
+  if (!(await requireAdminUser())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
   const { name, email, role, pin } = await req.json();
   if (!name || !role || !pin) return NextResponse.json({ error: "Nombre, rol y PIN son requeridos" }, { status: 400 });
   if (pin.length !== 4 || !/^\d{4}$/.test(pin)) return NextResponse.json({ error: "El PIN debe ser de 4 dígitos" }, { status: 400 });

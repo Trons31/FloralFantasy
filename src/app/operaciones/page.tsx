@@ -24,9 +24,15 @@ export default function OperacionesPage() {
     setLoading(false);
   };
 
-  if (user?.role === "PREPARADOR") return <PreparadorView user={user} onLogout={() => { setUser(null); setPin(""); }}/>;
-  if (user?.role === "REPARTIDOR") return <RepartidorView user={user} onLogout={() => { setUser(null); setPin(""); }}/>;
-  if (user?.role === "CORREDOR")   return <CorredorView   user={user} onLogout={() => { setUser(null); setPin(""); }}/>;
+  const handleLogout = async () => {
+    await fetch("/api/operaciones/logout", { method: "POST" }).catch(() => {});
+    setUser(null);
+    setPin("");
+  };
+
+  if (user?.role === "PREPARADOR") return <PreparadorView user={user} onLogout={handleLogout}/>;
+  if (user?.role === "REPARTIDOR") return <RepartidorView user={user} onLogout={handleLogout}/>;
+  if (user?.role === "CORREDOR")   return <CorredorView   user={user} onLogout={handleLogout}/>;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-rose-50 flex items-center justify-center p-4">

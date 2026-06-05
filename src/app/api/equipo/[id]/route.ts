@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAdminUser } from "@/lib/route-auth";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  if (!(await requireAdminUser())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
   const { name, pin } = await req.json();
   if (!name?.trim()) return NextResponse.json({ error: "Nombre requerido" }, { status: 400 });
 
@@ -23,6 +27,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+  if (!(await requireAdminUser())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
   await prisma.user.delete({ where: { id: params.id } });
   return NextResponse.json({ ok: true });
 }

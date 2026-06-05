@@ -11,7 +11,6 @@ import { toast } from "sonner";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import { formatPrice, formatDeliveryLeadDays, getDeliveryDateLabel } from "@/lib/utils";
 
-const OCCASIONS = ["amor","cumpleanos","bodas","condolencias","graduacion","recuperacion"];
 const TIME_UNITS = [
   { value: "MINUTES", label: "Minutos" },
   { value: "HOURS",   label: "Horas"   },
@@ -30,6 +29,7 @@ type Product = {
 };
 
 type Category = { id: string; name: string; slug: string };
+type Occasion = { id: string; name: string; slug: string; subtitle?: string | null };
 type Flower   = { id: string; name: string; type: string };
 type SelectedFlower = { flowerId: string; quantity: number };
 
@@ -40,7 +40,8 @@ type ImageSlot =
 
 export default function ProductosManager({
   products: init, categories, flowers,
-}: { products: any[]; categories: Category[]; flowers: Flower[] }) {
+  occasions,
+}: { products: any[]; categories: Category[]; flowers: Flower[]; occasions: Occasion[] }) {
   const [products, setProducts] = useState<Product[]>(init);
   const [showForm, setShowForm] = useState(false);
   const [editing,  setEditing]  = useState<Product | null>(null);
@@ -384,7 +385,12 @@ export default function ProductosManager({
                 <label className="block text-sm font-medium text-gray-700 mb-1">Ocasión</label>
                 <select {...register("occasion")} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-primary-400">
                   <option value="">Sin ocasión específica</option>
-                  {OCCASIONS.map(o => <option key={o} value={o}>{o.charAt(0).toUpperCase()+o.slice(1)}</option>)}
+                  {occasions.map((o) => (
+                    <option key={o.id} value={o.slug}>
+                      {o.name}
+                      {o.subtitle ? ` · ${o.subtitle}` : ""}
+                    </option>
+                  ))}
                 </select>
               </div>
 
