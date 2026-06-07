@@ -58,7 +58,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const bytes = await file.arrayBuffer();
     const base64 = `data:${file.type};base64,${Buffer.from(bytes).toString("base64")}`;
     const result = await uploadImage(base64, {
-      folder: "fantasiaFloral/comprobantes",
+      folder: "gardentech/payment-proofs",
     });
 
     if (order.paymentProofPublicId && order.paymentProofPublicId !== result.publicId) {

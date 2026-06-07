@@ -38,7 +38,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const buffer = Buffer.from(bytes);
     const upload: any = await new Promise((resolve, reject) =>
       cloudinary.uploader.upload_stream(
-        { folder: "fantasiafloral/receipts" },
+        { folder: "gardentech/invoices" },
         (err, res) => err ? reject(err) : resolve(res)
       ).end(buffer)
     );

@@ -1,79 +1,439 @@
-﻿"use client";
+"use client";
+
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { addMonths, format } from "date-fns";
+import { es } from "date-fns/locale";
 import PhotoViewer from "@/components/client/PhotoViewer";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import {
-  RiArrowDownLine, RiAddLine, RiDeleteBinLine, RiLoader4Line,
-  RiArrowLeftLine, RiArrowRightLine, RiFilterLine, RiCalendarLine,
-  RiCheckLine, RiZoomInLine, RiReceiptLine, RiDownloadLine,
+  RiAddLine,
+  RiArrowDownLine,
+  RiArrowLeftLine,
+  RiArrowRightLine,
+  RiCalendarLine,
+  RiCheckLine,
+  RiDeleteBinLine,
+  RiLoader4Line,
+  RiReceiptLine,
+  RiZoomInLine,
 } from "react-icons/ri";
 import { formatPrice } from "@/lib/utils";
 import { toast } from "sonner";
 
 const CATS = ["Flores", "Transporte", "Decoracion", "Empaque", "Personal", "Servicios", "Otro"];
-const PERIODOS = [
-  { value:"hoy",        label:"Hoy"           },
-  { value:"semana",     label:"7 días"        },
-  { value:"mes",        label:"Este mes"      },
-  { value:"mes_pasado", label:"Mes pasado"    },
-  { value:"custom",     label:"Personalizado" },
-];
-const CAT_COLORS: Record<string,string> = {
-  Flores:"bg-pink-100 text-pink-700", Transporte:"bg-blue-100 text-blue-700",
-  Decoracion:"bg-purple-100 text-purple-700", Empaque:"bg-amber-100 text-amber-700",
-  Personal:"bg-teal-100 text-teal-700", Servicios:"bg-indigo-100 text-indigo-700",
-  Otro:"bg-gray-100 text-gray-600", Insumos:"bg-orange-100 text-orange-700",
+
+const CAT_COLORS: Record<string, string> = {
+  Flores: "bg-pink-100 text-pink-700",
+  Transporte: "bg-blue-100 text-blue-700",
+  Decoracion: "bg-purple-100 text-purple-700",
+  Empaque: "bg-amber-100 text-amber-700",
+  Personal: "bg-teal-100 text-teal-700",
+  Servicios: "bg-indigo-100 text-indigo-700",
+  Otro: "bg-slate-100 text-slate-600",
+  Insumos: "bg-orange-100 text-orange-700",
+};
+
+type ExpenseItem = {
+  id: string;
+  description: string;
+  amount: number;
+  category: string;
+  date: string;
+  createdAt: string;
+  registeredBy?: string | null;
+  receiptPhotoUrl?: string | null;
+};
+
+type DaySummary = {
+  date: string;
+  dayNumber: number;
+  label: string;
+  count: number;
+  amount: number;
 };
 
 function normalizeCategory(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-function formatDate(iso: string) {
-  const d = new Date(iso);
-  const months = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
-  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+function StatCard({
+  label,
+  value,
+  hint,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  icon: ComponentType<{ className?: string }>;
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm sm:p-5">
+      <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-50 text-slate-600 sm:h-10 sm:w-10">
+        <Icon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
+      </div>
+      <p className="text-[11px] font-medium text-slate-400 sm:text-xs">{label}</p>
+      <p className="mt-1 text-lg font-semibold tracking-tight text-slate-900 sm:text-2xl">{value}</p>
+      <p className="mt-1 text-[11px] leading-4 text-slate-500 sm:text-xs">{hint}</p>
+    </div>
+  );
 }
 
-export default function EgresosClient({ expenses, summary, categories, pagination, filters }: {
-  expenses:   any[];
-  summary:    { total:number; count:number };
-  categories: { category:string; amount:number }[];
-  pagination: { page:number; perPage:number; total:number };
-  filters?:   { periodo?:string; from?:string; to?:string; categoria?:string };
+function SectionCard({
+  title,
+  subtitle,
+  children,
+  right,
+}: {
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+  right?: ReactNode;
+}) {
+  return (
+    <div className="rounded-[2rem] border border-slate-100 bg-white shadow-sm">
+      <div className="flex items-start justify-between gap-4 border-b border-slate-50 px-5 py-4">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">{title}</p>
+          {subtitle && <p className="mt-1 text-xs text-slate-500">{subtitle}</p>}
+        </div>
+        {right}
+      </div>
+      <div className="p-5">{children}</div>
+    </div>
+  );
+}
+
+function TablePager({
+  page,
+  totalPages,
+  total,
+  onPrev,
+  onNext,
+}: {
+  page: number;
+  totalPages: number;
+  total: number;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 border-t border-slate-50 px-4 py-3 sm:gap-3 sm:px-5">
+      <button
+        type="button"
+        onClick={onPrev}
+        disabled={page <= 1}
+        className="inline-flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-0 sm:px-3"
+        aria-label="Pagina anterior"
+      >
+        <RiArrowLeftLine size={14} />
+        <span className="ml-2 hidden text-sm font-medium sm:inline">Anterior</span>
+      </button>
+      <span className="flex-1 whitespace-nowrap text-center text-[11px] text-slate-400 sm:text-xs">
+        {total} registros · pag. {page} de {Math.max(1, totalPages)}
+      </span>
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={page >= totalPages}
+        className="inline-flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-0 sm:px-3"
+        aria-label="Pagina siguiente"
+      >
+        <span className="mr-2 hidden text-sm font-medium sm:inline">Siguiente</span>
+        <RiArrowRightLine size={14} />
+      </button>
+    </div>
+  );
+}
+
+function DayStrip({
+  days,
+  selectedDay,
+  onSelectDay,
+}: {
+  days: DaySummary[];
+  selectedDay: number;
+  onSelectDay: (day: number) => void;
+}) {
+  const selectedRef = useRef<HTMLButtonElement | null>(null);
+  const maxAmount = Math.max(...days.map((item) => item.amount), 1);
+
+  useEffect(() => {
+    selectedRef.current?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [days, selectedDay]);
+
+  return (
+    <div className="rounded-[2rem] border border-slate-100 bg-white p-4 shadow-sm">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">Dias del mes</p>
+          <p className="text-xs text-slate-500">Selecciona un dia para ver sus egresos.</p>
+        </div>
+        <span className="rounded-full bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500">
+          {days.length} dias
+        </span>
+      </div>
+
+      <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2">
+        {days.map((day) => {
+          const active = day.dayNumber === selectedDay;
+          const fill = day.amount > 0 ? Math.max(8, Math.round((day.amount / maxAmount) * 100)) : 6;
+
+          return (
+            <button
+              key={day.date}
+              type="button"
+              ref={active ? selectedRef : null}
+              onClick={() => onSelectDay(day.dayNumber)}
+              className={`min-w-[92px] snap-start rounded-2xl border p-3 text-left transition ${
+                active ? "border-primary-300 bg-primary-50" : "border-slate-200 bg-white hover:bg-slate-50"
+              }`}
+            >
+              <p className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${active ? "text-primary-700" : "text-slate-400"}`}>
+                {day.label}
+              </p>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <span className={`text-sm font-semibold ${active ? "text-slate-900" : "text-slate-600"}`}>{day.dayNumber}</span>
+                <span className="text-[11px] text-slate-400">{day.count} eg.</span>
+              </div>
+              <div className="mt-3 h-1.5 rounded-full bg-slate-100">
+                <div
+                  className={`h-1.5 rounded-full ${active ? "bg-primary-500" : "bg-slate-300"}`}
+                  style={{ width: `${fill}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-slate-500">{day.amount > 0 ? formatPrice(day.amount) : "Sin gastos"}</p>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ExpensesTable({
+  expenses,
+  deleting,
+  onDelete,
+  onViewPhoto,
+}: {
+  expenses: ExpenseItem[];
+  deleting: string | null;
+  onDelete: (id: string) => void;
+  onViewPhoto: (url: string) => void;
+}) {
+  if (!expenses.length) {
+    return (
+      <div className="py-14 text-center">
+        <RiArrowDownLine className="mx-auto mb-3 text-slate-200" size={48} />
+        <p className="text-sm text-slate-400">Sin egresos en este dia</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="hidden overflow-x-auto md:block">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-50">
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Descripcion</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Categoria</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Fecha</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Comprobante</th>
+              <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-400">Monto</th>
+              <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-400">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {expenses.map((expense) => (
+              <tr key={expense.id} className="border-b border-slate-50 last:border-b-0 hover:bg-slate-50/60">
+                <td className="px-5 py-3.5">
+                  <p className="font-medium text-slate-900">{expense.description}</p>
+                  {expense.registeredBy ? <p className="mt-1 text-xs text-slate-400">{expense.registeredBy}</p> : null}
+                </td>
+                <td className="px-5 py-3.5">
+                  <span
+                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      CAT_COLORS[normalizeCategory(expense.category)] || "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {expense.category}
+                  </span>
+                </td>
+                <td className="px-5 py-3.5 whitespace-nowrap text-xs text-slate-500">
+                  {format(new Date(expense.date), "d MMM yyyy, h:mm a", { locale: es })}
+                </td>
+                <td className="px-5 py-3.5">
+                  {expense.receiptPhotoUrl ? (
+                    <button
+                      type="button"
+                      onClick={() => onViewPhoto(expense.receiptPhotoUrl as string)}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-200"
+                    >
+                      <RiZoomInLine size={12} />
+                      Ver
+                    </button>
+                  ) : (
+                    <span className="text-xs text-slate-400">Sin foto</span>
+                  )}
+                </td>
+                <td className="px-5 py-3.5 text-right font-semibold text-rose-600">{formatPrice(expense.amount)}</td>
+                <td className="px-5 py-3.5 text-right">
+                  <button
+                    type="button"
+                    onClick={() => onDelete(expense.id)}
+                    disabled={deleting === expense.id}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-300 transition hover:bg-rose-50 hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Eliminar egreso"
+                  >
+                    {deleting === expense.id ? <RiLoader4Line className="animate-spin" size={14} /> : <RiDeleteBinLine size={14} />}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="divide-y divide-slate-50 md:hidden">
+        {expenses.map((expense) => (
+          <div key={expense.id} className="px-4 py-4">
+            <div className="flex items-start gap-3">
+              {expense.receiptPhotoUrl ? (
+                <button
+                  type="button"
+                  onClick={() => onViewPhoto(expense.receiptPhotoUrl as string)}
+                  className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50"
+                >
+                  <img src={expense.receiptPhotoUrl} alt="Comprobante" className="h-full w-full object-cover" />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition hover:bg-black/20">
+                    <RiZoomInLine className="text-white opacity-0 transition hover:opacity-100" size={18} />
+                  </div>
+                </button>
+              ) : (
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50">
+                  <RiReceiptLine className="text-slate-300" size={18} />
+                </div>
+              )}
+
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-slate-900">{expense.description}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                      CAT_COLORS[normalizeCategory(expense.category)] || "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {expense.category}
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    {format(new Date(expense.date), "d MMM yyyy, h:mm a", { locale: es })}
+                  </span>
+                </div>
+                {expense.registeredBy ? <p className="mt-1 text-xs text-slate-500">{expense.registeredBy}</p> : null}
+              </div>
+
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                <p className="text-sm font-semibold text-rose-600">{formatPrice(expense.amount)}</p>
+                <button
+                  type="button"
+                  onClick={() => onDelete(expense.id)}
+                  disabled={deleting === expense.id}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-300 transition hover:bg-rose-50 hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Eliminar egreso"
+                >
+                  {deleting === expense.id ? <RiLoader4Line className="animate-spin" size={14} /> : <RiDeleteBinLine size={14} />}
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+export default function EgresosClient({
+  expenses,
+  summary,
+  pagination,
+  selection,
+  days,
+}: {
+  expenses: ExpenseItem[];
+  summary: { total: number; count: number };
+  pagination: { page: number; perPage: number; total: number };
+  selection: {
+    year: number;
+    month: number;
+    day: number;
+    monthLabel: string;
+    dayLabel: string;
+    selectedDateValue: string;
+  };
+  days: DaySummary[];
 }) {
   const router = useRouter();
-  const [showForm,   setShowForm]   = useState(false);
-  const [saving,     setSaving]     = useState(false);
-  const [deleting,   setDeleting]   = useState<string|null>(null);
-  const [showCustom, setShowCustom] = useState(false);
-  const [customFrom, setCustomFrom] = useState(filters?.from || "");
-  const [customTo,   setCustomTo]   = useState(filters?.to   || "");
-  const [viewPhoto,  setViewPhoto]  = useState<string|null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [viewPhoto, setViewPhoto] = useState<string | null>(null);
   const [form, setForm] = useState({
-    description:"", amount:"", category:"Flores",
-    date: new Date().toISOString().split("T")[0],
+    description: "",
+    amount: "",
+    category: "Flores",
   });
 
-  const totalPages = Math.ceil(pagination.total / pagination.perPage);
+  const totalPages = Math.max(1, Math.ceil(pagination.total / pagination.perPage));
 
-  const navigate = (params: Record<string, string|undefined>) => {
+  const navigate = (params: Record<string, string | undefined>) => {
     const sp = new URLSearchParams();
-    Object.entries(params).forEach(([k,v]) => { if (v) sp.set(k, v); });
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) sp.set(key, value);
+    });
     router.push(`/dashboard/egresos?${sp.toString()}`);
   };
 
+  const changeMonth = (delta: number) => {
+    const next = addMonths(new Date(selection.year, selection.month - 1, 1), delta);
+    const maxDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+    const nextDay = Math.min(selection.day, maxDay);
+
+    navigate({
+      year: String(next.getFullYear()),
+      month: String(next.getMonth() + 1),
+      day: String(nextDay),
+      page: "1",
+    });
+  };
+
   const handleSave = async () => {
-    if (!form.description.trim() || !form.amount) { toast.error("Completa todos los campos"); return; }
+    if (!form.description.trim() || !form.amount) {
+      toast.error("Completa todos los campos");
+      return;
+    }
+
     setSaving(true);
-    const res  = await fetch("/api/expenses", {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ ...form, amount: parseFloat(form.amount) }),
+    const res = await fetch("/api/expenses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...form,
+        amount: Number.parseFloat(form.amount),
+        date: selection.selectedDateValue,
+      }),
     });
     const data = await res.json();
-    if (!res.ok) { toast.error(data.error || "Error"); setSaving(false); return; }
-    setForm({ description:"", amount:"", category:"Flores", date: new Date().toISOString().split("T")[0] });
+
+    if (!res.ok) {
+      toast.error(data.error || "Error");
+      setSaving(false);
+      return;
+    }
+
+    setForm({ description: "", amount: "", category: "Flores" });
     setShowForm(false);
     toast.success("Egreso registrado");
     router.refresh();
@@ -81,267 +441,196 @@ export default function EgresosClient({ expenses, summary, categories, paginatio
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Â¿Eliminar este egreso?")) return;
+    if (!confirm("Eliminar este egreso?")) return;
     setDeleting(id);
-    const res = await fetch(`/api/expenses/${id}`, { method:"DELETE" });
-    if (res.ok) { toast.success("Eliminado"); router.refresh(); }
-    else toast.error("Error al eliminar");
+    const res = await fetch(`/api/expenses/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      toast.success("Eliminado");
+      router.refresh();
+    } else {
+      toast.error("Error al eliminar");
+    }
     setDeleting(null);
   };
 
   return (
-    <div className="p-4 lg:p-8 space-y-5">
-
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <RiArrowDownLine className="text-red-500" size={22}/> Egresos
-          </h1>
-          <p className="text-gray-400 text-sm mt-1">Gestiona todos los gastos del negocio</p>
-        </div>
-        <button onClick={() => setShowForm(true)}
-          className="inline-flex w-fit items-center gap-2 bg-primary-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-700 transition-colors active:scale-95">
-          <RiAddLine size={16}/> Registrar egreso
-        </button>
-      </div>
-
-      {/* Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-          <p className="text-xs text-gray-400 mb-1">Total egresos</p>
-          <p className="text-xl font-bold text-red-500">{formatPrice(summary.total)}</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-          <p className="text-xs text-gray-400 mb-1">Registros</p>
-          <p className="text-xl font-bold text-gray-900">{summary.count}</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 col-span-2 sm:col-span-1">
-          <p className="text-xs text-gray-400 mb-1">Promedio por egreso</p>
-          <p className="text-xl font-bold text-amber-600">
-            {summary.count > 0 ? formatPrice(summary.total / summary.count) : "â€”"}
-          </p>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <RiFilterLine className="text-gray-400" size={14}/>
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Filtros</span>
-        </div>
-        <div className="flex flex-wrap gap-2 mb-3">
-          {PERIODOS.map(p => (
-            <button key={p.value}
-              onClick={() => {
-                if (p.value === "custom") { setShowCustom(true); return; }
-                setShowCustom(false);
-                navigate({ periodo: p.value });
-              }}
-              className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${
-                (p.value === "custom" && showCustom) ||
-                (p.value !== "custom" && filters?.periodo === p.value && !showCustom)
-                  ? "bg-primary-600 text-white"
-                  : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-              }`}>
-              {p.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => navigate({ periodo: filters?.periodo || "mes" })}
-            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
-              !filters?.categoria ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}>
-            Todas
-          </button>
-          {categories.map(c => (
-            <button key={c.category}
-              onClick={() => navigate({ periodo: filters?.periodo || "mes", categoria: c.category })}
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
-                filters?.categoria === c.category
-                  ? "bg-gray-800 text-white"
-                  : `${CAT_COLORS[c.category] || "bg-gray-100 text-gray-600"} opacity-80 hover:opacity-100`
-              }`}>
-              {c.category} Â· {formatPrice(c.amount)}
-            </button>
-          ))}
-        </div>
-        {showCustom && (
-          <div className="flex flex-wrap items-end gap-3 mt-4 pt-4 border-t border-gray-50">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1.5">Desde</label>
-              <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
-                className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary-400"/>
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1.5">Hasta</label>
-              <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
-                className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary-400"/>
-            </div>
-            <button onClick={() => { if (customFrom && customTo) navigate({ from:customFrom, to:customTo }); }}
-              disabled={!customFrom || !customTo}
-              className="flex items-center gap-1.5 bg-primary-600 text-white px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-40">
-              <RiCalendarLine size={13}/> Aplicar
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Expense list */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
-          <p className="font-semibold text-gray-900 text-sm">Registros ({pagination.total})</p>
-          {pagination.total > 0 && (
-            <p className="text-xs text-gray-400">pÃ¡g. {pagination.page}/{Math.max(1, totalPages)}</p>
-          )}
-        </div>
-
-        {expenses.length === 0 ? (
-          <div className="text-center py-16">
-            <RiArrowDownLine className="text-gray-200 mx-auto mb-3" size={48}/>
-            <p className="text-gray-400 text-sm">Sin egresos en este perÃ­odo</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {expenses.map(e => (
-              <div key={e.id} className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors group">
-
-                {/* Receipt thumbnail */}
-                {e.receiptPhotoUrl ? (
-                  <button
-                    onClick={() => setViewPhoto(e.receiptPhotoUrl)}
-                    className="w-14 h-14 rounded-xl overflow-hidden border-2 border-amber-200 flex-shrink-0 hover:border-amber-400 transition-colors relative group/thumb"
-                  >
-                    <img src={e.receiptPhotoUrl} alt="Factura" className="w-full h-full object-cover"/>
-                    <div className="absolute inset-0 bg-black/0 group-hover/thumb:bg-black/25 transition-colors flex items-center justify-center">
-                      <RiZoomInLine className="text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity" size={18}/>
-                    </div>
-                  </button>
-                ) : (
-                  <div className="w-14 h-14 rounded-xl border border-dashed border-gray-200 flex-shrink-0 flex items-center justify-center bg-gray-50">
-                    <RiReceiptLine className="text-gray-300" size={20}/>
-                  </div>
-                )}
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-gray-900">{e.description}</p>
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CAT_COLORS[normalizeCategory(e.category)] || "bg-gray-100 text-gray-600"}`}>
-                      {e.category}
-                    </span>
-                    <span className="text-xs text-gray-400">{formatDate(e.date)}</span>
-                    {e.registeredBy && (
-                      <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">
-                        {e.registeredBy}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Amount + delete */}
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <span className="font-bold text-red-500">{formatPrice(e.amount)}</span>
-                  <button onClick={() => handleDelete(e.id)} disabled={deleting === e.id}
-                    className="p-1.5 text-gray-200 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
-                    {deleting === e.id
-                      ? <RiLoader4Line className="animate-spin" size={14}/>
-                      : <RiDeleteBinLine size={14}/>}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-3">
-          <button
-            onClick={() => navigate({ periodo: filters?.periodo||"mes", page: String(pagination.page-1), categoria: filters?.categoria })}
-            disabled={pagination.page <= 1}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
-            <RiArrowLeftLine size={14}/> Anterior
-          </button>
-          <span className="text-sm text-gray-500">{pagination.page} / {totalPages}</span>
-          <button
-            onClick={() => navigate({ periodo: filters?.periodo||"mes", page: String(pagination.page+1), categoria: filters?.categoria })}
-            disabled={pagination.page >= totalPages}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
-            Siguiente <RiArrowRightLine size={14}/>
-          </button>
-        </div>
-      )}
-
-      {/* Create modal */}
-      <ResponsiveModal
-        open={showForm}
-        onClose={() => setShowForm(false)}
-        title="Registrar egreso"
-        panelClassName="sm:max-w-lg"
-      >
-        <div className="space-y-4">
+    <div className="mx-auto max-w-7xl space-y-6 p-4 lg:p-8">
+      <div className="rounded-[2rem] border border-slate-100 bg-white px-5 py-5 shadow-sm lg:px-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Descripción *</label>
+            <p className="text-3xl font-extrabold leading-tight tracking-normal text-slate-900 sm:text-4xl">Egresos</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">Gestiona todos los gastos del negocio.</p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-2 self-start rounded-2xl bg-primary-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-700"
+          >
+            <RiAddLine size={16} /> Registrar egreso
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => changeMonth(-1)}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50"
+            aria-label="Mes anterior"
+          >
+            <RiArrowLeftLine size={18} />
+          </button>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+              <RiCalendarLine size={14} />
+              Mes activo
+            </div>
+            <p className="mt-1 truncate text-base font-semibold text-slate-900">{selection.monthLabel}</p>
+            <p className="text-xs text-slate-500">Dia seleccionado: {selection.dayLabel}</p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => changeMonth(1)}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50"
+            aria-label="Mes siguiente"
+          >
+            <RiArrowRightLine size={18} />
+          </button>
+        </div>
+      </div>
+
+      <DayStrip
+        days={days}
+        selectedDay={selection.day}
+        onSelectDay={(day) =>
+          navigate({
+            year: String(selection.year),
+            month: String(selection.month),
+            day: String(day),
+            page: "1",
+          })
+        }
+      />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <StatCard
+          label="Total egresos"
+          value={formatPrice(summary.total)}
+          hint="Gastos del dia seleccionado"
+          icon={RiArrowDownLine}
+        />
+        <StatCard
+          label="Registros"
+          value={String(summary.count)}
+          hint="Egresos del dia"
+          icon={RiReceiptLine}
+        />
+        <StatCard
+          label="Promedio por egreso"
+          value={summary.count > 0 ? formatPrice(summary.total / summary.count) : "Sin registros"}
+          hint="Promedio del dia seleccionado"
+          icon={RiCalendarLine}
+        />
+      </div>
+
+      <SectionCard
+        title="Registros del dia"
+        subtitle={selection.dayLabel}
+        right={<span className="text-xs font-medium text-slate-400">Total: {pagination.total}</span>}
+      >
+        <ExpensesTable expenses={expenses} deleting={deleting} onDelete={handleDelete} onViewPhoto={setViewPhoto} />
+
+        <TablePager
+          page={pagination.page}
+          totalPages={totalPages}
+          total={pagination.total}
+          onPrev={() =>
+            navigate({
+              year: String(selection.year),
+              month: String(selection.month),
+              day: String(selection.day),
+              page: String(Math.max(1, pagination.page - 1)),
+            })
+          }
+          onNext={() =>
+            navigate({
+              year: String(selection.year),
+              month: String(selection.month),
+              day: String(selection.day),
+              page: String(Math.min(totalPages, pagination.page + 1)),
+            })
+          }
+        />
+      </SectionCard>
+
+      <ResponsiveModal open={showForm} onClose={() => setShowForm(false)} title="Registrar egreso" panelClassName="sm:max-w-lg">
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Se registrara en</p>
+            <p className="mt-1 text-sm font-medium text-slate-900">{selection.dayLabel}</p>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">Descripcion *</label>
             <input
               value={form.description}
-              onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+              onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
               placeholder="Ej: Compra de rosas rojas"
               autoComplete="off"
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base focus:border-primary-400 focus:outline-none"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base focus:border-primary-400 focus:outline-none"
             />
           </div>
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Monto (COP) *</label>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">Monto (COP) *</label>
               <input
                 value={form.amount}
-                onChange={e => setForm(p => ({ ...p, amount: e.target.value }))}
+                onChange={(event) => setForm((prev) => ({ ...prev, amount: event.target.value }))}
                 type="number"
                 placeholder="50000"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base focus:border-primary-400 focus:outline-none"
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base focus:border-primary-400 focus:outline-none"
               />
             </div>
+
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Fecha</label>
-              <input
-                value={form.date}
-                onChange={e => setForm(p => ({ ...p, date: e.target.value }))}
-                type="date"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base focus:border-primary-400 focus:outline-none"
-              />
+              <label className="mb-2 block text-sm font-medium text-slate-700">Categoria</label>
+              <div className="flex flex-wrap gap-2">
+                {CATS.map((category) => (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, category }))}
+                    className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                      form.category === category
+                        ? "bg-primary-600 text-white"
+                        : `${CAT_COLORS[normalizeCategory(category)] || "bg-slate-100 text-slate-600"}`
+                    }`}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Categoría</label>
-            <div className="flex flex-wrap gap-2">
-              {CATS.map(c => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setForm(p => ({ ...p, category: c }))}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
-                    form.category === c ? "bg-primary-600 text-white" : `${CAT_COLORS[normalizeCategory(c)] || "bg-gray-100 text-gray-600"}`
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-          </div>
+
           <div className="flex gap-3 pt-2">
             <button
+              type="button"
               onClick={() => setShowForm(false)}
-              className="flex-1 rounded-xl border border-gray-200 py-3.5 text-sm font-medium text-gray-600"
+              className="flex-1 rounded-xl border border-slate-200 py-3.5 text-sm font-medium text-slate-600"
             >
               Cancelar
             </button>
             <button
+              type="button"
               onClick={handleSave}
               disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary-600 py-3.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50 active:scale-95"
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 py-3.5 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:opacity-50"
             >
               {saving ? <RiLoader4Line className="animate-spin" size={15} /> : <RiCheckLine size={15} />}
               {saving ? "Guardando..." : "Guardar"}
@@ -350,10 +639,7 @@ export default function EgresosClient({ expenses, summary, categories, paginatio
         </div>
       </ResponsiveModal>
 
-      {/* Photo viewer â€” portal renders directly in document.body */}
-      {viewPhoto && <PhotoViewer url={viewPhoto} onClose={() => setViewPhoto(null)}/>}
-
+      {viewPhoto && <PhotoViewer url={viewPhoto} onClose={() => setViewPhoto(null)} />}
     </div>
   );
 }
-

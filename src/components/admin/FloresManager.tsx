@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import {
   RiAddLine,
+  RiArrowLeftLine,
+  RiArrowRightLine,
   RiCloseLine,
   RiDeleteBinLine,
   RiFlowerLine,
@@ -36,6 +38,7 @@ type Flower = { id: string; name: string; type: string; description?: string | n
 
 export default function FloresManager({ flowers: initial }: { flowers: Flower[] }) {
   const [flowers, setFlowers] = useState(initial);
+  const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Flower | null>(null);
   const [saving, setSaving] = useState(false);
@@ -43,6 +46,7 @@ export default function FloresManager({ flowers: initial }: { flowers: Flower[] 
   const [previewUrl, setPreviewUrl] = useState("");
   const [form, setForm] = useState({ name: "", type: "Rosa", description: "", imageUrl: "" });
   const [deleteTarget, setDeleteTarget] = useState<Flower | null>(null);
+  const PER_PAGE = 10;
 
   useEffect(() => {
     return () => {
@@ -97,6 +101,7 @@ export default function FloresManager({ flowers: initial }: { flowers: Flower[] 
       if (pendingFile) {
         const fd = new FormData();
         fd.append("file", pendingFile);
+        fd.append("folder", "gardentech/flowers");
         const uploadRes = await fetch("/api/upload", { method: "POST", body: fd });
         const uploadData = await uploadRes.json();
         if (!uploadRes.ok) throw new Error(uploadData.error || "Error subiendo imagen");
@@ -152,6 +157,17 @@ export default function FloresManager({ flowers: initial }: { flowers: Flower[] 
     acc[f.type].push(f);
     return acc;
   }, {} as Record<string, Flower[]>);
+  const totalPages = Math.max(1, Math.ceil(flowers.length / PER_PAGE));
+  const pageItems = flowers.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
+  const groupedPageByType = pageItems.reduce((acc, f) => {
+    acc[f.type] = acc[f.type] || [];
+    acc[f.type].push(f);
+    return acc;
+  }, {} as Record<string, Flower[]>);
 
   return (
     <>
@@ -172,7 +188,7 @@ export default function FloresManager({ flowers: initial }: { flowers: Flower[] 
         </div>
       ) : (
         <div className="space-y-6">
-          {Object.entries(groupedByType).map(([type, items]) => (
+          {Object.entries(groupedPageByType).map(([type, items]) => (
             <div key={type}>
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">{type}</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -204,6 +220,36 @@ export default function FloresManager({ flowers: initial }: { flowers: Flower[] 
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="mt-5 flex items-center justify-between gap-2 rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm sm:px-5">
+          <button
+            type="button"
+            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+            disabled={page <= 1}
+            className="inline-flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-0 sm:px-3"
+            aria-label="Página anterior"
+          >
+            <RiArrowLeftLine size={14} />
+            <span className="ml-2 hidden text-sm font-medium sm:inline">Anterior</span>
+          </button>
+
+          <span className="flex-1 whitespace-nowrap text-center text-[11px] text-gray-400 sm:text-xs">
+            {flowers.length} registros · pág. {page} de {totalPages}
+          </span>
+
+          <button
+            type="button"
+            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+            disabled={page >= totalPages}
+            className="inline-flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-0 sm:px-3"
+            aria-label="Página siguiente"
+          >
+            <span className="mr-2 hidden text-sm font-medium sm:inline">Siguiente</span>
+            <RiArrowRightLine size={14} />
+          </button>
         </div>
       )}
 

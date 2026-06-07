@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       }
       const bytes = await image.arrayBuffer();
       const base64 = `data:${image.type};base64,${Buffer.from(bytes).toString("base64")}`;
-      imageData = await uploadImage(base64, { folder: "fantasiaFloral/metodos-pago" });
+      imageData = await uploadImage(base64, { folder: "gardentech/payment-methods" });
     }
 
     const method = await prisma.paymentMethod.create({

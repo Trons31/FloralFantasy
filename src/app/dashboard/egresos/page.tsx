@@ -1,75 +1,107 @@
 import { prisma } from "@/lib/prisma";
 import EgresosClient from "./EgresosClient";
-import { startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay } from "date-fns";
+import {
+  eachDayOfInterval,
+  endOfDay,
+  endOfMonth,
+  format,
+  startOfDay,
+  startOfMonth,
+} from "date-fns";
+import { es } from "date-fns/locale";
 
 export const dynamic = "force-dynamic";
 
 export default async function EgresosPage({
   searchParams,
 }: {
-  searchParams: { periodo?:string; from?:string; to?:string; page?:string; categoria?:string };
+  searchParams: { year?: string; month?: string; day?: string; page?: string };
 }) {
-  const periodo = searchParams.periodo || "mes";
-  const page    = Math.max(1, parseInt(searchParams.page || "1"));
-  const perPage = 20;
-  const now     = new Date();
+  const now = new Date();
+  const year = Number.parseInt(searchParams.year || String(now.getFullYear()), 10);
+  const month = Number.parseInt(searchParams.month || String(now.getMonth() + 1), 10);
+  const monthIndex = Math.min(Math.max(month, 1), 12) - 1;
+  const monthAnchor = new Date(year, monthIndex, 1);
+  const maxDay = new Date(year, monthIndex + 1, 0).getDate();
+  const day = Math.min(
+    Math.max(Number.parseInt(searchParams.day || String(now.getDate()), 10), 1),
+    maxDay
+  );
+  const page = Math.max(1, Number.parseInt(searchParams.page || "1", 10));
+  const perPage = 10;
 
-  let dateFrom: Date;
-  let dateTo: Date = endOfDay(now);
+  const selectedDate = new Date(year, monthIndex, day);
+  const selectedFrom = startOfDay(selectedDate);
+  const selectedTo = endOfDay(selectedDate);
+  const monthFrom = startOfMonth(monthAnchor);
+  const monthTo = endOfMonth(monthAnchor);
 
-  if (searchParams.from && searchParams.to) {
-    dateFrom = startOfDay(new Date(searchParams.from));
-    dateTo   = endOfDay(new Date(searchParams.to));
-  } else {
-    switch (periodo) {
-      case "hoy":        dateFrom = startOfDay(now); break;
-      case "semana":     dateFrom = new Date(now.getTime() - 7*24*60*60*1000); break;
-      case "mes":        dateFrom = startOfMonth(now); break;
-      case "mes_pasado":
-        dateFrom = startOfMonth(subMonths(now, 1));
-        dateTo   = endOfMonth(subMonths(now, 1));
-        break;
-      default:           dateFrom = startOfMonth(now);
-    }
-  }
+  const dayTotal = await prisma.expense.count({ where: { date: { gte: selectedFrom, lte: selectedTo } } });
+  const totalPages = Math.max(1, Math.ceil(dayTotal / perPage));
+  const currentPage = Math.min(page, totalPages);
 
-  // where con todos los filtros activos (lista + total)
-  const where: any = { date: { gte: dateFrom, lte: dateTo } };
-  if (searchParams.categoria) where.category = searchParams.categoria;
-
-  // whereBase sin filtro de categoría (para los contadores de categoría)
-  const whereBase: any = { date: { gte: dateFrom, lte: dateTo } };
-
-  const [total, expenses, summary, categories] = await Promise.all([
-    prisma.expense.count({ where }),
+  const [dayExpenses, daySummary, monthExpenses] = await Promise.all([
     prisma.expense.findMany({
-      where,
+      where: { date: { gte: selectedFrom, lte: selectedTo } },
       orderBy: { date: "desc" },
-      skip:    (page - 1) * perPage,
-      take:    perPage,
+      skip: (currentPage - 1) * perPage,
+      take: perPage,
     }),
-    // summary usa where completo (con categoría si aplica)
     prisma.expense.aggregate({
-      where,
-      _sum:   { amount: true },
+      where: { date: { gte: selectedFrom, lte: selectedTo } },
+      _sum: { amount: true },
       _count: { id: true },
     }),
-    // categorías usan whereBase (sin filtro de categoría para ver todas)
-    prisma.expense.groupBy({
-      by:      ["category"],
-      where:   whereBase,
-      _sum:    { amount: true },
-      orderBy: { _sum: { amount: "desc" } },
+    prisma.expense.findMany({
+      where: { date: { gte: monthFrom, lte: monthTo } },
+      select: { date: true, amount: true },
     }),
   ]);
 
+  const dayMap = new Map<number, { count: number; amount: number }>();
+  monthExpenses.forEach((expense) => {
+    const expenseDate = new Date(expense.date);
+    const key = expenseDate.getDate();
+    const current = dayMap.get(key) || { count: 0, amount: 0 };
+    current.count += 1;
+    current.amount += expense.amount;
+    dayMap.set(key, current);
+  });
+
+  const days = eachDayOfInterval({ start: monthFrom, end: monthTo }).map((dayDate) => {
+    const stats = dayMap.get(dayDate.getDate()) || { count: 0, amount: 0 };
+    const label = format(dayDate, "EEE", { locale: es }).replace(/\./g, "").toUpperCase();
+
+    return {
+      date: dayDate.toISOString(),
+      dayNumber: dayDate.getDate(),
+      label,
+      count: stats.count,
+      amount: stats.amount,
+    };
+  });
+
   return (
     <EgresosClient
-      expenses={expenses.map(e => ({ ...e, date: e.date.toISOString(), createdAt: e.createdAt.toISOString() }))}
-      summary={{ total: summary._sum.amount || 0, count: total }}
-      categories={categories.map(c => ({ category: c.category, amount: c._sum.amount || 0 }))}
-      pagination={{ page, perPage, total }}
-      filters={{ periodo, from: searchParams.from, to: searchParams.to, categoria: searchParams.categoria }}
+      expenses={dayExpenses.map((expense) => ({
+        ...expense,
+        date: expense.date.toISOString(),
+        createdAt: expense.createdAt.toISOString(),
+      }))}
+      summary={{
+        total: daySummary._sum.amount || 0,
+        count: dayTotal,
+      }}
+      pagination={{ page: currentPage, perPage, total: dayTotal }}
+      selection={{
+        year,
+        month: monthIndex + 1,
+        day,
+        monthLabel: format(monthFrom, "MMMM yyyy", { locale: es }),
+        dayLabel: format(selectedDate, "d 'de' MMMM yyyy", { locale: es }),
+        selectedDateValue: `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+      }}
+      days={days}
     />
   );
 }

@@ -52,6 +52,7 @@ export default function AddonsManager({ addons: init }: { addons: any[] }) {
       if (pendingFile) {
         const fd = new FormData();
         fd.append("file", pendingFile);
+        fd.append("folder", "gardentech/addons");
         const uploadRes = await fetch("/api/upload", { method: "POST", body: fd });
         if (!uploadRes.ok) throw new Error("Error subiendo imagen");
         const uploadData = await uploadRes.json();

@@ -13,7 +13,7 @@ export async function uploadImage(
   } = {}
 ) {
   const result = await cloudinary.uploader.upload(fileBase64, {
-    folder: options.folder || "fantasiaFloral",
+    folder: options.folder || "gardentech",
     resource_type: "image",
     transformation: options.transformation || [
       { width: 1000, height: 1000, crop: "limit" },

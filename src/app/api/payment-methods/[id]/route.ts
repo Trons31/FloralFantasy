@@ -43,7 +43,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
       const bytes = await image.arrayBuffer();
       const base64 = `data:${image.type};base64,${Buffer.from(bytes).toString("base64")}`;
-      const uploaded = await uploadImage(base64, { folder: "fantasiaFloral/metodos-pago" });
+      const uploaded = await uploadImage(base64, { folder: "gardentech/payment-methods" });
       imageUrl = uploaded.url;
       imagePublicId = uploaded.publicId;
       if (current.imagePublicId && current.imagePublicId !== uploaded.publicId) {

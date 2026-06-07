@@ -2,12 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 import {
   RiAddLine,
   RiDeleteBinLine,
   RiEdit2Line,
+  RiLockLine,
   RiImageAddLine,
+  RiMailLine,
   RiLoader4Line,
   RiSaveLine,
 } from "react-icons/ri";
@@ -59,17 +62,24 @@ const makeDraft = (type: PaymentMethod["type"] = "QR"): DraftMethod => ({
 export default function AjustesClient({
   initialMethods,
   initialDeliveryFee,
+  initialLoginEmail,
 }: {
   initialMethods: PaymentMethod[];
   initialDeliveryFee: number;
+  initialLoginEmail: string;
 }) {
   const router = useRouter();
   const [methods, setMethods] = useState(initialMethods);
   const [saving, setSaving] = useState(false);
   const [savingDeliveryFee, setSavingDeliveryFee] = useState(false);
+  const [savingCredentials, setSavingCredentials] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
   const [deliveryFee, setDeliveryFee] = useState<number>(initialDeliveryFee);
+  const [newEmail, setNewEmail] = useState(initialLoginEmail);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [drafts, setDrafts] = useState<DraftMethod[]>(
     initialMethods.length
       ? initialMethods.map(m => ({
@@ -209,6 +219,32 @@ export default function AjustesClient({
     }
   };
 
+  const saveCredentials = async () => {
+    setSavingCredentials(true);
+    try {
+      const res = await fetch("/api/settings/login-credentials", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          newEmail,
+          currentPassword,
+          newPassword,
+          confirmPassword,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo actualizar el acceso");
+
+      toast.success("Credenciales actualizadas");
+      await signOut({ callbackUrl: "/auth/login" });
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setSavingCredentials(false);
+    }
+  };
+
   const getSummary = (draft: DraftMethod) => {
     if (draft.type === "QR") return "Configura QR o cuenta para pagos anticipados";
     if (draft.type === "BANK_ACCOUNT") return "Número de cuenta o identificador para transferencias";
@@ -217,6 +253,99 @@ export default function AjustesClient({
 
   return (
     <div className="space-y-6">
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div>
+            <h3 className="font-bold text-gray-900">Credenciales de acceso</h3>
+            <p className="text-sm text-gray-400">Actualiza el correo y la contrasena que usas para entrar al panel.</p>
+          </div>
+          <div className="hidden sm:flex h-11 w-11 items-center justify-center rounded-2xl bg-fuchsia-50 text-fuchsia-500">
+            <RiLockLine size={18} />
+          </div>
+        </div>
+
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div>
+            <label className="block text-sm text-gray-600 mb-1.5">Correo actual</label>
+            <div className="relative">
+              <RiMailLine className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                value={initialLoginEmail}
+                readOnly
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-11 py-3 text-sm text-gray-700 outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-600 mb-1.5">Nuevo correo</label>
+            <div className="relative">
+              <RiMailLine className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="email"
+                value={newEmail}
+                onChange={e => setNewEmail(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-11 py-3 text-sm focus:outline-none focus:border-primary-400"
+                placeholder="admin@tuempresa.com"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-600 mb-1.5">Contraseña actual</label>
+            <div className="relative">
+              <RiLockLine className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={e => setCurrentPassword(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-11 py-3 text-sm focus:outline-none focus:border-primary-400"
+                placeholder="Ingresa tu contraseña actual"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-600 mb-1.5">Nueva contraseña</label>
+            <div className="relative">
+              <RiLockLine className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="password"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-11 py-3 text-sm focus:outline-none focus:border-primary-400"
+                placeholder="Minimo 6 caracteres"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-600 mb-1.5">Confirmar contraseña</label>
+            <div className="relative">
+              <RiLockLine className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-11 py-3 text-sm focus:outline-none focus:border-primary-400"
+                placeholder="Repite la nueva contraseña"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={saveCredentials}
+            disabled={savingCredentials}
+            className="inline-flex items-center gap-2 rounded-2xl bg-gray-900 px-5 py-3 text-white font-semibold hover:bg-gray-800 disabled:opacity-50 transition-colors shadow-sm"
+          >
+            {savingCredentials ? <RiLoader4Line className="animate-spin" size={16} /> : <RiSaveLine size={16} />}
+            {savingCredentials ? "Actualizando..." : "Actualizar acceso y cerrar sesión"}
+          </button>
+        </div>
+      </div>
+
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>

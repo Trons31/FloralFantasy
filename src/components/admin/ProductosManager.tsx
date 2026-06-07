@@ -1,8 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   RiAddLine, RiSubtractLine, RiPencilLine, RiDeleteBinLine, RiLoader4Line, RiUploadCloud2Line,
   RiCloseLine, RiLeafLine, RiTimeLine, RiBellLine, RiCheckLine, RiStarLine,
+  RiArrowLeftLine, RiArrowRightLine,
   RiFlowerLine, RiAlertLine,
 } from "react-icons/ri";
 import { FaStar } from "react-icons/fa6";
@@ -43,6 +44,7 @@ export default function ProductosManager({
   occasions,
 }: { products: any[]; categories: Category[]; flowers: Flower[]; occasions: Occasion[] }) {
   const [products, setProducts] = useState<Product[]>(init);
+  const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editing,  setEditing]  = useState<Product | null>(null);
   const [saving,   setSaving]   = useState(false);
@@ -54,12 +56,19 @@ export default function ProductosManager({
   const [showCatForm, setShowCatForm] = useState(false);
   const [newCatName,  setNewCatName]  = useState("");
   const [localCats,   setLocalCats]   = useState(categories);
+  const PER_PAGE = 10;
 
   const { register, handleSubmit, reset, watch, setValue } = useForm<any>({
     defaultValues: { preparationTimeValue: 0, preparationTimeUnit: "MINUTES", deliveryLeadDays: 0, inStock: true },
   });
 
   const deliveryDays = watch("deliveryLeadDays", 0);
+  const totalPages = Math.max(1, Math.ceil(products.length / PER_PAGE));
+  const pageItems = products.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
 
   const slugify = (s: string) =>
     s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g,"-").replace(/[^a-z0-9-]/g,"");
@@ -103,6 +112,7 @@ export default function ProductosManager({
     setUploadingSlots(p => new Set(p).add(idx));
     const fd = new FormData();
     fd.append("file", slot.file);
+    fd.append("folder", "gardentech/products");
     const res  = await fetch("/api/upload", { method: "POST", body: fd });
     const data = await res.json();
     URL.revokeObjectURL(slot.previewUrl); // liberar memoria
@@ -226,7 +236,7 @@ export default function ProductosManager({
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {products.map(p => (
+          {pageItems.map(p => (
             <div key={p.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow group">
               <div className="aspect-video relative overflow-hidden bg-gray-50">
                 {p.images[0]
@@ -267,6 +277,36 @@ export default function ProductosManager({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="mt-5 flex items-center justify-between gap-2 rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm sm:px-5">
+          <button
+            type="button"
+            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+            disabled={page <= 1}
+            className="inline-flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-0 sm:px-3"
+            aria-label="Página anterior"
+          >
+            <RiArrowLeftLine size={14} />
+            <span className="ml-2 hidden text-sm font-medium sm:inline">Anterior</span>
+          </button>
+
+          <span className="flex-1 whitespace-nowrap text-center text-[11px] text-gray-400 sm:text-xs">
+            {products.length} registros · pág. {page} de {totalPages}
+          </span>
+
+          <button
+            type="button"
+            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+            disabled={page >= totalPages}
+            className="inline-flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-0 sm:px-3"
+            aria-label="Página siguiente"
+          >
+            <span className="mr-2 hidden text-sm font-medium sm:inline">Siguiente</span>
+            <RiArrowRightLine size={14} />
+          </button>
         </div>
       )}
 

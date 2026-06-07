@@ -175,6 +175,7 @@ export default function OcasionesManager({ occasions: initial }: { occasions: Oc
     setUploadingSlots((prev) => new Set(prev).add(idx));
     const fd = new FormData();
     fd.append("file", slot.file);
+    fd.append("folder", "gardentech/occasions");
     const res = await fetch("/api/upload", { method: "POST", body: fd });
     const data = await res.json();
     setUploadingSlots((prev) => {

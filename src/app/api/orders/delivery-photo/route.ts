@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const result = await new Promise<any>((res, rej) =>
-    cloudinary.uploader.upload_stream({ folder: "fantasiaFloral/entregas" },
+    cloudinary.uploader.upload_stream({ folder: "gardentech/deliveries" },
       (err, r) => err ? rej(err) : res(r)
     ).end(buffer)
   );
