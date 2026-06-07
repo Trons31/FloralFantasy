@@ -15,6 +15,47 @@ type Order     = { id:string; trackingToken:string; customerName:string; address
   deliveryPhotoUrl?:string; items:OrderItem[] };
 
 const EXPENSE_CATS = ["Insumos","Flores","Transporte","Empaque","Otro"];
+const MAX_DELIVERY_PHOTO_DIMENSION = 1600;
+const DELIVERY_PHOTO_QUALITY = 0.82;
+
+async function compressImageForUpload(file: File) {
+  if (!file.type.startsWith("image/")) return file;
+
+  const bitmap = await createImageBitmap(file);
+  const { width, height } = bitmap;
+  const scale = Math.min(
+    1,
+    MAX_DELIVERY_PHOTO_DIMENSION / Math.max(width, height)
+  );
+  const targetWidth = Math.max(1, Math.round(width * scale));
+  const targetHeight = Math.max(1, Math.round(height * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close();
+    return file;
+  }
+
+  ctx.drawImage(bitmap, 0, 0, targetWidth, targetHeight);
+  bitmap.close();
+
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(
+      (value) => resolve(value),
+      "image/webp",
+      DELIVERY_PHOTO_QUALITY
+    );
+  });
+
+  if (!blob || blob.size >= file.size) return file;
+
+  const baseName = file.name.replace(/\.[^.]+$/, "") || "delivery-photo";
+  return new File([blob], `${baseName}.webp`, { type: "image/webp" });
+}
 
 export default function RepartidorView({ user, onLogout }: { user:any; onLogout:()=>void }) {
   const [orders,       setOrders]       = useState<Order[]>([]);
@@ -77,7 +118,8 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
     if (!photoOrder) return;
     setUploading(true);
     const fd = new FormData();
-    fd.append("file", photoFile);
+    const optimizedPhoto = await compressImageForUpload(photoFile);
+    fd.append("file", optimizedPhoto);
     fd.append("orderId", photoOrder.id);
     const res = await fetch("/api/orders/delivery-photo", { method:"POST", body: fd });
     if (res.ok) {
