@@ -284,6 +284,7 @@ model Expense {
   createdAt       DateTime @default(now())
   receiptPhotoUrl     String?
   receiptPublicId     String?
+  receiptPhotos   Json?
   registeredBy    String?
 }
 

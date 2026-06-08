@@ -8,6 +8,8 @@ import {
 import { toast } from "sonner";
 
 const EXPENSE_CATS = ["Insumos", "Flores", "Transporte", "Empaque", "Otro"];
+const MAX_RECEIPT_PHOTO_DIMENSION = 1600;
+const RECEIPT_PHOTO_QUALITY = 0.82;
 
 const CAT_COLORS: Record<string, string> = {
   Insumos:    "bg-amber-100 text-amber-700",
@@ -24,6 +26,12 @@ type Expense = {
   category: string;
   date: string;
   receiptPhotoUrl?: string | null;
+  receiptPhotos?: { url: string; publicId?: string | null }[] | null;
+};
+
+type ReceiptPhoto = {
+  file: File;
+  preview: string;
 };
 
 function formatPrice(n: number) {
@@ -32,14 +40,49 @@ function formatPrice(n: number) {
 
 const emptyForm = { description: "", amount: "", category: "Insumos" };
 
+async function compressImageForUpload(file: File) {
+  if (!file.type.startsWith("image/")) return file;
+
+  const bitmap = await createImageBitmap(file);
+  const { width, height } = bitmap;
+  const scale = Math.min(1, MAX_RECEIPT_PHOTO_DIMENSION / Math.max(width, height));
+  const targetWidth = Math.max(1, Math.round(width * scale));
+  const targetHeight = Math.max(1, Math.round(height * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close();
+    return file;
+  }
+
+  ctx.drawImage(bitmap, 0, 0, targetWidth, targetHeight);
+  bitmap.close();
+
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob((value) => resolve(value), "image/webp", RECEIPT_PHOTO_QUALITY);
+  });
+
+  if (!blob || blob.size >= file.size) return file;
+
+  const baseName = file.name.replace(/\.[^.]+$/, "") || "receipt-photo";
+  return new File([blob], `${baseName}.webp`, { type: "image/webp" });
+}
+
+function createPhotoPreview(file: File) {
+  return URL.createObjectURL(file);
+}
+
 export default function CorredorView({ user, onLogout }: { user: { id: string; name: string; role: string }; onLogout: () => void }) {
   const [expenses,     setExpenses]     = useState<Expense[]>([]);
   const [loading,      setLoading]      = useState(true);
   /* ── Create state ── */
   const [showCreate,   setShowCreate]   = useState(false);
   const [createForm,   setCreateForm]   = useState(emptyForm);
-  const [createFile,   setCreateFile]   = useState<File | null>(null);
-  const [createPreview,setCreatePreview]= useState<string | null>(null);
+  const [createPhotos,  setCreatePhotos] = useState<ReceiptPhoto[]>([]);
   const [saving,       setSaving]       = useState(false);
   /* ── Edit state ── */
   const [editing,      setEditing]      = useState<Expense | null>(null);
@@ -66,31 +109,70 @@ export default function CorredorView({ user, onLogout }: { user: { id: string; n
 
   const total = expenses.reduce((s, e) => s + e.amount, 0);
 
+  const addCreatePhotos = (files: FileList | File[]) => {
+    const next = Array.from(files).map((file) => ({ file, preview: createPhotoPreview(file) }));
+    setCreatePhotos((prev) => [...prev, ...next]);
+    if (createFileRef.current) createFileRef.current.value = "";
+  };
+
+  const removeCreatePhoto = (index: number) => {
+    setCreatePhotos((prev) => {
+      const photo = prev[index];
+      if (photo) URL.revokeObjectURL(photo.preview);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const clearCreatePhotos = () => {
+    setCreatePhotos((prev) => {
+      prev.forEach((photo) => URL.revokeObjectURL(photo.preview));
+      return [];
+    });
+    if (createFileRef.current) createFileRef.current.value = "";
+  };
+
+  const uploadCreatePhoto = async (photo: ReceiptPhoto) => {
+    const optimizedFile = await compressImageForUpload(photo.file);
+    const fd = new FormData();
+    fd.append("file", optimizedFile);
+    const res = await fetch("/api/upload", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error subiendo imagen");
+    return { url: data.url as string, publicId: data.publicId as string };
+  };
+
   /* ── Create ── */
   const handleCreate = async () => {
     if (!createForm.description.trim() || !createForm.amount) { toast.error("Descripción y monto son requeridos"); return; }
-    if (!createFile) { toast.error("La foto de la factura es obligatoria"); return; }
+    if (!createPhotos.length) { toast.error("La foto de la factura es obligatoria"); return; }
     setSaving(true);
-    const fd = new FormData();
-    fd.append("description",  createForm.description);
-    fd.append("amount",       createForm.amount);
-    fd.append("category",     createForm.category);
-    fd.append("registeredBy", user.name);
-    fd.append("file",         createFile);
-    const res = await fetch("/api/expenses/with-photo", { method: "POST", body: fd });
-    if (res.ok) {
+    try {
+      const uploadedPhotos = await Promise.all(createPhotos.map(uploadCreatePhoto));
+      const fd = new FormData();
+      fd.append("description",  createForm.description);
+      fd.append("amount",       createForm.amount);
+      fd.append("category",     createForm.category);
+      fd.append("registeredBy", user.name);
+      fd.append("receiptPhotos", JSON.stringify(uploadedPhotos));
+      const res = await fetch("/api/expenses/with-photo", { method: "POST", body: fd });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Error al registrar");
+      }
       toast.success("Gasto registrado");
       closeCreate();
       load();
-    } else toast.error("Error al registrar");
-    setSaving(false);
+    } catch (error: any) {
+      toast.error(error?.message || "Error al registrar");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const closeCreate = () => {
     setShowCreate(false);
     setCreateForm(emptyForm);
-    setCreateFile(null);
-    setCreatePreview(null);
+    clearCreatePhotos();
   };
 
   /* ── Edit ── */
@@ -233,18 +315,15 @@ export default function CorredorView({ user, onLogout }: { user: { id: string; n
 
       {/* ── CREATE modal ── */}
       {showCreate && (
-        <ExpenseModal
+        <ExpenseCreateModal
           title="Registrar gasto"
           form={createForm}
           setForm={setCreateForm}
-          file={createFile}
-          preview={createPreview}
           fileRef={createFileRef}
-          onFileChange={e => {
-            const f = e.target.files?.[0]; if (!f) return;
-            setCreateFile(f); setCreatePreview(URL.createObjectURL(f));
-          }}
-          onClearFile={() => { setCreateFile(null); setCreatePreview(null); }}
+          photos={createPhotos}
+          onAddFiles={addCreatePhotos}
+          onRemovePhoto={removeCreatePhoto}
+          onClearPhotos={clearCreatePhotos}
           onSave={handleCreate}
           onClose={closeCreate}
           saving={saving}
@@ -372,6 +451,163 @@ function ExpenseModal({
                 <RiCameraLine className="text-green-400" size={32}/>
                 <span className="text-sm text-green-600 font-medium">Tomar foto de la factura</span>
                 <span className="text-xs text-gray-400">El admin podrá verla en egresos</span>
+              </button>
+            )}
+          </div>
+
+          <div className="flex gap-3 pt-1">
+            <button onClick={onClose}
+              className="flex-1 border border-gray-200 text-gray-600 py-3.5 rounded-xl text-sm font-medium">
+              Cancelar
+            </button>
+            <button onClick={onSave} disabled={saving}
+              className={`flex-1 text-white py-3.5 rounded-xl text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-2 active:scale-95 transition-all ${accentColor}`}>
+              {saving ? <RiLoader4Line className="animate-spin" size={15}/> : <RiArrowDownLine size={15}/>}
+              {saving ? "Guardando..." : saveLabel}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExpenseCreateModal({
+  title,
+  form,
+  setForm,
+  fileRef,
+  photos,
+  onAddFiles,
+  onRemovePhoto,
+  onClearPhotos,
+  onSave,
+  onClose,
+  saving,
+  saveLabel,
+  accentColor,
+}: {
+  title: string;
+  form: { description: string; amount: string; category: string };
+  setForm: React.Dispatch<React.SetStateAction<{ description: string; amount: string; category: string }>>;
+  fileRef: React.RefObject<HTMLInputElement>;
+  photos: ReceiptPhoto[];
+  onAddFiles: (files: FileList | File[]) => void;
+  onRemovePhoto: (index: number) => void;
+  onClearPhotos: () => void;
+  onSave: () => void;
+  onClose: () => void;
+  saving: boolean;
+  saveLabel: string;
+  accentColor: string;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 backdrop-blur-sm">
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md shadow-2xl p-6 pb-8 overflow-y-auto max-h-[90vh]">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="font-bold text-lg flex items-center gap-2">
+            <RiReceiptLine className="text-green-500" size={20}/> {title}
+          </h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400">
+            <RiCloseLine size={20}/>
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">¿Qué compraste? *</label>
+            <input value={form.description}
+              onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+              placeholder="Ej: Rosas rojas mercado central" autoComplete="off"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-green-400"/>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Monto pagado (COP) *</label>
+            <input value={form.amount}
+              onChange={e => setForm(p => ({ ...p, amount: e.target.value }))}
+              type="number" placeholder="50000" inputMode="numeric"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-green-400"/>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Categoría</label>
+            <div className="flex flex-wrap gap-2">
+              {EXPENSE_CATS.map(c => (
+                <button key={c} type="button" onClick={() => setForm(p => ({ ...p, category: c }))}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                    form.category === c ? "bg-green-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Fotos de la factura <span className="text-gray-400 font-normal">(puedes subir varias)</span>
+            </label>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => {
+                const files = e.target.files;
+                if (!files?.length) return;
+                onAddFiles(files);
+                e.currentTarget.value = "";
+              }}
+              className="hidden"
+            />
+
+            {photos.length > 0 ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  {photos.map((photo, index) => (
+                    <div key={`${photo.preview}-${index}`} className="relative overflow-hidden rounded-2xl border border-gray-200 bg-gray-50">
+                      <img src={photo.preview} alt={`Factura ${index + 1}`} className="h-28 w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => onRemovePhoto(index)}
+                        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white"
+                        aria-label={`Quitar foto ${index + 1}`}
+                      >
+                        <RiCloseLine size={14} />
+                      </button>
+                      <div className="absolute bottom-2 left-2 rounded-full bg-green-500 px-2 py-0.5 text-[11px] font-semibold text-white">
+                        Foto {index + 1}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    className="flex-1 rounded-xl border border-dashed border-green-300 bg-green-50 px-4 py-3 text-sm font-medium text-green-700"
+                  >
+                    Agregar más fotos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClearPhotos}
+                    className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-600"
+                  >
+                    Limpiar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="w-full h-32 border-2 border-dashed border-green-200 rounded-2xl flex flex-col items-center justify-center gap-2 hover:border-green-400 hover:bg-green-50 transition-colors bg-green-50/50"
+              >
+                <RiCameraLine className="text-green-400" size={32}/>
+                <span className="text-sm text-green-600 font-medium">Tomar o elegir fotos de la factura</span>
+                <span className="text-xs text-gray-400">Se comprimen antes de subir para ir más rápido</span>
               </button>
             )}
           </div>

@@ -9,6 +9,17 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+type ReceiptPhoto = { url: string; publicId?: string };
+
+function uploadBufferToCloudinary(buffer: Buffer) {
+  return new Promise<any>((resolve, reject) => {
+    cloudinary.uploader.upload_stream(
+      { folder: "gardentech/invoices" },
+      (err, result) => (err ? reject(err) : resolve(result))
+    ).end(buffer);
+  });
+}
+
 export async function POST(req: NextRequest) {
   const access = await requireOrderManagementUser(req);
   if (!access) {
@@ -18,42 +29,53 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const formData    = await req.formData();
-  const file        = formData.get("file")        as File | null;
+  const formData = await req.formData();
+  const file = formData.get("file") as File | null;
   const description = formData.get("description") as string;
-  const amount      = formData.get("amount")      as string;
-  const category    = formData.get("category")    as string;
+  const amount = formData.get("amount") as string;
+  const category = formData.get("category") as string;
   const registeredBy = formData.get("registeredBy") as string;
+  const receiptPhotosRaw = formData.get("receiptPhotos") as string | null;
 
   if (!description || !amount) {
-    return NextResponse.json({ error: "Descripción y monto son requeridos" }, { status: 400 });
+    return NextResponse.json({ error: "DescripciÃ³n y monto son requeridos" }, { status: 400 });
   }
 
-  let receiptPhotoUrl: string | undefined;
-  let receiptPublicId: string | undefined;
+  let receiptPhotos: ReceiptPhoto[] = [];
 
-  if (file) {
+  if (receiptPhotosRaw) {
+    try {
+      const parsed = JSON.parse(receiptPhotosRaw);
+      if (Array.isArray(parsed)) {
+        receiptPhotos = parsed
+          .filter((photo) => photo && typeof photo.url === "string" && photo.url.trim())
+          .map((photo) => ({
+            url: photo.url,
+            publicId: typeof photo.publicId === "string" ? photo.publicId : undefined,
+          }));
+      }
+    } catch {
+      return NextResponse.json({ error: "Las fotos de la factura no son vÃ¡lidas" }, { status: 400 });
+    }
+  }
+
+  if (!receiptPhotos.length && file) {
     const buffer = Buffer.from(await file.arrayBuffer());
-    const result = await new Promise<any>((res, rej) =>
-      cloudinary.uploader.upload_stream(
-        { folder: "gardentech/invoices" },
-        (err, r) => err ? rej(err) : res(r)
-      ).end(buffer)
-    );
-    receiptPhotoUrl = result.secure_url;
-    receiptPublicId = result.public_id;
+    const result = await uploadBufferToCloudinary(buffer);
+    receiptPhotos = [{ url: result.secure_url, publicId: result.public_id }];
   }
 
   const expense = await prisma.expense.create({
     data: {
       description,
-      amount:      parseFloat(amount),
-      category:    category || "Insumos",
-      date:        new Date(),
-      receiptPhotoUrl,
-      receiptPublicId,
+      amount: parseFloat(amount),
+      category: category || "Insumos",
+      date: new Date(),
+      receiptPhotoUrl: receiptPhotos[0]?.url,
+      receiptPublicId: receiptPhotos[0]?.publicId,
+      receiptPhotos: receiptPhotos.length ? receiptPhotos : undefined,
       registeredBy,
-    },
+    } as any,
   });
 
   return NextResponse.json(expense);

@@ -390,7 +390,7 @@ export default function ProductosManager({
               </div>
 
               {/* Price & Category */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Precio (COP) *</label>
                   <input {...register("price",{required:true})} type="number" min="0" placeholder="85000"
@@ -405,11 +405,11 @@ export default function ProductosManager({
                     </button>
                   </div>
                   {showCatForm && (
-                    <div className="flex gap-2 mb-2">
+                    <div className="mb-2 flex flex-col gap-2 sm:flex-row">
                       <input value={newCatName} onChange={e => setNewCatName(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && (e.preventDefault(), handleCreateCat())}
                         placeholder="Nombre..." className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary-400" />
-                      <button type="button" onClick={handleCreateCat} className="bg-primary-600 text-white px-3 py-2 rounded-lg text-xs">Crear</button>
+                      <button type="button" onClick={handleCreateCat} className="w-full rounded-lg bg-primary-600 px-3 py-2 text-xs text-white sm:w-auto">Crear</button>
                     </div>
                   )}
                   <select {...register("categoryId",{required:true})}

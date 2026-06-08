@@ -43,6 +43,7 @@ type ExpenseItem = {
   createdAt: string;
   registeredBy?: string | null;
   receiptPhotoUrl?: string | null;
+  receiptPhotos?: { url: string; publicId?: string | null }[] | null;
 };
 
 type DaySummary = {
@@ -55,6 +56,10 @@ type DaySummary = {
 
 function normalizeCategory(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function getExpensePhotoUrls(expense: ExpenseItem) {
+  return expense.receiptPhotos?.map((photo) => photo.url).filter(Boolean) ?? (expense.receiptPhotoUrl ? [expense.receiptPhotoUrl] : []);
 }
 
 function StatCard({
@@ -221,7 +226,7 @@ function ExpensesTable({
   expenses: ExpenseItem[];
   deleting: string | null;
   onDelete: (id: string) => void;
-  onViewPhoto: (url: string) => void;
+  onViewPhoto: (urls: string[]) => void;
 }) {
   if (!expenses.length) {
     return (
@@ -247,40 +252,106 @@ function ExpensesTable({
             </tr>
           </thead>
           <tbody>
-            {expenses.map((expense) => (
-              <tr key={expense.id} className="border-b border-slate-50 last:border-b-0 hover:bg-slate-50/60">
-                <td className="px-5 py-3.5">
-                  <p className="font-medium text-slate-900">{expense.description}</p>
-                  {expense.registeredBy ? <p className="mt-1 text-xs text-slate-400">{expense.registeredBy}</p> : null}
-                </td>
-                <td className="px-5 py-3.5">
-                  <span
-                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                      CAT_COLORS[normalizeCategory(expense.category)] || "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {expense.category}
-                  </span>
-                </td>
-                <td className="px-5 py-3.5 whitespace-nowrap text-xs text-slate-500">
-                  {format(new Date(expense.date), "d MMM yyyy, h:mm a", { locale: es })}
-                </td>
-                <td className="px-5 py-3.5">
-                  {expense.receiptPhotoUrl ? (
+            {expenses.map((expense) => {
+              const photoUrls = getExpensePhotoUrls(expense);
+              return (
+                <tr key={expense.id} className="border-b border-slate-50 last:border-b-0 hover:bg-slate-50/60">
+                  <td className="px-5 py-3.5">
+                    <p className="font-medium text-slate-900">{expense.description}</p>
+                    {expense.registeredBy ? <p className="mt-1 text-xs text-slate-400">{expense.registeredBy}</p> : null}
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        CAT_COLORS[normalizeCategory(expense.category)] || "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {expense.category}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5 whitespace-nowrap text-xs text-slate-500">
+                    {format(new Date(expense.date), "d MMM yyyy, h:mm a", { locale: es })}
+                  </td>
+                  <td className="px-5 py-3.5">
+                    {photoUrls.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => onViewPhoto(photoUrls)}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-200"
+                      >
+                        <RiZoomInLine size={12} />
+                        Ver{photoUrls.length > 1 ? ` (${photoUrls.length})` : ""}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-slate-400">Sin foto</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-3.5 text-right font-semibold text-rose-600">{formatPrice(expense.amount)}</td>
+                  <td className="px-5 py-3.5 text-right">
                     <button
                       type="button"
-                      onClick={() => onViewPhoto(expense.receiptPhotoUrl as string)}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-200"
+                      onClick={() => onDelete(expense.id)}
+                      disabled={deleting === expense.id}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-300 transition hover:bg-rose-50 hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label="Eliminar egreso"
                     >
-                      <RiZoomInLine size={12} />
-                      Ver
+                      {deleting === expense.id ? <RiLoader4Line className="animate-spin" size={14} /> : <RiDeleteBinLine size={14} />}
                     </button>
-                  ) : (
-                    <span className="text-xs text-slate-400">Sin foto</span>
-                  )}
-                </td>
-                <td className="px-5 py-3.5 text-right font-semibold text-rose-600">{formatPrice(expense.amount)}</td>
-                <td className="px-5 py-3.5 text-right">
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="divide-y divide-slate-50 md:hidden">
+        {expenses.map((expense) => {
+          const photoUrls = getExpensePhotoUrls(expense);
+          return (
+            <div key={expense.id} className="px-4 py-4">
+              <div className="flex items-start gap-3">
+                {photoUrls.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => onViewPhoto(photoUrls)}
+                    className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50"
+                  >
+                    <img src={photoUrls[0]} alt="Comprobante" className="h-full w-full object-cover" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition hover:bg-black/20">
+                      <RiZoomInLine className="text-white opacity-0 transition hover:opacity-100" size={18} />
+                    </div>
+                    {photoUrls.length > 1 && (
+                      <div className="absolute bottom-1 right-1 rounded-full bg-black/65 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                        +{photoUrls.length - 1}
+                      </div>
+                    )}
+                  </button>
+                ) : (
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50">
+                    <RiReceiptLine className="text-slate-300" size={18} />
+                  </div>
+                )}
+
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-slate-900">{expense.description}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                        CAT_COLORS[normalizeCategory(expense.category)] || "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {expense.category}
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      {format(new Date(expense.date), "d MMM yyyy, h:mm a", { locale: es })}
+                    </span>
+                  </div>
+                  {expense.registeredBy ? <p className="mt-1 text-xs text-slate-500">{expense.registeredBy}</p> : null}
+                </div>
+
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <p className="text-sm font-semibold text-rose-600">{formatPrice(expense.amount)}</p>
                   <button
                     type="button"
                     onClick={() => onDelete(expense.id)}
@@ -290,66 +361,11 @@ function ExpensesTable({
                   >
                     {deleting === expense.id ? <RiLoader4Line className="animate-spin" size={14} /> : <RiDeleteBinLine size={14} />}
                   </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="divide-y divide-slate-50 md:hidden">
-        {expenses.map((expense) => (
-          <div key={expense.id} className="px-4 py-4">
-            <div className="flex items-start gap-3">
-              {expense.receiptPhotoUrl ? (
-                <button
-                  type="button"
-                  onClick={() => onViewPhoto(expense.receiptPhotoUrl as string)}
-                  className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50"
-                >
-                  <img src={expense.receiptPhotoUrl} alt="Comprobante" className="h-full w-full object-cover" />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition hover:bg-black/20">
-                    <RiZoomInLine className="text-white opacity-0 transition hover:opacity-100" size={18} />
-                  </div>
-                </button>
-              ) : (
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50">
-                  <RiReceiptLine className="text-slate-300" size={18} />
                 </div>
-              )}
-
-              <div className="min-w-0 flex-1">
-                <p className="font-medium text-slate-900">{expense.description}</p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <span
-                    className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                      CAT_COLORS[normalizeCategory(expense.category)] || "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {expense.category}
-                  </span>
-                  <span className="text-[11px] text-slate-400">
-                    {format(new Date(expense.date), "d MMM yyyy, h:mm a", { locale: es })}
-                  </span>
-                </div>
-                {expense.registeredBy ? <p className="mt-1 text-xs text-slate-500">{expense.registeredBy}</p> : null}
-              </div>
-
-              <div className="flex shrink-0 flex-col items-end gap-2">
-                <p className="text-sm font-semibold text-rose-600">{formatPrice(expense.amount)}</p>
-                <button
-                  type="button"
-                  onClick={() => onDelete(expense.id)}
-                  disabled={deleting === expense.id}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-300 transition hover:bg-rose-50 hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label="Eliminar egreso"
-                >
-                  {deleting === expense.id ? <RiLoader4Line className="animate-spin" size={14} /> : <RiDeleteBinLine size={14} />}
-                </button>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </>
   );
@@ -379,7 +395,7 @@ export default function EgresosClient({
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [viewPhoto, setViewPhoto] = useState<string | null>(null);
+  const [viewPhotos, setViewPhotos] = useState<string[] | null>(null);
   const [form, setForm] = useState({
     description: "",
     amount: "",
@@ -542,7 +558,7 @@ export default function EgresosClient({
         subtitle={selection.dayLabel}
         right={<span className="text-xs font-medium text-slate-400">Total: {pagination.total}</span>}
       >
-        <ExpensesTable expenses={expenses} deleting={deleting} onDelete={handleDelete} onViewPhoto={setViewPhoto} />
+        <ExpensesTable expenses={expenses} deleting={deleting} onDelete={handleDelete} onViewPhoto={(urls) => setViewPhotos(urls)} />
 
         <TablePager
           page={pagination.page}
@@ -639,7 +655,7 @@ export default function EgresosClient({
         </div>
       </ResponsiveModal>
 
-      {viewPhoto && <PhotoViewer url={viewPhoto} onClose={() => setViewPhoto(null)} />}
+      {viewPhotos && <PhotoViewer urls={viewPhotos} onClose={() => setViewPhotos(null)} />}
     </div>
   );
 }
