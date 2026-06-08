@@ -12,19 +12,6 @@ import { es } from "date-fns/locale";
 
 export const dynamic = "force-dynamic";
 
-type ReceiptPhoto = { url: string; publicId?: string | null };
-
-function parseReceiptPhotos(value: unknown): ReceiptPhoto[] | null {
-  if (!Array.isArray(value)) return null;
-  return value
-    .filter((photo): photo is { url?: unknown; publicId?: unknown } => !!photo && typeof photo === "object")
-    .map((photo) => ({
-      url: typeof photo.url === "string" ? photo.url : "",
-      publicId: typeof photo.publicId === "string" ? photo.publicId : null,
-    }))
-    .filter((photo) => Boolean(photo.url));
-}
-
 export default async function EgresosPage({
   searchParams,
 }: {
@@ -56,6 +43,17 @@ export default async function EgresosPage({
   const [dayExpenses, daySummary, monthExpenses] = await Promise.all([
     prisma.expense.findMany({
       where: { date: { gte: selectedFrom, lte: selectedTo } },
+      select: {
+        id: true,
+        description: true,
+        amount: true,
+        category: true,
+        date: true,
+        createdAt: true,
+        registeredBy: true,
+        receiptPhotoUrl: true,
+        receiptPublicId: true,
+      },
       orderBy: { date: "desc" },
       skip: (currentPage - 1) * perPage,
       take: perPage,
@@ -96,15 +94,11 @@ export default async function EgresosPage({
 
   return (
     <EgresosClient
-      expenses={dayExpenses.map((expense) => {
-        const receiptPhotos = parseReceiptPhotos((expense as { receiptPhotos?: unknown }).receiptPhotos);
-        return {
-          ...expense,
-          date: expense.date.toISOString(),
-          createdAt: expense.createdAt.toISOString(),
-          receiptPhotos,
-        };
-      })}
+      expenses={dayExpenses.map((expense) => ({
+        ...expense,
+        date: expense.date.toISOString(),
+        createdAt: expense.createdAt.toISOString(),
+      }))}
       summary={{
         total: daySummary._sum.amount || 0,
         count: dayTotal,

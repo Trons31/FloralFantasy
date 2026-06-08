@@ -43,7 +43,7 @@ type ExpenseItem = {
   createdAt: string;
   registeredBy?: string | null;
   receiptPhotoUrl?: string | null;
-  receiptPhotos?: { url: string; publicId?: string | null }[] | null;
+  receiptPublicId?: string | null;
 };
 
 type DaySummary = {
@@ -59,7 +59,21 @@ function normalizeCategory(value: string) {
 }
 
 function getExpensePhotoUrls(expense: ExpenseItem) {
-  return expense.receiptPhotos?.map((photo) => photo.url).filter(Boolean) ?? (expense.receiptPhotoUrl ? [expense.receiptPhotoUrl] : []);
+  if (expense.receiptPublicId) {
+    try {
+      const parsed = JSON.parse(expense.receiptPublicId);
+      if (Array.isArray(parsed)) {
+        const urls = parsed
+          .filter((photo): photo is { url?: unknown } => !!photo && typeof photo === "object")
+          .map((photo) => (typeof photo.url === "string" ? photo.url : ""))
+          .filter(Boolean);
+        if (urls.length) return urls;
+      }
+    } catch {
+      // fall through to the primary photo url
+    }
+  }
+  return expense.receiptPhotoUrl ? [expense.receiptPhotoUrl] : [];
 }
 
 function StatCard({

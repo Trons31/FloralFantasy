@@ -44,9 +44,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
             url: photo.url,
             publicId: typeof photo.publicId === "string" ? photo.publicId : undefined,
           }));
-        data.receiptPhotos = receiptPhotos;
         data.receiptPhotoUrl = receiptPhotos[0]?.url ?? null;
-        data.receiptPublicId = receiptPhotos[0]?.publicId ?? null;
+        data.receiptPublicId = receiptPhotos.length > 1
+          ? JSON.stringify(receiptPhotos)
+          : receiptPhotos[0]?.publicId ?? null;
       }
     } catch {
       return NextResponse.json({ error: "Las fotos de la factura no son válidas" }, { status: 400 });
@@ -62,12 +63,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     );
     data.receiptPhotoUrl    = upload.secure_url;
     data.receiptPublicId    = upload.public_id;
-    data.receiptPhotos      = [{ url: upload.secure_url, publicId: upload.public_id }];
   }
 
   const updated = await prisma.expense.update({
     where: { id: params.id },
     data,
+    select: {
+      id: true,
+      description: true,
+      amount: true,
+      category: true,
+      date: true,
+      createdAt: true,
+      receiptPhotoUrl: true,
+      receiptPublicId: true,
+      registeredBy: true,
+    },
   });
 
   return NextResponse.json(updated);
@@ -82,13 +93,31 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const expense = await prisma.expense.findUnique({ where: { id: params.id } });
+  const expense = await prisma.expense.findUnique({
+    where: { id: params.id },
+    select: { receiptPhotoUrl: true, receiptPublicId: true },
+  });
 
-  const receiptPhotos = Array.isArray((expense as any)?.receiptPhotos) ? (expense as any).receiptPhotos : [];
-  const publicIds = [
-    ...(expense?.receiptPublicId ? [expense.receiptPublicId] : []),
-    ...receiptPhotos.map((photo: any) => photo?.publicId).filter(Boolean),
-  ];
+  const receiptPhotos = (() => {
+    const stored = expense?.receiptPublicId;
+    if (!stored) return [];
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((photo) => photo && typeof photo.publicId === "string" && photo.publicId.trim())
+          .map((photo) => ({ publicId: photo.publicId as string, url: typeof photo.url === "string" ? photo.url : "" }));
+      }
+    } catch {
+      return [];
+    }
+    return expense?.receiptPhotoUrl ? [{ publicId: stored, url: expense.receiptPhotoUrl }] : [];
+  })();
+  const publicIds = receiptPhotos.length > 0
+    ? receiptPhotos.map((photo) => photo.publicId).filter(Boolean)
+    : expense?.receiptPublicId
+      ? [expense.receiptPublicId]
+      : [];
 
   for (const publicId of Array.from(new Set(publicIds))) {
     await cloudinary.uploader.destroy(publicId).catch(() => {});

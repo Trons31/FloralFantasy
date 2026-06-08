@@ -25,6 +25,16 @@ export async function GET(req: NextRequest) {
       registeredBy,
       date: { gte: start, lte: end },
     },
+    select: {
+      id: true,
+      description: true,
+      amount: true,
+      category: true,
+      date: true,
+      receiptPhotoUrl: true,
+      receiptPublicId: true,
+      registeredBy: true,
+    },
     orderBy: { createdAt: "desc" },
   });
 

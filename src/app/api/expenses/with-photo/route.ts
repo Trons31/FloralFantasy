@@ -65,6 +65,11 @@ export async function POST(req: NextRequest) {
     receiptPhotos = [{ url: result.secure_url, publicId: result.public_id }];
   }
 
+  const storedPublicId =
+    receiptPhotos.length > 1
+      ? JSON.stringify(receiptPhotos)
+      : receiptPhotos[0]?.publicId || null;
+
   const expense = await prisma.expense.create({
     data: {
       description,
@@ -72,10 +77,20 @@ export async function POST(req: NextRequest) {
       category: category || "Insumos",
       date: new Date(),
       receiptPhotoUrl: receiptPhotos[0]?.url,
-      receiptPublicId: receiptPhotos[0]?.publicId,
-      receiptPhotos: receiptPhotos.length ? receiptPhotos : undefined,
+      receiptPublicId: storedPublicId,
       registeredBy,
     } as any,
+    select: {
+      id: true,
+      description: true,
+      amount: true,
+      category: true,
+      date: true,
+      createdAt: true,
+      receiptPhotoUrl: true,
+      receiptPublicId: true,
+      registeredBy: true,
+    },
   });
 
   return NextResponse.json(expense);
