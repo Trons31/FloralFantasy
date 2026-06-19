@@ -19,6 +19,17 @@ export async function POST(req: NextRequest) {
 
   if (!user) return NextResponse.json({ error: "PIN incorrecto" }, { status: 401 });
 
+  await prisma.appSetting.upsert({
+    where: { key: "operationsLastAccess" },
+    create: {
+      key: "operationsLastAccess",
+      value: JSON.stringify({ at: new Date().toISOString(), id: user.id, name: user.name, role: user.role }),
+    },
+    update: {
+      value: JSON.stringify({ at: new Date().toISOString(), id: user.id, name: user.name, role: user.role }),
+    },
+  }).catch(() => null);
+
   const response = NextResponse.json(user);
   if (OPERATION_ROLES.includes(user.role as any)) {
     response.cookies.set(

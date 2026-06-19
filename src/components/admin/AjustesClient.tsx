@@ -6,15 +6,24 @@ import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 import {
   RiAddLine,
+  RiBankCardLine,
   RiDeleteBinLine,
-  RiEdit2Line,
+  RiEditLine,
+  RiInformationLine,
   RiLockLine,
-  RiImageAddLine,
-  RiMailLine,
   RiLoader4Line,
+  RiMailLine,
+  RiMore2Line,
+  RiQrCodeLine,
   RiSaveLine,
+  RiSettings3Line,
+  RiShieldCheckLine,
+  RiTruckLine,
+  RiUserLine,
 } from "react-icons/ri";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import ResponsiveModal from "@/components/ui/ResponsiveModal";
+import { formatPrice } from "@/lib/utils";
 
 type PaymentMethod = {
   id: string;
@@ -29,24 +38,21 @@ type PaymentMethod = {
   sortOrder: number;
 };
 
-type DraftMethod = {
-  id: string;
-  title: string;
+type MethodDraft = {
+  id?: string;
   provider: string;
   visibleLabel: string;
   type: PaymentMethod["type"];
   details: string;
   accountNumber: string;
-  imageUrl?: string | null;
+  imageUrl: string | null;
   isActive: boolean;
   sortOrder: number;
   file: File | null;
   preview: string | null;
 };
 
-const makeDraft = (type: PaymentMethod["type"] = "QR"): DraftMethod => ({
-  id: crypto.randomUUID(),
-  title: "",
+const emptyMethod = (type: PaymentMethod["type"], sortOrder: number): MethodDraft => ({
   provider: "",
   visibleLabel: "",
   type,
@@ -54,10 +60,32 @@ const makeDraft = (type: PaymentMethod["type"] = "QR"): DraftMethod => ({
   accountNumber: "",
   imageUrl: null,
   isActive: true,
-  sortOrder: 0,
+  sortOrder,
   file: null,
   preview: null,
 });
+
+const methodToDraft = (method: PaymentMethod): MethodDraft => ({
+  id: method.id,
+  provider: method.provider || method.title,
+  visibleLabel: method.visibleLabel || "",
+  type: method.type,
+  details: method.details || "",
+  accountNumber: method.accountNumber || "",
+  imageUrl: method.imageUrl || null,
+  isActive: method.isActive,
+  sortOrder: method.sortOrder,
+  file: null,
+  preview: method.imageUrl || null,
+});
+
+function providerStyle(provider: string) {
+  const value = provider.toLowerCase();
+  if (value.includes("nequi")) return "bg-[#26002f] text-white";
+  if (value.includes("daviplata")) return "bg-red-500 text-white";
+  if (value.includes("bancolombia")) return "bg-yellow-300 text-slate-950";
+  return "bg-primary-500 text-white";
+}
 
 export default function AjustesClient({
   initialMethods,
@@ -70,486 +98,520 @@ export default function AjustesClient({
 }) {
   const router = useRouter();
   const [methods, setMethods] = useState(initialMethods);
-  const [saving, setSaving] = useState(false);
+  const [deliveryFee, setDeliveryFee] = useState(initialDeliveryFee);
+  const [savedDeliveryFee, setSavedDeliveryFee] = useState(initialDeliveryFee);
   const [savingDeliveryFee, setSavingDeliveryFee] = useState(false);
   const [savingCredentials, setSavingCredentials] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
-  const [deliveryFee, setDeliveryFee] = useState<number>(initialDeliveryFee);
+  const [savingMethod, setSavingMethod] = useState(false);
+  const [methodModal, setMethodModal] = useState<MethodDraft | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<PaymentMethod | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [newEmail, setNewEmail] = useState(initialLoginEmail);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [drafts, setDrafts] = useState<DraftMethod[]>(
-    initialMethods.length
-      ? initialMethods.map(m => ({
-          id: m.id,
-          title: m.title,
-          provider: m.provider || "",
-          visibleLabel: m.visibleLabel || "",
-          type: m.type,
-          details: m.details || "",
-          accountNumber: m.accountNumber || "",
-          imageUrl: m.imageUrl || null,
-          isActive: m.isActive,
-          sortOrder: m.sortOrder,
-          file: null,
-          preview: m.imageUrl || null,
-        }))
-      : []
-  );
 
-  const syncDraft = (id: string, patch: Partial<DraftMethod>) => {
-    setDrafts(prev => prev.map(d => (d.id === id ? { ...d, ...patch } : d)));
-  };
-
-  const addDraft = (type: PaymentMethod["type"]) => {
-    const nextSortOrder = (Math.max(0, ...drafts.map(d => d.sortOrder)) || 0) + 1;
-    setDrafts(prev => [...prev, { ...makeDraft(type), sortOrder: nextSortOrder }]);
-  };
-
-  const removeDraft = (id: string, persisted: boolean) => {
-    if (persisted) {
-      const current = methods.find(m => m.id === id);
-      setDeleteTarget({ id, title: current?.title || "este método de pago" });
-      return;
-    }
-    setDrafts(prev => prev.filter(d => d.id !== id));
-  };
-
-  const confirmDelete = async () => {
-    if (!deleteTarget) return;
-    setDeletingId(deleteTarget.id);
-    try {
-      const res = await fetch(`/api/payment-methods/${deleteTarget.id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "No se pudo eliminar");
-      setMethods(prev => prev.filter(m => m.id !== deleteTarget.id));
-      setDrafts(prev => prev.filter(d => d.id !== deleteTarget.id));
-      toast.success("Método eliminado");
-      router.refresh();
-      setDeleteTarget(null);
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
-  const handleFile = (id: string, file?: File) => {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("La imagen debe ser válida");
-      return;
-    }
-    syncDraft(id, { file, preview: URL.createObjectURL(file) });
-  };
-
-  const saveAll = async () => {
-    setSaving(true);
-    try {
-      for (const draft of drafts) {
-        const title = draft.provider.trim() || draft.visibleLabel.trim() || `Método ${draft.type}`;
-        const fd = new FormData();
-        fd.append("title", title);
-        fd.append("provider", draft.provider);
-        fd.append("visibleLabel", draft.visibleLabel);
-        fd.append("type", draft.type);
-        fd.append("details", draft.details);
-        fd.append("accountNumber", draft.accountNumber);
-        fd.append("isActive", String(draft.isActive));
-        fd.append("sortOrder", String(draft.sortOrder));
-        if (draft.file) fd.append("file", draft.file);
-
-        const isPersisted = methods.some(m => m.id === draft.id);
-        const res = await fetch(isPersisted ? `/api/payment-methods/${draft.id}` : "/api/payment-methods", {
-          method: isPersisted ? "PATCH" : "POST",
-          body: fd,
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "No se pudo guardar");
-
-        setMethods(prev => {
-          const exists = prev.some(m => m.id === data.id);
-          return exists ? prev.map(m => (m.id === data.id ? data : m)) : [...prev, data];
-        });
-
-        setDrafts(prev =>
-          prev.map(item =>
-            item.id === draft.id
-              ? {
-                  ...item,
-                  id: data.id,
-                  title: data.title,
-                  imageUrl: data.imageUrl || item.imageUrl,
-                  preview: data.imageUrl || item.preview,
-                  sortOrder: data.sortOrder ?? item.sortOrder,
-                  file: null,
-                }
-              : item
-          )
-        );
-      }
-
-      toast.success("Pagos guardados");
-      router.refresh();
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const activeMethods = methods.filter(method => method.isActive).length;
 
   const saveDeliveryFee = async () => {
     setSavingDeliveryFee(true);
     try {
-      const res = await fetch("/api/settings", {
+      const response = await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ deliveryFee }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "No se pudo guardar la configuración");
-      setDeliveryFee(Number(data.deliveryFee) || deliveryFee);
-      toast.success("Costo de domicilio guardado");
-    } catch (error: any) {
-      toast.error(error.message);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo guardar el domicilio");
+      const saved = Number(data.deliveryFee) || deliveryFee;
+      setDeliveryFee(saved);
+      setSavedDeliveryFee(saved);
+      toast.success("Costo de domicilio actualizado");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo guardar el domicilio");
     } finally {
       setSavingDeliveryFee(false);
     }
   };
 
   const saveCredentials = async () => {
+    if (!newEmail || !currentPassword || !newPassword || !confirmPassword) {
+      toast.error("Completa todos los campos de acceso");
+      return;
+    }
     setSavingCredentials(true);
     try {
-      const res = await fetch("/api/settings/login-credentials", {
+      const response = await fetch("/api/settings/login-credentials", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          newEmail,
-          currentPassword,
-          newPassword,
-          confirmPassword,
-        }),
+        body: JSON.stringify({ newEmail, currentPassword, newPassword, confirmPassword }),
       });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "No se pudo actualizar el acceso");
-
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo actualizar el acceso");
       toast.success("Credenciales actualizadas");
       await signOut({ callbackUrl: "/auth/login" });
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo actualizar el acceso");
     } finally {
       setSavingCredentials(false);
     }
   };
 
-  const getSummary = (draft: DraftMethod) => {
-    if (draft.type === "QR") return "Configura QR o cuenta para pagos anticipados";
-    if (draft.type === "BANK_ACCOUNT") return "Número de cuenta o identificador para transferencias";
-    return "Instrucciones visibles para el cliente";
+  const openNewMethod = (type: PaymentMethod["type"]) => {
+    const nextOrder = Math.max(0, ...methods.map(method => method.sortOrder)) + 1;
+    setMethodModal(emptyMethod(type, nextOrder));
   };
 
+  const savePaymentMethod = async () => {
+    if (!methodModal) return;
+    if (!methodModal.provider.trim()) {
+      toast.error("Indica el proveedor del método");
+      return;
+    }
+    if (methodModal.type === "QR" && !methodModal.preview) {
+      toast.error("Agrega una imagen QR");
+      return;
+    }
+    if (methodModal.type === "BANK_ACCOUNT" && !methodModal.accountNumber.trim()) {
+      toast.error("Indica el número o identificador de la cuenta");
+      return;
+    }
+
+    setSavingMethod(true);
+    try {
+      const body = new FormData();
+      body.set("title", methodModal.provider.trim());
+      body.set("provider", methodModal.provider.trim());
+      body.set("visibleLabel", methodModal.visibleLabel.trim());
+      body.set("type", methodModal.type);
+      body.set("details", methodModal.details.trim());
+      body.set("accountNumber", methodModal.accountNumber.trim());
+      body.set("isActive", String(methodModal.isActive));
+      body.set("sortOrder", String(methodModal.sortOrder));
+      if (methodModal.file) body.set("file", methodModal.file);
+
+      const response = await fetch(
+        methodModal.id ? `/api/payment-methods/${methodModal.id}` : "/api/payment-methods",
+        { method: methodModal.id ? "PATCH" : "POST", body }
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo guardar el método");
+
+      setMethods(current => {
+        const exists = current.some(method => method.id === data.id);
+        const next = exists
+          ? current.map(method => method.id === data.id ? data : method)
+          : [...current, data];
+        return next.sort((a, b) => a.sortOrder - b.sortOrder);
+      });
+      toast.success(methodModal.id ? "Método actualizado" : "Método agregado");
+      setMethodModal(null);
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo guardar el método");
+    } finally {
+      setSavingMethod(false);
+    }
+  };
+
+  const deleteMethod = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/payment-methods/${deleteTarget.id}`, { method: "DELETE" });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.error || "No se pudo eliminar el método");
+      setMethods(current => current.filter(method => method.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      toast.success("Método eliminado");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar el método");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleQr = (file?: File) => {
+    if (!file || !methodModal) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Selecciona una imagen válida");
+      return;
+    }
+    setMethodModal({ ...methodModal, file, preview: URL.createObjectURL(file) });
+  };
+
+  const cards = [
+    {
+      label: "Métodos de pago",
+      value: String(activeMethods),
+      detail: "Activos",
+      Icon: RiShieldCheckLine,
+      color: "bg-primary-50 text-primary-500",
+    },
+    {
+      label: "Costo de domicilio",
+      value: formatPrice(savedDeliveryFee),
+      detail: "COP",
+      Icon: RiTruckLine,
+      color: "bg-emerald-50 text-emerald-600",
+    },
+    {
+      label: "Cuenta administradora",
+      value: initialLoginEmail,
+      detail: "Cuenta activa",
+      Icon: RiUserLine,
+      color: "bg-violet-50 text-violet-600",
+    },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div>
-            <h3 className="font-bold text-gray-900">Credenciales de acceso</h3>
-            <p className="text-sm text-gray-400">Actualiza el correo y la contrasena que usas para entrar al panel.</p>
+    <div className="min-h-full bg-slate-50/70 p-3 sm:p-5 lg:p-7">
+      <div className="mx-auto max-w-[1500px] space-y-5">
+        <header>
+          <div className="flex items-start gap-3">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary-50 text-primary-500">
+              <RiSettings3Line size={23} />
+            </span>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Ajustes</h1>
+              <p className="mt-1 text-sm text-slate-500">Métodos de pago y configuración activa del checkout.</p>
+            </div>
           </div>
-          <div className="hidden sm:flex h-11 w-11 items-center justify-center rounded-2xl bg-fuchsia-50 text-fuchsia-500">
-            <RiLockLine size={18} />
-          </div>
-        </div>
+        </header>
 
-        <div className="grid gap-3 lg:grid-cols-2">
-          <div>
-            <label className="block text-sm text-gray-600 mb-1.5">Correo actual</label>
-            <div className="relative">
-              <RiMailLine className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input
-                value={initialLoginEmail}
-                readOnly
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-11 py-3 text-sm text-gray-700 outline-none"
-              />
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {cards.map(card => (
+            <article key={card.label} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+              <div className="flex items-center gap-4">
+                <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ${card.color}`}>
+                  <card.Icon size={22} />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-slate-500">{card.label}</p>
+                  <strong className="mt-1 block truncate text-lg font-bold text-slate-950 sm:text-xl" title={card.value}>
+                    {card.value}
+                  </strong>
+                  <p className="mt-1 text-xs text-slate-500">{card.detail}</p>
+                </div>
+              </div>
+            </article>
+          ))}
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <div className="mb-5 flex items-start justify-between gap-3">
+            <div className="flex gap-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary-50 text-primary-500">
+                <RiLockLine size={20} />
+              </span>
+              <div>
+                <h2 className="font-bold text-slate-950">Credenciales de acceso</h2>
+                <p className="mt-1 text-xs text-slate-500">Actualiza el correo y la contraseña que usas para entrar al panel.</p>
+              </div>
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm text-gray-600 mb-1.5">Nuevo correo</label>
-            <div className="relative">
-              <RiMailLine className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input
-                type="email"
-                value={newEmail}
-                onChange={e => setNewEmail(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-11 py-3 text-sm focus:outline-none focus:border-primary-400"
-                placeholder="admin@tuempresa.com"
-              />
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Correo actual" icon={<RiMailLine />} value={initialLoginEmail} readOnly />
+            <Field label="Nuevo correo" icon={<RiMailLine />} value={newEmail} onChange={setNewEmail} type="email" />
+            <Field label="Contraseña actual" icon={<RiLockLine />} value={currentPassword} onChange={setCurrentPassword} type="password" placeholder="Ingresa tu contraseña actual" />
+            <Field label="Nueva contraseña" icon={<RiLockLine />} value={newPassword} onChange={setNewPassword} type="password" placeholder="Mínimo 6 caracteres" />
+            <Field label="Confirmar contraseña" icon={<RiLockLine />} value={confirmPassword} onChange={setConfirmPassword} type="password" placeholder="Repite la nueva contraseña" />
+          </div>
+
+          <div className="mt-5 flex flex-col gap-4 rounded-xl bg-gradient-to-r from-primary-50 to-rose-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary-400 text-white">
+                <RiLockLine />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-primary-600">Tu información está segura</p>
+                <p className="mt-0.5 text-xs text-primary-800/70">Usamos encriptación de nivel bancario para proteger tus datos.</p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={saveCredentials}
+              disabled={savingCredentials}
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-primary-200 bg-white px-4 text-xs font-semibold text-primary-600 disabled:opacity-60"
+            >
+              {savingCredentials ? <RiLoader4Line className="animate-spin" /> : <RiEditLine />}
+              {savingCredentials ? "Actualizando..." : "Actualizar acceso"}
+            </button>
           </div>
+        </section>
 
-          <div>
-            <label className="block text-sm text-gray-600 mb-1.5">Contraseña actual</label>
-            <div className="relative">
-              <RiLockLine className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input
-                type="password"
-                value={currentPassword}
-                onChange={e => setCurrentPassword(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-11 py-3 text-sm focus:outline-none focus:border-primary-400"
-                placeholder="Ingresa tu contraseña actual"
-              />
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-600">
+                <RiTruckLine size={20} />
+              </span>
+              <div>
+                <h2 className="font-bold text-slate-950">Costo de domicilio</h2>
+                <p className="mt-1 text-xs text-slate-500">Este valor se mostrará en checkout, carrito y pedidos creados manualmente.</p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={saveDeliveryFee}
+              disabled={savingDeliveryFee}
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 text-xs font-semibold text-white transition hover:bg-primary-600 disabled:opacity-60"
+            >
+              {savingDeliveryFee ? <RiLoader4Line className="animate-spin" /> : <RiSaveLine />}
+              {savingDeliveryFee ? "Guardando..." : "Guardar domicilio"}
+            </button>
           </div>
-
-          <div>
-            <label className="block text-sm text-gray-600 mb-1.5">Nueva contraseña</label>
-            <div className="relative">
-              <RiLockLine className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input
-                type="password"
-                value={newPassword}
-                onChange={e => setNewPassword(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-11 py-3 text-sm focus:outline-none focus:border-primary-400"
-                placeholder="Minimo 6 caracteres"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-600 mb-1.5">Confirmar contraseña</label>
-            <div className="relative">
-              <RiLockLine className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-11 py-3 text-sm focus:outline-none focus:border-primary-400"
-                placeholder="Repite la nueva contraseña"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 flex justify-end">
-          <button
-            onClick={saveCredentials}
-            disabled={savingCredentials}
-            className="inline-flex items-center gap-2 rounded-2xl bg-gray-900 px-5 py-3 text-white font-semibold hover:bg-gray-800 disabled:opacity-50 transition-colors shadow-sm"
-          >
-            {savingCredentials ? <RiLoader4Line className="animate-spin" size={16} /> : <RiSaveLine size={16} />}
-            {savingCredentials ? "Actualizando..." : "Actualizar acceso y cerrar sesión"}
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div>
-            <h3 className="font-bold text-gray-900">Costo de domicilio</h3>
-            <p className="text-sm text-gray-400">Este valor se mostrará en checkout, carrito y pedidos creados manualmente.</p>
-          </div>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1">
-            <label className="block text-sm text-gray-600 mb-1.5">Valor (COP)</label>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-medium text-slate-600">Valor del domicilio (COP)</span>
             <input
               type="number"
               min={0}
               value={deliveryFee}
-              onChange={e => setDeliveryFee(Number(e.target.value) || 0)}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:border-primary-400"
-              placeholder="8000"
+              onChange={event => setDeliveryFee(Number(event.target.value) || 0)}
+              className="h-11 w-full rounded-xl border border-slate-200 px-4 text-sm text-slate-900 outline-none transition focus:border-primary-300 focus:ring-2 focus:ring-primary-50"
             />
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={saveDeliveryFee}
-              disabled={savingDeliveryFee}
-              className="inline-flex items-center gap-2 rounded-2xl bg-primary-600 px-5 py-3 text-white font-semibold hover:bg-primary-700 disabled:opacity-50 transition-colors shadow-sm"
-            >
-              {savingDeliveryFee ? <RiLoader4Line className="animate-spin" size={16} /> : <RiSaveLine size={16} />}
-              {savingDeliveryFee ? "Guardando..." : "Guardar"}
-            </button>
-          </div>
-        </div>
-      </div>
+          </label>
+        </section>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          onClick={() => addDraft("QR")}
-          className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          <RiAddLine size={16} /> Agregar QR
-        </button>
-        <button
-          onClick={() => addDraft("BANK_ACCOUNT")}
-          className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          <RiAddLine size={16} /> Agregar cuenta
-        </button>
-      </div>
-
-      {drafts.length > 0 ? (
-        <div className="space-y-4">
-          {drafts.map((draft, index) => {
-            const persisted = methods.some(m => m.id === draft.id);
-            return (
-              <div key={draft.id} className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
-                <div className="flex items-start justify-between gap-4 mb-5">
-                  <div>
-                    <h3 className="font-bold text-gray-900">{persisted ? `Método ${index + 1}` : `Nuevo método ${index + 1}`}</h3>
-                    <p className="text-sm text-gray-400">{getSummary(draft)}</p>
-                  </div>
-                  <button
-                    onClick={() => removeDraft(draft.id, persisted)}
-                    disabled={deletingId === draft.id}
-                    className="w-10 h-10 rounded-xl bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 transition-colors disabled:opacity-50"
-                  >
-                    {deletingId === draft.id ? <RiLoader4Line className="animate-spin" size={16} /> : <RiDeleteBinLine size={16} />}
-                  </button>
-                </div>
-
-                <div className="grid lg:grid-cols-2 gap-3 mb-3">
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1.5">Proveedor</label>
-                    <input
-                      value={draft.provider}
-                      onChange={e => syncDraft(draft.id, { provider: e.target.value })}
-                      className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:border-primary-400"
-                      placeholder="Nequi, Bancolombia, Daviplata..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1.5">Etiqueta visible</label>
-                    <input
-                      value={draft.visibleLabel}
-                      onChange={e => syncDraft(draft.id, { visibleLabel: e.target.value })}
-                      className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:border-primary-400"
-                      placeholder="Empresa, Persona, Tienda..."
-                    />
-                  </div>
-                </div>
-
-                <div className="grid sm:grid-cols-2 gap-3 mb-3">
-                  <button
-                    type="button"
-                    onClick={() => syncDraft(draft.id, { type: "QR" })}
-                    className={`rounded-2xl border px-4 py-3 text-sm font-medium transition-colors ${draft.type === "QR" ? "border-primary-400 bg-primary-50 text-primary-700" : "border-gray-200 bg-white text-gray-700"}`}
-                  >
-                    QR para escanear
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => syncDraft(draft.id, { type: "BANK_ACCOUNT" })}
-                    className={`rounded-2xl border px-4 py-3 text-sm font-medium transition-colors ${draft.type === "BANK_ACCOUNT" ? "border-primary-400 bg-primary-50 text-primary-700" : "border-gray-200 bg-white text-gray-700"}`}
-                  >
-                    Número de cuenta
-                  </button>
-                </div>
-
-                <div className="grid lg:grid-cols-[1fr_1fr] gap-3 mb-3">
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1.5">{draft.type === "QR" ? "Código QR" : "Número o identificador"}</label>
-                    {draft.type === "QR" ? (
-                      <div className="w-full min-h-[160px] rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={e => handleFile(draft.id, e.target.files?.[0] || undefined)}
-                          className="hidden"
-                          id={`payment-method-image-${draft.id}`}
-                        />
-                        <label htmlFor={`payment-method-image-${draft.id}`} className="w-full h-full min-h-[160px] flex items-center justify-center cursor-pointer">
-                          {draft.preview ? (
-                            <img src={draft.preview} alt="QR" className="max-h-[150px] object-contain" />
-                          ) : (
-                            <div className="flex flex-col items-center gap-2 text-gray-400">
-                              <RiImageAddLine size={34} />
-                              <span className="text-sm">Subir QR</span>
-                            </div>
-                          )}
-                        </label>
-                      </div>
-                    ) : (
-                      <input
-                        value={draft.accountNumber}
-                        onChange={e => syncDraft(draft.id, { accountNumber: e.target.value })}
-                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:border-primary-400"
-                        placeholder="3001234567 o cuenta bancaria"
-                      />
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1.5">Notas / instrucciones</label>
-                    <textarea
-                      value={draft.details}
-                      onChange={e => syncDraft(draft.id, { details: e.target.value })}
-                      className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:border-primary-400 min-h-[160px]"
-                      placeholder="Incluye referencias, titular, instrucciones o texto que verá el cliente"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3 justify-between">
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={draft.isActive}
-                      onChange={e => syncDraft(draft.id, { isActive: e.target.checked })}
-                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    Método activo
-                  </label>
-
-                  <label className="inline-flex items-center gap-2 rounded-xl border border-gray-800 bg-white px-3 py-2 text-sm font-medium text-gray-700">
-                    <RiEdit2Line size={16} />
-                    Orden:
-                    <input
-                      type="number"
-                      min={1}
-                      value={draft.sortOrder}
-                      onChange={e => syncDraft(draft.id, { sortOrder: Number(e.target.value) || 1 })}
-                      className="w-16 border-0 p-0 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-0"
-                    />
-                  </label>
-                </div>
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex gap-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-violet-50 text-violet-600">
+                <RiBankCardLine size={20} />
+              </span>
+              <div>
+                <h2 className="font-bold text-slate-950">Métodos de pago</h2>
+                <p className="mt-1 text-xs text-slate-500">Cuentas o identificadores disponibles para transferencias.</p>
               </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="rounded-3xl border border-dashed border-gray-200 bg-white/70 p-8 text-center text-sm text-gray-400">
-          No hay métodos configurados todavía. Usa los botones de arriba para agregar uno nuevo.
-        </div>
-      )}
+            </div>
+            <div className="flex flex-col gap-2 xs:flex-row sm:flex-row">
+              <button
+                type="button"
+                onClick={() => openNewMethod("QR")}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-xs font-semibold text-slate-700 transition hover:border-primary-200 hover:text-primary-500"
+              >
+                <RiQrCodeLine size={16} />
+                Agregar QR
+              </button>
+              <button
+                type="button"
+                onClick={() => openNewMethod("BANK_ACCOUNT")}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 text-xs font-semibold text-white transition hover:bg-primary-600"
+              >
+                <RiAddLine size={16} />
+                Agregar cuenta
+              </button>
+            </div>
+          </div>
 
-      {drafts.length > 0 && (
-        <div className="flex justify-end">
+          {methods.length ? (
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {methods.map(method => (
+                <article key={method.id} className="flex min-h-64 flex-col rounded-2xl border border-slate-200 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className={`inline-flex min-h-8 items-center rounded-lg px-3 text-xs font-bold ${providerStyle(method.provider || method.title)}`}>
+                      {method.provider || method.title}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded-lg px-2.5 py-1 text-[10px] font-semibold ${method.isActive ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-500"}`}>
+                        {method.isActive ? "Activo" : "Inactivo"}
+                      </span>
+                      <RiMore2Line className="text-slate-500" />
+                    </div>
+                  </div>
+
+                  <h3 className="mt-4 text-sm font-bold text-slate-950">{method.visibleLabel || method.provider || method.title}</h3>
+                  {method.details && <p className="mt-1 line-clamp-2 text-xs text-slate-500">{method.details}</p>}
+                  {method.accountNumber && <p className="mt-1 text-sm text-slate-600">{method.accountNumber}</p>}
+                  {method.imageUrl && (
+                    <div className="mt-3 flex items-end gap-3">
+                      <img src={method.imageUrl} alt={`QR ${method.provider || method.title}`} className="h-20 w-20 rounded-lg border border-slate-200 object-contain" />
+                      <span className="pb-1 text-[10px] text-slate-500">QR para recibir pagos</span>
+                    </div>
+                  )}
+
+                  <div className="mt-auto flex gap-2 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setMethodModal(methodToDraft(method))}
+                      className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 transition hover:border-primary-200 hover:text-primary-500"
+                    >
+                      <RiEditLine />
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(method)}
+                      className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-red-100 text-xs font-semibold text-red-500 transition hover:bg-red-50"
+                    >
+                      <RiDeleteBinLine />
+                      Eliminar
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-5 rounded-2xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-400">
+              No hay métodos de pago configurados.
+            </div>
+          )}
+
           <button
-            onClick={saveAll}
-            disabled={saving}
-            className="inline-flex items-center gap-2 rounded-2xl bg-primary-600 px-5 py-3 text-white font-semibold hover:bg-primary-700 disabled:opacity-50 transition-colors shadow-sm"
+            type="button"
+            onClick={() => openNewMethod("QR")}
+            className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl border border-dashed border-primary-300 bg-primary-50/40 px-4 py-5 text-left text-primary-500 transition hover:bg-primary-50"
           >
-            {saving ? <RiLoader4Line className="animate-spin" size={16} /> : <RiSaveLine size={16} />}
-            {saving ? "Guardando..." : "Guardar pagos al reservar"}
+            <span className="grid h-8 w-8 place-items-center rounded-full border border-primary-400">
+              <RiAddLine />
+            </span>
+            <span>
+              <strong className="block text-xs">Agregar nuevo método de pago</strong>
+              <span className="mt-0.5 block text-[10px] text-slate-500">QR o cuenta bancaria para transferencias</span>
+            </span>
           </button>
-        </div>
-      )}
+
+          <div className="mt-5 flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-4">
+            <RiInformationLine className="mt-0.5 shrink-0 text-blue-600" size={21} />
+            <div>
+              <p className="text-xs font-semibold text-blue-600">Información importante</p>
+              <p className="mt-1 text-[11px] leading-5 text-slate-500">
+                Los métodos de pago estarán disponibles en el checkout y para pedidos manuales. Mantén sus datos actualizados.
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <ResponsiveModal
+        open={!!methodModal}
+        onClose={() => !savingMethod && setMethodModal(null)}
+        title={methodModal?.id ? "Editar método de pago" : "Agregar método de pago"}
+        description="Configura la información que verá el cliente al realizar una transferencia."
+        panelClassName="sm:max-w-2xl"
+      >
+        {methodModal && (
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SimpleInput label="Proveedor" value={methodModal.provider} onChange={provider => setMethodModal({ ...methodModal, provider })} placeholder="Nequi, Bancolombia..." />
+              <SimpleInput label="Etiqueta visible" value={methodModal.visibleLabel} onChange={visibleLabel => setMethodModal({ ...methodModal, visibleLabel })} placeholder="Cuenta de ahorros, Daniel..." />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setMethodModal({ ...methodModal, type: "QR" })} className={`rounded-xl border-2 py-3 text-xs font-semibold ${methodModal.type === "QR" ? "border-primary-500 bg-primary-50 text-primary-600" : "border-slate-200 text-slate-500"}`}>
+                Código QR
+              </button>
+              <button type="button" onClick={() => setMethodModal({ ...methodModal, type: "BANK_ACCOUNT" })} className={`rounded-xl border-2 py-3 text-xs font-semibold ${methodModal.type === "BANK_ACCOUNT" ? "border-primary-500 bg-primary-50 text-primary-600" : "border-slate-200 text-slate-500"}`}>
+                Cuenta bancaria
+              </button>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              {methodModal.type === "QR" ? (
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-semibold text-slate-700">Imagen QR</span>
+                  <input id="payment-qr" type="file" accept="image/*" onChange={event => handleQr(event.target.files?.[0])} className="hidden" />
+                  <span className="grid min-h-40 cursor-pointer place-items-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50" onClick={() => document.getElementById("payment-qr")?.click()}>
+                    {methodModal.preview ? <img src={methodModal.preview} alt="Vista previa QR" className="max-h-36 object-contain" /> : <span className="text-center text-slate-400"><RiQrCodeLine className="mx-auto mb-2" size={32} />Subir QR</span>}
+                  </span>
+                </label>
+              ) : (
+                <SimpleInput label="Número o identificador" value={methodModal.accountNumber} onChange={accountNumber => setMethodModal({ ...methodModal, accountNumber })} placeholder="3001234567 o número de cuenta" />
+              )}
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-700">Notas o instrucciones</span>
+                <textarea value={methodModal.details} onChange={event => setMethodModal({ ...methodModal, details: event.target.value })} className="min-h-40 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-primary-300" placeholder="Información visible para el cliente" />
+              </label>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" checked={methodModal.isActive} onChange={event => setMethodModal({ ...methodModal, isActive: event.target.checked })} className="rounded border-slate-300 text-primary-500" />
+                Método activo
+              </label>
+              <label className="flex items-center gap-2 text-xs text-slate-600">
+                Orden
+                <input type="number" min={1} value={methodModal.sortOrder} onChange={event => setMethodModal({ ...methodModal, sortOrder: Number(event.target.value) || 1 })} className="h-9 w-20 rounded-lg border border-slate-200 px-3" />
+              </label>
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+              <button type="button" onClick={() => setMethodModal(null)} disabled={savingMethod} className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-600">Cancelar</button>
+              <button type="button" onClick={savePaymentMethod} disabled={savingMethod} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white disabled:opacity-60">
+                {savingMethod ? <RiLoader4Line className="animate-spin" /> : <RiSaveLine />}
+                {savingMethod ? "Guardando..." : "Guardar método"}
+              </button>
+            </div>
+          </div>
+        )}
+      </ResponsiveModal>
 
       <ConfirmDialog
         open={!!deleteTarget}
         title="Eliminar método de pago"
-        message={`Vas a eliminar ${deleteTarget?.title || "este método de pago"}. Esta acción no se puede deshacer.`}
+        message={`Vas a eliminar ${deleteTarget?.provider || deleteTarget?.title || "este método"}. Esta acción no se puede deshacer.`}
         confirmText="Eliminar"
-        onClose={() => !deletingId && setDeleteTarget(null)}
-        onConfirm={confirmDelete}
-        loading={!!deletingId}
+        loading={deleting}
+        onClose={() => !deleting && setDeleteTarget(null)}
+        onConfirm={deleteMethod}
       />
     </div>
+  );
+}
+
+function Field({
+  label,
+  icon,
+  value,
+  onChange,
+  type = "text",
+  placeholder,
+  readOnly,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  value: string;
+  onChange?: (value: string) => void;
+  type?: string;
+  placeholder?: string;
+  readOnly?: boolean;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-medium text-slate-600">{label}</span>
+      <span className="relative block">
+        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">{icon}</span>
+        <input
+          type={type}
+          value={value}
+          readOnly={readOnly}
+          onChange={event => onChange?.(event.target.value)}
+          placeholder={placeholder}
+          className={`h-11 w-full rounded-xl border border-slate-200 pl-11 pr-4 text-sm text-slate-800 outline-none transition focus:border-primary-300 focus:ring-2 focus:ring-primary-50 ${readOnly ? "bg-slate-50" : "bg-white"}`}
+        />
+      </span>
+    </label>
+  );
+}
+
+function SimpleInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-semibold text-slate-700">{label}</span>
+      <input value={value} onChange={event => onChange(event.target.value)} placeholder={placeholder} className="h-11 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none focus:border-primary-300 focus:ring-2 focus:ring-primary-50" />
+    </label>
   );
 }

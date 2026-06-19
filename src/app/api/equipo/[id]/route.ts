@@ -6,8 +6,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!(await requireAdminUser())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
-  const { name, pin } = await req.json();
+  const { name, pin, role } = await req.json();
   if (!name?.trim()) return NextResponse.json({ error: "Nombre requerido" }, { status: 400 });
+  if (role && !["PREPARADOR", "REPARTIDOR", "CORREDOR"].includes(role)) {
+    return NextResponse.json({ error: "Rol no válido" }, { status: 400 });
+  }
 
   if (pin) {
     if (!/^\d{4}$/.test(pin)) return NextResponse.json({ error: "PIN debe ser 4 dígitos" }, { status: 400 });
@@ -17,6 +20,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const data: any = { name: name.trim() };
   if (pin) data.pin = pin;
+  if (role) data.role = role;
 
   const user = await prisma.user.update({
     where: { id: params.id },

@@ -6,6 +6,7 @@ import {
   RiPencilLine, RiImageLine,
 } from "react-icons/ri";
 import { toast } from "sonner";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 const EXPENSE_CATS = ["Insumos", "Flores", "Transporte", "Empaque", "Otro"];
 const MAX_RECEIPT_PHOTO_DIMENSION = 1600;
@@ -92,6 +93,7 @@ export default function CorredorView({ user, onLogout }: { user: { id: string; n
   const [editSaving,   setEditSaving]   = useState(false);
   /* ── Delete ── */
   const [deleting,     setDeleting]     = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null);
 
   const createFileRef = useRef<HTMLInputElement>(null);
   const editFileRef   = useRef<HTMLInputElement>(null);
@@ -202,15 +204,24 @@ export default function CorredorView({ user, onLogout }: { user: { id: string; n
   };
 
   /* ── Delete ── */
-  const handleDelete = async (id: string) => {
-    if (!confirm("¿Eliminar este gasto?")) return;
-    setDeleting(id);
-    const res = await fetch(`/api/expenses/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      setExpenses(p => p.filter(e => e.id !== id));
+  const requestDelete = (id: string) => {
+    setDeleteTarget(expenses.find(expense => expense.id === id) || null);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(deleteTarget.id);
+    try {
+      const response = await fetch(`/api/expenses/${deleteTarget.id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("Error al eliminar");
+      setExpenses(current => current.filter(expense => expense.id !== deleteTarget.id));
       toast.success("Gasto eliminado");
-    } else toast.error("Error al eliminar");
-    setDeleting(null);
+      setDeleteTarget(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al eliminar");
+    } finally {
+      setDeleting(null);
+    }
   };
 
   return (
@@ -298,7 +309,7 @@ export default function CorredorView({ user, onLogout }: { user: { id: string; n
                       className="w-9 h-9 flex items-center justify-center hover:bg-green-50 rounded-xl text-gray-400 hover:text-green-600 transition-colors">
                       <RiPencilLine size={16}/>
                     </button>
-                    <button onClick={() => handleDelete(exp.id)} disabled={deleting === exp.id}
+                    <button onClick={() => requestDelete(exp.id)} disabled={deleting === exp.id}
                       className="w-9 h-9 flex items-center justify-center hover:bg-red-50 rounded-xl text-gray-400 hover:text-red-500 transition-colors disabled:opacity-40">
                       {deleting === exp.id
                         ? <RiLoader4Line className="animate-spin" size={16}/>
@@ -354,6 +365,16 @@ export default function CorredorView({ user, onLogout }: { user: { id: string; n
           photoOptional
         />
       )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Eliminar gasto"
+        message={`Vas a eliminar ${deleteTarget?.description || "este gasto"}. Esta acción no se puede deshacer.`}
+        confirmText="Eliminar"
+        loading={!!deleting}
+        onClose={() => !deleting && setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+      />
+
     </div>
   );
 }

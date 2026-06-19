@@ -4,22 +4,31 @@ import EquipoManager from "@/components/admin/EquipoManager";
 export const dynamic = "force-dynamic";
 
 export default async function EquipoPage() {
-  const team = await prisma.user.findMany({
-    where: { role: { in: ["PREPARADOR", "REPARTIDOR", "CORREDOR"] } },
-    select: { id: true, name: true, email: true, role: true, pin: true, createdAt: true },
-    orderBy: { createdAt: "desc" },
-  }).catch(() => []);
+  const [team, lastAccessSetting] = await Promise.all([
+    prisma.user.findMany({
+      where: { role: { in: ["PREPARADOR", "REPARTIDOR", "CORREDOR"] } },
+      select: { id: true, name: true, email: true, role: true, pin: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    }).catch(() => []),
+    prisma.appSetting.findUnique({ where: { key: "operationsLastAccess" } }).catch(() => null),
+  ]);
+
+  const lastAccess = (() => {
+    if (!lastAccessSetting?.value) return null;
+    try {
+      const parsed = JSON.parse(lastAccessSetting.value);
+      return typeof parsed?.at === "string" && typeof parsed?.name === "string"
+        ? { at: parsed.at, id: typeof parsed.id === "string" ? parsed.id : undefined, name: parsed.name, role: String(parsed.role || "") }
+        : null;
+    } catch {
+      return null;
+    }
+  })();
 
   return (
-    <div className="p-4 lg:p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Equipo</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Gestiona preparadores, repartidores y corredores — acceden con PIN en{" "}
-          <strong className="text-primary-600">/operaciones</strong>
-        </p>
-      </div>
-      <EquipoManager members={team} />
-    </div>
+    <EquipoManager
+      members={team.map(member => ({ ...member, createdAt: member.createdAt.toISOString() }))}
+      lastAccess={lastAccess}
+    />
   );
 }

@@ -165,6 +165,7 @@ export async function GET(req: NextRequest) {
     orderBy: { createdAt: "desc" },
     include: {
       paymentMethod: true,
+      statusHistory: { orderBy: { createdAt: "asc" } },
       items: {
         include: {
           product: { include: { images: true, flowers: { include: { flower: true } } } },

@@ -1,15 +1,16 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   RiAddLine, RiSubtractLine, RiPencilLine, RiDeleteBinLine, RiLoader4Line, RiUploadCloud2Line,
   RiCloseLine, RiLeafLine, RiTimeLine, RiBellLine, RiCheckLine, RiStarLine,
   RiArrowLeftLine, RiArrowRightLine,
-  RiFlowerLine, RiAlertLine,
+  RiFlowerLine, RiAlertLine, RiSearchLine, RiEqualizerLine, RiShoppingBag3Line, RiFileCopyLine, RiGridLine, RiFireLine,
 } from "react-icons/ri";
 import { FaStar } from "react-icons/fa6";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { formatPrice, formatDeliveryLeadDays, getDeliveryDateLabel } from "@/lib/utils";
 
 const TIME_UNITS = [
@@ -27,6 +28,7 @@ type Product = {
   images: { id: string; url: string; publicId: string; isMain: boolean; order: number }[];
   category: { id: string; name: string };
   flowers: { id: string; flower: { id: string; name: string; type: string }; quantity: number }[];
+  sales: number; createdAt?: string;
 };
 
 type Category = { id: string; name: string; slug: string };
@@ -45,6 +47,13 @@ export default function ProductosManager({
 }: { products: any[]; categories: Category[]; flowers: Flower[]; occasions: Occasion[] }) {
   const [products, setProducts] = useState<Product[]>(init);
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("ALL");
+  const [showFilters, setShowFilters] = useState(false);
+  const [sort, setSort] = useState("recent");
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editing,  setEditing]  = useState<Product | null>(null);
   const [saving,   setSaving]   = useState(false);
@@ -56,19 +65,39 @@ export default function ProductosManager({
   const [showCatForm, setShowCatForm] = useState(false);
   const [newCatName,  setNewCatName]  = useState("");
   const [localCats,   setLocalCats]   = useState(categories);
-  const PER_PAGE = 10;
+  const PER_PAGE = 12;
 
   const { register, handleSubmit, reset, watch, setValue } = useForm<any>({
     defaultValues: { preparationTimeValue: 0, preparationTimeUnit: "MINUTES", deliveryLeadDays: 0, inStock: true },
   });
 
   const deliveryDays = watch("deliveryLeadDays", 0);
-  const totalPages = Math.max(1, Math.ceil(products.length / PER_PAGE));
-  const pageItems = products.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  const medianPrice = useMemo(() => {
+    if (!products.length) return 0;
+    const values = products.map(product => product.price).sort((a, b) => a - b);
+    return values[Math.floor(values.length / 2)];
+  }, [products]);
+  const filteredProducts = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase("es");
+    const result = products.filter(product => {
+      const matchesSearch = !query || product.name.toLocaleLowerCase("es").includes(query) || product.category?.name.toLocaleLowerCase("es").includes(query);
+      const matchesFilter = filter === "ALL"
+        || (filter === "PREMIUM" && product.featured)
+        || (filter === "ECONOMIC" && product.price <= medianPrice)
+        || product.categoryId === filter
+        || product.occasion === filter;
+      return matchesSearch && matchesFilter;
+    });
+    return [...result].sort((a, b) => sort === "priceAsc" ? a.price - b.price : sort === "priceDesc" ? b.price - a.price : sort === "sales" ? b.sales - a.sales : new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+  }, [products, search, filter, medianPrice, sort]);
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PER_PAGE));
+  const pageItems = filteredProducts.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
   useEffect(() => {
     setPage((current) => Math.min(current, totalPages));
   }, [totalPages]);
+  useEffect(() => { setPage(1); }, [search, filter, sort]);
+
 
   const slugify = (s: string) =>
     s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g,"-").replace(/[^a-z0-9-]/g,"");
@@ -152,8 +181,8 @@ export default function ProductosManager({
       const res    = await fetch(url, { method, headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
       const saved  = await res.json();
       if (!res.ok) throw new Error(saved.error);
-      if (editing) setProducts(p => p.map(x => x.id === editing.id ? saved : x));
-      else         setProducts(p => [saved, ...p]);
+      if (editing) setProducts(p => p.map(x => x.id === editing.id ? { ...saved, sales: x.sales, createdAt: x.createdAt } : x));
+      else         setProducts(p => [{ ...saved, sales: 0, createdAt: saved.createdAt || new Date().toISOString() }, ...p]);
       toast.success(editing ? "Producto actualizado" : "Producto creado");
       closeForm();
     } catch (e: any) { toast.error(e.message); }
@@ -184,13 +213,55 @@ export default function ProductosManager({
     setShowForm(false); setEditing(null); reset(); setImageSlots([]); setSelectedFlowers([]);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("¿Eliminar este producto?")) return;
-    const res = await fetch(`/api/products/${id}`, { method:"DELETE" });
-    if (res.ok) { setProducts(p => p.filter(x => x.id !== id)); toast.success("Eliminado"); }
-    else toast.error("Error al eliminar");
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/products/${deleteTarget.id}`, { method: "DELETE" });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.error || "No se pudo eliminar el producto");
+      setProducts(current => current.filter(product => product.id !== deleteTarget.id));
+      toast.success("Producto eliminado");
+      setDeleteTarget(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar el producto");
+    } finally {
+      setDeleting(false);
+    }
   };
 
+  const duplicateProduct = async (product: Product) => {
+    setDuplicatingId(product.id);
+    try {
+      const response = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: `${product.name} (Copia)`,
+          description: product.description,
+          price: product.price,
+          categoryId: product.categoryId,
+          occasion: product.occasion,
+          preparationTimeValue: product.preparationTimeValue,
+          preparationTimeUnit: product.preparationTimeUnit,
+          deliveryLeadDays: product.deliveryLeadDays,
+          requiresSpecialOrder: product.requiresSpecialOrder,
+          inStock: product.inStock,
+          featured: false,
+          images: product.images.map(image => ({ url: image.url, publicId: image.publicId })),
+          flowerRelations: product.flowers.map(item => ({ flowerId: item.flower.id, quantity: item.quantity })),
+        }),
+      });
+      const saved = await response.json();
+      if (!response.ok) throw new Error(saved.error || "No se pudo duplicar el producto");
+      setProducts(current => [{ ...saved, sales: 0, createdAt: saved.createdAt || new Date().toISOString() }, ...current]);
+      toast.success("Producto duplicado");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo duplicar el producto");
+    } finally {
+      setDuplicatingId(null);
+    }
+  };
   const toggleFlower = (id: string) =>
     setSelectedFlowers(prev => {
       const exists = prev.find(item => item.flowerId === id);
@@ -222,93 +293,140 @@ export default function ProductosManager({
 
   return (
     <>
-      <div className="flex justify-end mb-4">
-        <button onClick={openCreate}
-          className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-primary-700 transition-colors">
-          <RiAddLine size={16} /> Nuevo producto
-        </button>
-      </div>
-
-      {products.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-100 text-center py-16">
-          <RiLeafLine className="text-5xl text-gray-200 mx-auto mb-3" />
-          <p className="text-gray-400 text-sm">Sin productos aún</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {pageItems.map(p => (
-            <div key={p.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow group">
-              <div className="aspect-video relative overflow-hidden bg-gray-50">
-                {p.images[0]
-                  ? <img src={p.images[0].url} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                  : <div className="w-full h-full flex items-center justify-center text-gray-200"><RiFlowerLine size={48} /></div>
-                }
-                <div className="absolute top-2 right-2 flex gap-1">
-                  {p.featured && (
-                    <span className="bg-white text-yellow-600 text-xs px-2 py-2 rounded-full flex items-center gap-1">
-                      <FaStar className="h-4 w-4" />
-                    </span>
-                  )}
-                  {!p.inStock && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">Agotado</span>}
-                </div>
-              </div>
-              <div className="p-4">
-                <p className="text-xs text-primary-500 uppercase tracking-wide font-medium">{p.category?.name}</p>
-                <h3 className="font-semibold text-gray-900 mt-0.5">{p.name}</h3>
-                {p.flowers.length > 0 && (
-                  <div className="flex items-center gap-1 mt-1">
-                    <RiFlowerLine size={11} className="text-gray-400 flex-shrink-0" />
-                    <p className="text-xs text-gray-400 truncate">{p.flowers.map(f => f.flower.name).join(", ")}</p>
-                  </div>
-                )}
-                <div className="flex items-center justify-between mt-3">
-                  <div>
-                      <p className="font-bold text-gray-900">{formatPrice(p.price)}</p>
-                      <p className="text-xs text-emerald-600 flex items-center gap-1 mt-0.5">
-                        <RiTimeLine size={11} />
-                        {formatDeliveryLeadDays(p.deliveryLeadDays)}
-                      </p>
-                  </div>
-                  <div className="flex gap-1">
-                    <button onClick={() => openEdit(p)} className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"><RiPencilLine size={15} /></button>
-                    <button onClick={() => handleDelete(p.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><RiDeleteBinLine size={15} /></button>
-                  </div>
-                </div>
+      <div className="min-h-full bg-slate-50/70 p-3 sm:p-5 lg:p-7">
+        <div className="mx-auto max-w-[1500px] space-y-5">
+          <header className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary-50 text-primary-500">
+                <RiShoppingBag3Line size={24} />
+              </span>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Productos</h1>
+                <p className="mt-1 text-sm text-slate-500">Ramos, arreglos y composiciones florales.</p>
               </div>
             </div>
-          ))}
+            <div className="hidden gap-2 sm:flex">
+              <label className="flex h-11 min-w-[280px] items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 shadow-sm">
+                <RiSearchLine className="shrink-0 text-slate-400" size={18} />
+                <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar producto..." className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" />
+              </label>
+              <button type="button" onClick={() => setShowFilters(current => !current)} className={`grid h-11 w-12 place-items-center rounded-xl border bg-white text-slate-600 shadow-sm transition ${showFilters ? "border-primary-300 text-primary-500" : "border-slate-200"}`} aria-label="Mostrar filtros">
+                <RiEqualizerLine size={18} />
+              </button>
+              <button type="button" onClick={openCreate} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(236,18,91,.2)] transition hover:bg-primary-600">
+                <RiAddLine size={19} /> Nuevo producto
+              </button>
+            </div>
+            <button type="button" onClick={openCreate} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(236,18,91,.2)] transition hover:bg-primary-600 sm:hidden">
+              <RiAddLine size={19} /> Nuevo producto
+            </button>
+          </header>
+
+          <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            {[
+              { label: "Total productos", value: String(products.length), detail: "En catálogo", Icon: RiShoppingBag3Line, color: "bg-primary-50 text-primary-500" },
+              { label: "Activos", value: String(products.filter(product => product.inStock).length), detail: "Disponibles", Icon: RiCheckLine, color: "bg-emerald-50 text-emerald-600" },
+              { label: "Premium", value: String(products.filter(product => product.featured).length), detail: "Productos destacados", Icon: RiStarLine, color: "bg-violet-50 text-violet-600" },
+              { label: "Más vendido", value: products.reduce((top, product) => product.sales > (top?.sales || -1) ? product : top, products[0])?.name || "Sin ventas", detail: `${Math.max(0, ...products.map(product => product.sales))} ventas`, Icon: RiFireLine, color: "bg-orange-50 text-orange-500" },
+            ].map(card => (
+              <article key={card.label} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                  <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${card.color}`}><card.Icon size={21} /></span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-slate-500">{card.label}</p>
+                    <strong className="mt-1 block truncate text-lg font-bold text-slate-950 sm:text-xl" title={card.value}>{card.value}</strong>
+                    <p className="mt-1 truncate text-[11px] text-slate-500">{card.detail}</p>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </section>
+
+          <section className="flex items-center gap-2 sm:hidden">
+            <label className="flex h-11 min-w-0 flex-1 items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 shadow-sm">
+              <RiSearchLine className="shrink-0 text-slate-400" size={18} />
+              <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar producto..." className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" />
+            </label>
+            <button type="button" onClick={() => setShowFilters(current => !current)} className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border bg-white text-slate-600 shadow-sm transition ${showFilters ? "border-primary-300 text-primary-500" : "border-slate-200"}`} aria-label="Mostrar filtros">
+              <RiEqualizerLine size={18} />
+            </button>
+          </section>
+
+          {showFilters && (
+            <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <button type="button" onClick={() => setFilter("ALL")} className={`h-10 shrink-0 rounded-xl px-5 text-xs font-semibold ${filter === "ALL" ? "bg-primary-500 text-white" : "border border-slate-200 text-slate-600"}`}>Todos</button>
+                <button type="button" onClick={() => setFilter("PREMIUM")} className={`h-10 shrink-0 rounded-xl px-5 text-xs font-semibold ${filter === "PREMIUM" ? "bg-primary-500 text-white" : "border border-slate-200 text-slate-600"}`}>Premium</button>
+                <button type="button" onClick={() => setFilter("ECONOMIC")} className={`h-10 shrink-0 rounded-xl px-5 text-xs font-semibold ${filter === "ECONOMIC" ? "bg-primary-500 text-white" : "border border-slate-200 text-slate-600"}`}>Económicos</button>
+                {localCats.slice(0, 4).map(category => (
+                  <button key={category.id} type="button" onClick={() => setFilter(category.id)} className={`h-10 shrink-0 rounded-xl px-5 text-xs font-semibold ${filter === category.id ? "bg-primary-500 text-white" : "border border-slate-200 text-slate-600"}`}>{category.name}</button>
+                ))}
+                {(localCats.length > 4 || occasions.length > 0) && (
+                  <label className="relative flex h-10 shrink-0 items-center rounded-xl border border-slate-200 px-4">
+                    <select value={[...localCats.slice(4).map(item => item.id), ...occasions.map(item => item.slug)].includes(filter) ? filter : ""} onChange={event => setFilter(event.target.value || "ALL")} className="appearance-none bg-transparent pr-6 text-xs font-semibold text-slate-600 outline-none">
+                      <option value="">Más filtros</option>
+                      {localCats.slice(4).map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
+                      {occasions.map(occasion => <option key={occasion.id} value={occasion.slug}>{occasion.name}</option>)}
+                    </select>
+                    <RiArrowRightLine className="pointer-events-none absolute right-3 rotate-90 text-slate-400" />
+                  </label>
+                )}
+              </div>
+              <select value={sort} onChange={event => setSort(event.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-600 outline-none">
+                <option value="recent">Más recientes</option>
+                <option value="sales">Más vendidos</option>
+                <option value="priceAsc">Precio menor</option>
+                <option value="priceDesc">Precio mayor</option>
+              </select>
+            </section>
+          )}
+
+          {pageItems.length ? (
+            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {pageItems.map(product => {
+                const flowerCount = product.flowers.reduce((sum, item) => sum + item.quantity, 0);
+                return (
+                  <article key={product.id} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                    <div className="relative aspect-[16/8] overflow-hidden bg-slate-50">
+                      {product.images[0] ? <img src={product.images[0].url} alt={product.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="grid h-full place-items-center"><RiFlowerLine className="text-slate-200" size={48} /></div>}
+                      <span className={`absolute left-3 top-3 rounded-lg bg-white/95 px-2.5 py-1 text-[9px] font-bold ${product.featured ? "text-primary-500" : "text-emerald-600"}`}>{product.featured ? "PREMIUM" : product.inStock ? "ACTIVO" : "AGOTADO"}</span>
+                      <button type="button" onClick={() => openEdit(product)} className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-lg bg-white/95 text-slate-700 shadow-sm"><RiGridLine /></button>
+                    </div>
+                    <div className="p-4">
+                      <h2 className="truncate text-sm font-bold text-slate-950">{product.name}</h2>
+                      <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-slate-500"><RiFlowerLine className="text-primary-500" />{product.flowers.map(item => item.flower.name).join(", ") || product.category?.name}</p>
+                      <strong className="mt-3 block text-lg font-bold text-slate-950">{formatPrice(product.price)}</strong>
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-[10px] text-slate-500">
+                        <span className="inline-flex items-center gap-1"><RiFlowerLine />{flowerCount} flores</span>
+                        <span className="inline-flex items-center gap-1 text-emerald-600"><RiTimeLine />{formatDeliveryLeadDays(product.deliveryLeadDays)}</span>
+                        {product.sales > 0 && <span className="inline-flex items-center gap-1"><RiFireLine />{product.sales}</span>}
+                      </div>
+                      <div className="mt-4 grid grid-cols-[1fr_1fr_42px] gap-2">
+                        <button type="button" onClick={() => openEdit(product)} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:border-primary-200 hover:text-primary-500"><RiPencilLine />Editar</button>
+                        <button type="button" onClick={() => duplicateProduct(product)} disabled={duplicatingId === product.id} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 disabled:opacity-50">{duplicatingId === product.id ? <RiLoader4Line className="animate-spin" /> : <RiFileCopyLine />}Duplicar</button>
+                        <button type="button" onClick={() => setDeleteTarget(product)} className="grid h-10 place-items-center rounded-xl border border-red-100 text-red-500 hover:bg-red-50" aria-label={`Eliminar ${product.name}`}><RiDeleteBinLine /></button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </section>
+          ) : (
+            <section className="grid min-h-64 place-items-center rounded-2xl border border-slate-200 bg-white px-5 py-10 text-center shadow-sm">
+              <div><RiShoppingBag3Line className="mx-auto text-slate-200" size={48} /><h2 className="mt-4 font-semibold text-slate-800">No encontramos productos</h2><p className="mt-1 text-sm text-slate-500">Cambia la búsqueda o los filtros seleccionados.</p></div>
+            </section>
+          )}
+
+          <footer className="flex flex-col gap-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+            <p>Mostrando {filteredProducts.length ? (page - 1) * PER_PAGE + 1 : 0} - {Math.min(page * PER_PAGE, filteredProducts.length)} de {filteredProducts.length} productos</p>
+            <div className="flex items-center gap-2">
+              <button type="button" disabled={page <= 1} onClick={() => setPage(current => current - 1)} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white disabled:opacity-35"><RiArrowLeftLine /></button>
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, index) => { const startPage = Math.max(1, Math.min(page - 2, totalPages - 4)); const number = startPage + index; return number <= totalPages ? <button key={number} type="button" onClick={() => setPage(number)} className={`grid h-9 min-w-9 place-items-center rounded-lg px-2 font-semibold ${page === number ? "bg-primary-500 text-white" : "border border-slate-200 bg-white text-slate-600"}`}>{number}</button> : null; })}
+              <button type="button" disabled={page >= totalPages} onClick={() => setPage(current => current + 1)} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white disabled:opacity-35"><RiArrowRightLine /></button>
+            </div>
+          </footer>
         </div>
-      )}
-
-      {totalPages > 1 && (
-        <div className="mt-5 flex items-center justify-between gap-2 rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm sm:px-5">
-          <button
-            type="button"
-            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-            disabled={page <= 1}
-            className="inline-flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-0 sm:px-3"
-            aria-label="Página anterior"
-          >
-            <RiArrowLeftLine size={14} />
-            <span className="ml-2 hidden text-sm font-medium sm:inline">Anterior</span>
-          </button>
-
-          <span className="flex-1 whitespace-nowrap text-center text-[11px] text-gray-400 sm:text-xs">
-            {products.length} registros · pág. {page} de {totalPages}
-          </span>
-
-          <button
-            type="button"
-            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-            disabled={page >= totalPages}
-            className="inline-flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-0 sm:px-3"
-            aria-label="Página siguiente"
-          >
-            <span className="mr-2 hidden text-sm font-medium sm:inline">Siguiente</span>
-            <RiArrowRightLine size={14} />
-          </button>
-        </div>
-      )}
+      </div>
 
       {showForm && (
         <ResponsiveModal
@@ -575,6 +693,16 @@ export default function ProductosManager({
             </form>
         </ResponsiveModal>
       )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Eliminar producto"
+        message={`Vas a eliminar ${deleteTarget?.name || "este producto"}. Esta acción no se puede deshacer.`}
+        confirmText="Eliminar"
+        loading={deleting}
+        onClose={() => !deleting && setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+      />
+
     </>
   );
 }

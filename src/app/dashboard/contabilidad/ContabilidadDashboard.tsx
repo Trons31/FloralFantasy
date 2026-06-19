@@ -1,264 +1,93 @@
 "use client";
 
-import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import Link from "next/link";
+import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { addMonths, format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   RiArrowDownLine,
-  RiArrowLeftLine,
-  RiArrowRightLine,
+  RiArrowLeftSLine,
+  RiArrowRightSLine,
+  RiArrowUpLine,
+  RiBankCardLine,
+  RiBarChartBoxLine,
   RiCalendarLine,
+  RiDownload2Line,
+  RiEyeLine,
+  RiFilter3Line,
   RiLoader4Line,
   RiMoneyDollarCircleLine,
-  RiExternalLinkLine,
+  RiSearchLine,
   RiShoppingBagLine,
 } from "react-icons/ri";
 import { formatPrice, STATUS_LABELS } from "@/lib/utils";
-import type { AccountingSummary, AccountingMode } from "@/lib/accounting";
+import type {
+  AccountingMode,
+  AccountingSummary,
+} from "@/lib/accounting";
 
 const PER_PAGE = 10;
-const TAB_STYLES = {
-  active: "bg-slate-900 text-white shadow-sm",
-  idle: "text-slate-500 hover:bg-slate-50",
-};
+
+type MovementType = "all" | "orders" | "expenses";
+
+type Movement =
+  | {
+      type: "order";
+      id: string;
+      date: string;
+      title: string;
+      subtitle: string;
+      detail: string;
+      token: string;
+      status: string;
+      amount: number;
+    }
+  | {
+      type: "expense";
+      id: string;
+      date: string;
+      title: string;
+      subtitle: string;
+      detail: string;
+      category: string;
+      amount: number;
+    };
+
+function percentChange(current: number, previous: number) {
+  if (previous === 0) return { value: current === 0 ? 0 : 100, down: false };
+  const raw = ((current - previous) / previous) * 100;
+  return { value: Math.abs(Math.round(raw * 10) / 10), down: raw < 0 };
+}
 
 function StatCard({
   label,
   value,
   hint,
+  trend,
   icon: Icon,
+  style,
 }: {
   label: string;
   value: string;
   hint: string;
+  trend: { value: number; down: boolean };
   icon: ComponentType<{ size?: number; className?: string }>;
+  style: string;
 }) {
   return (
-    <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm sm:p-5">
-      <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-50 text-slate-600 sm:h-10 sm:w-10">
-        <Icon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
+    <div className="flex min-h-[126px] items-center gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+      <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full ${style}`}>
+        <Icon size={25} />
       </div>
-      <p className="text-[11px] font-medium text-slate-400 sm:text-xs">{label}</p>
-      <p className="mt-1 text-lg font-semibold tracking-tight text-slate-900 sm:text-2xl">{value}</p>
-      <p className="mt-1 text-[11px] leading-4 text-slate-500 sm:text-xs">{hint}</p>
+      <div className="min-w-0">
+        <p className="text-xs font-medium text-slate-500">{label}</p>
+        <p className="mt-1 truncate text-xl font-bold text-[#11182c]">{value}</p>
+        <p className="mt-1 truncate text-[10px] text-slate-400">{hint}</p>
+        <p className={`mt-1.5 text-[10px] font-medium ${trend.down ? "text-rose-500" : "text-emerald-600"}`}>
+          {trend.down ? "↓" : "↑"} {trend.value}% <span className="font-normal text-slate-400">vs período anterior</span>
+        </p>
+      </div>
     </div>
-  );
-}
-
-function SectionCard({
-  title,
-  subtitle,
-  children,
-  right,
-}: {
-  title: string;
-  subtitle?: string;
-  children: ReactNode;
-  right?: ReactNode;
-}) {
-  return (
-    <div className="rounded-[2rem] border border-slate-100 bg-white shadow-sm">
-      <div className="flex items-start justify-between gap-4 border-b border-slate-50 px-5 py-4">
-        <div>
-          <p className="text-sm font-semibold text-slate-900">{title}</p>
-          {subtitle && <p className="mt-1 text-xs text-slate-500">{subtitle}</p>}
-        </div>
-        {right}
-      </div>
-      <div className="p-5">{children}</div>
-    </div>
-  );
-}
-
-function TablePager({
-  page,
-  totalPages,
-  total,
-  onPrev,
-  onNext,
-}: {
-  page: number;
-  totalPages: number;
-  total: number;
-  onPrev: () => void;
-  onNext: () => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2 border-t border-slate-50 px-4 py-3 sm:gap-3 sm:px-5">
-      <button
-        type="button"
-        onClick={onPrev}
-        disabled={page <= 1}
-        className="inline-flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-0 sm:px-3"
-        aria-label="Página anterior"
-      >
-        <RiArrowLeftLine size={14} />
-        <span className="ml-2 hidden text-sm font-medium sm:inline">Anterior</span>
-      </button>
-      <span className="flex-1 whitespace-nowrap text-center text-[11px] text-slate-400 sm:text-xs">
-        {total} registros · pág. {page} de {Math.max(1, totalPages)}
-      </span>
-      <button
-        type="button"
-        onClick={onNext}
-        disabled={page >= totalPages}
-        className="inline-flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-0 sm:px-3"
-        aria-label="Página siguiente"
-      >
-        <span className="mr-2 hidden text-sm font-medium sm:inline">Siguiente</span>
-        <RiArrowRightLine size={14} />
-      </button>
-    </div>
-  );
-}
-
-function OrdersTable({ orders }: { orders: AccountingSummary["orders"] }) {
-  if (!orders.length) {
-    return (
-      <div className="py-14 text-center">
-        <RiShoppingBagLine className="mx-auto mb-3 text-slate-200" size={48} />
-        <p className="text-sm text-slate-400">Sin pedidos en este período</p>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div className="hidden md:block overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-50">
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Token</th>
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Cliente</th>
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Productos</th>
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Estado</th>
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Fecha</th>
-              <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-400">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.map((order) => (
-              <tr key={order.id} className="border-b border-slate-50 last:border-b-0 hover:bg-slate-50/60">
-                <td className="px-5 py-3.5">
-                  <span className="font-mono text-xs text-primary-600">{order.trackingToken}</span>
-                </td>
-                <td className="px-5 py-3.5">
-                  <p className="font-medium text-slate-900">{order.customerName}</p>
-                  <p className="text-xs text-slate-400">{order.customerPhone}</p>
-                </td>
-                <td className="px-5 py-3.5">
-                  <p className="line-clamp-2 text-xs text-slate-600">{order.itemsSummary || "-"}</p>
-                </td>
-                <td className="px-5 py-3.5">
-                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                    {STATUS_LABELS[order.status] || order.status}
-                  </span>
-                </td>
-                <td className="px-5 py-3.5 whitespace-nowrap text-xs text-slate-500">
-                  {format(new Date(order.createdAt), "d MMM yyyy, h:mm a", { locale: es })}
-                </td>
-                <td className="px-5 py-3.5 text-right font-semibold text-slate-900">{formatPrice(order.total)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="divide-y divide-slate-50 md:hidden">
-        {orders.map((order) => (
-          <div key={order.id} className="px-4 py-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-mono text-[11px] text-primary-600">{order.trackingToken}</p>
-                <p className="mt-1 font-medium text-slate-900">{order.customerName}</p>
-                <p className="text-xs text-slate-400">{order.customerPhone}</p>
-              </div>
-              <p className="shrink-0 text-sm font-semibold text-slate-900">{formatPrice(order.total)}</p>
-            </div>
-            <p className="mt-2 line-clamp-2 text-xs text-slate-600">{order.itemsSummary || "-"}</p>
-            <div className="mt-3 flex items-center justify-between gap-2">
-              <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                {STATUS_LABELS[order.status] || order.status}
-              </span>
-              <span className="text-[11px] text-slate-500">
-                {format(new Date(order.createdAt), "d MMM yyyy, h:mm a", { locale: es })}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
-
-function ExpensesTable({ expenses }: { expenses: AccountingSummary["expenses"] }) {
-  if (!expenses.length) {
-    return (
-      <div className="py-14 text-center">
-        <RiArrowDownLine className="mx-auto mb-3 text-slate-200" size={48} />
-        <p className="text-sm text-slate-400">Sin egresos en este período</p>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div className="hidden md:block overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-50">
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Descripción</th>
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Categoría</th>
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Fecha</th>
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Registrado por</th>
-              <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-400">Monto</th>
-            </tr>
-          </thead>
-          <tbody>
-            {expenses.map((expense) => (
-              <tr key={expense.id} className="border-b border-slate-50 last:border-b-0 hover:bg-slate-50/60">
-                <td className="px-5 py-3.5">
-                  <p className="font-medium text-slate-900">{expense.description}</p>
-                </td>
-                <td className="px-5 py-3.5">
-                  <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                    {expense.category}
-                  </span>
-                </td>
-                <td className="px-5 py-3.5 whitespace-nowrap text-xs text-slate-500">
-                  {format(new Date(expense.date), "d MMM yyyy, h:mm a", { locale: es })}
-                </td>
-                <td className="px-5 py-3.5 text-xs text-slate-500">{expense.registeredBy || "—"}</td>
-                <td className="px-5 py-3.5 text-right font-semibold text-rose-600">{formatPrice(expense.amount)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="divide-y divide-slate-50 md:hidden">
-        {expenses.map((expense) => (
-          <div key={expense.id} className="px-4 py-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-medium text-slate-900">{expense.description}</p>
-                <p className="mt-1 text-xs text-slate-500">{expense.registeredBy || "—"}</p>
-              </div>
-              <p className="shrink-0 text-sm font-semibold text-rose-600">{formatPrice(expense.amount)}</p>
-            </div>
-            <div className="mt-3 flex items-center justify-between gap-2">
-              <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                {expense.category}
-              </span>
-              <span className="text-[11px] text-slate-500">
-                {format(new Date(expense.date), "d MMM yyyy, h:mm a", { locale: es })}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </>
   );
 }
 
@@ -271,134 +100,142 @@ function DayStrip({
   selectedDay: number | null;
   onSelectDay: (day: number) => void;
 }) {
-  const maxRevenue = Math.max(...days.map((d) => d.income), 1);
-  const selectedRef = useRef<HTMLButtonElement | null>(null);
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef({ active: false, moved: false, startX: 0, scrollLeft: 0 });
 
   useEffect(() => {
-    selectedRef.current?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    const track = trackRef.current;
+    const active = track?.querySelector<HTMLElement>("[data-active-day='true']");
+    if (!track || !active) return;
+    track.scrollTo({
+      left: active.offsetLeft - track.clientWidth / 2 + active.clientWidth / 2,
+      behavior: "smooth",
+    });
   }, [selectedDay, days]);
 
   return (
-    <div className="rounded-[2rem] border border-slate-100 bg-white p-4 shadow-sm">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-slate-900">Días del mes</p>
-          <p className="text-xs text-slate-500">Selecciona un día para ver su detalle.</p>
-        </div>
-        <span className="rounded-full bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500">
-          {days.length} días
-        </span>
-      </div>
-
-      <div className="flex gap-3 overflow-x-auto pb-2">
-        {days.map((day) => {
-          const active = day.dayNumber === selectedDay;
-          const fill = day.income > 0 ? Math.max(8, Math.round((day.income / maxRevenue) * 100)) : 6;
-
-          return (
-            <button
-              key={day.date}
-              type="button"
-              ref={active ? selectedRef : null}
-              onClick={() => onSelectDay(day.dayNumber)}
-              className={`min-w-[90px] rounded-2xl border p-3 text-left transition ${
-                active ? "border-primary-300 bg-primary-50" : "border-slate-200 bg-white hover:bg-slate-50"
-              }`}
-            >
-              <p className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${active ? "text-primary-700" : "text-slate-400"}`}>
-                {day.label}
-              </p>
-              <div className="mt-1 flex items-center justify-between">
-                <span className={`text-sm font-semibold ${active ? "text-slate-900" : "text-slate-600"}`}>{day.dayNumber}</span>
-                <span className="text-[11px] text-slate-400">{day.orders} ped.</span>
-              </div>
-              <div className="mt-3 h-1.5 rounded-full bg-slate-100">
-                <div
-                  className={`h-1.5 rounded-full ${active ? "bg-primary-500" : "bg-slate-300"}`}
-                  style={{ width: `${fill}%` }}
-                />
-              </div>
-              <p className="mt-2 text-xs text-slate-500">{day.income > 0 ? formatPrice(day.income) : "Sin ventas"}</p>
-            </button>
-          );
-        })}
-      </div>
+    <div
+      ref={trackRef}
+      onPointerDown={event => {
+        if (event.pointerType !== "mouse" || !trackRef.current) return;
+        dragRef.current = { active: true, moved: false, startX: event.clientX, scrollLeft: trackRef.current.scrollLeft };
+      }}
+      onPointerMove={event => {
+        const track = trackRef.current;
+        const drag = dragRef.current;
+        if (event.pointerType !== "mouse" || !track || !drag.active) return;
+        const distance = event.clientX - drag.startX;
+        if (Math.abs(distance) > 4 && !drag.moved) {
+          drag.moved = true;
+          track.setPointerCapture(event.pointerId);
+        }
+        if (drag.moved) track.scrollLeft = drag.scrollLeft - distance;
+      }}
+      onPointerUp={event => {
+        if (event.pointerType !== "mouse") return;
+        dragRef.current.active = false;
+        if (trackRef.current?.hasPointerCapture(event.pointerId)) trackRef.current.releasePointerCapture(event.pointerId);
+      }}
+      onPointerCancel={() => { dragRef.current.active = false; }}
+      style={{ touchAction: "pan-x", WebkitOverflowScrolling: "touch" }}
+      className="flex cursor-grab select-none gap-1.5 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-3 active:cursor-grabbing [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      {days.map(item => {
+        const active = item.dayNumber === selectedDay;
+        return (
+          <button
+            key={item.date}
+            type="button"
+            data-active-day={active ? "true" : "false"}
+            onClick={() => {
+              if (dragRef.current.moved) {
+                dragRef.current.moved = false;
+                return;
+              }
+              onSelectDay(item.dayNumber);
+            }}
+            className={`min-w-[56px] flex-none rounded-xl border px-1 py-1.5 text-center transition sm:min-w-[60px] ${
+              active ? "border-primary-500 bg-primary-500 text-white" : "border-slate-200 text-slate-600 hover:border-primary-200"
+            }`}
+          >
+            <span className="block text-sm font-bold">{String(item.dayNumber).padStart(2, "0")}</span>
+            <span className="block text-[10px] capitalize">{item.label}</span>
+            <span className={`mt-0.5 block text-[8px] ${active ? "text-white/85" : "text-slate-400"}`}>{item.orders} ped.</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
-
 export default function ContabilidadDashboard({ initialData }: { initialData: AccountingSummary }) {
-  const [data, setData] = useState<AccountingSummary>(initialData);
+  const [data, setData] = useState(initialData);
+  const [comparison, setComparison] = useState<AccountingSummary | null>(null);
   const [mode, setMode] = useState<AccountingMode>(initialData.mode);
   const [year, setYear] = useState(initialData.year);
   const [month, setMonth] = useState(initialData.month);
   const [day, setDay] = useState(initialData.day ?? new Date().getDate());
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"orders" | "expenses">("orders");
-  const [ordersPage, setOrdersPage] = useState(1);
-  const [expensesPage, setExpensesPage] = useState(1);
+  const [movementType, setMovementType] = useState<MovementType>("all");
+  const [search, setSearch] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [page, setPage] = useState(1);
   const skipFirstFetch = useRef(true);
 
   useEffect(() => {
-    setOrdersPage(1);
-    setExpensesPage(1);
-  }, [mode, year, month, day]);
+    setPage(1);
+  }, [mode, year, month, day, movementType, search]);
 
   useEffect(() => {
     if (skipFirstFetch.current) {
       skipFirstFetch.current = false;
       return;
     }
-
     const controller = new AbortController();
-
     const load = async () => {
       setLoading(true);
       try {
-        const params = new URLSearchParams({
-          mode,
-          year: String(year),
-          month: String(month),
-        });
+        const params = new URLSearchParams({ mode, year: String(year), month: String(month) });
         if (mode === "day") params.set("day", String(day));
-
-        const res = await fetch(`/api/contabilidad?${params.toString()}`, { signal: controller.signal });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || "No se pudo cargar la contabilidad");
+        const response = await fetch(`/api/contabilidad?${params}`, { signal: controller.signal });
+        const json = await response.json();
+        if (!response.ok) throw new Error(json.error || "No se pudo cargar la contabilidad");
         setData(json);
       } catch (error: any) {
-        if (error?.name !== "AbortError") {
-          console.error(error);
-        }
+        if (error?.name !== "AbortError") console.error(error);
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
     };
-
     load();
     return () => controller.abort();
   }, [mode, year, month, day]);
 
   useEffect(() => {
-    if (!mode || mode !== "day") return;
+    const controller = new AbortController();
+    const previousDate =
+      mode === "month"
+        ? addMonths(new Date(year, month - 1, 1), -1)
+        : new Date(year, month - 1, Math.max(1, day - 1));
+    const params = new URLSearchParams({
+      mode,
+      year: String(previousDate.getFullYear()),
+      month: String(previousDate.getMonth() + 1),
+    });
+    if (mode === "day") params.set("day", String(previousDate.getDate()));
+    fetch(`/api/contabilidad?${params}`, { signal: controller.signal })
+      .then(response => response.ok ? response.json() : null)
+      .then(json => setComparison(json))
+      .catch(error => {
+        if (error?.name !== "AbortError") console.error(error);
+      });
+    return () => controller.abort();
+  }, [mode, year, month, day]);
 
-    const current = new Date();
-    const sameMonth = current.getFullYear() === year && current.getMonth() + 1 === month;
+  useEffect(() => {
+    if (mode !== "day") return;
     const maxDay = new Date(year, month, 0).getDate();
-
-    if (sameMonth) {
-      setDay(current.getDate());
-      return;
-    }
-
-    setDay((prev) => Math.min(Math.max(prev || current.getDate(), 1), maxDay));
+    setDay(previous => Math.min(Math.max(previous, 1), maxDay));
   }, [mode, year, month]);
-
-  const isDayMode = mode === "day";
-  const periodIncome = data.summary.income;
-  const periodExpenses = data.summary.expenses;
-  const periodProfit = data.summary.profit;
-  const margin = periodIncome > 0 ? (periodProfit / periodIncome) * 100 : 0;
 
   const changeMonth = (delta: number) => {
     const next = addMonths(new Date(year, month - 1, 1), delta);
@@ -406,167 +243,292 @@ export default function ContabilidadDashboard({ initialData }: { initialData: Ac
     setMonth(next.getMonth() + 1);
   };
 
-  const ordersTotalPages = Math.max(1, Math.ceil(data.orders.length / PER_PAGE));
-  const expensesTotalPages = Math.max(1, Math.ceil(data.expenses.length / PER_PAGE));
-  const ordersPageItems = data.orders.slice((ordersPage - 1) * PER_PAGE, ordersPage * PER_PAGE);
-  const expensesPageItems = data.expenses.slice((expensesPage - 1) * PER_PAGE, expensesPage * PER_PAGE);
+  const summary = data.summary;
+  const previous = comparison?.summary;
+  const margin = summary.income > 0 ? (summary.profit / summary.income) * 100 : 0;
+
+  const movements = useMemo<Movement[]>(() => {
+    const orderRows: Movement[] = data.orders.map(order => ({
+      type: "order",
+      id: order.id,
+      date: order.createdAt,
+      title: order.customerName,
+      subtitle: order.itemsSummary || "Pedido floral",
+      detail: order.customerPhone,
+      token: order.trackingToken,
+      status: order.status,
+      amount: order.total,
+    }));
+    const expenseRows: Movement[] = data.expenses.map(expense => ({
+      type: "expense",
+      id: expense.id,
+      date: expense.date,
+      title: expense.description,
+      subtitle: expense.category,
+      detail: expense.registeredBy || "Sin responsable",
+      category: expense.category,
+      amount: expense.amount,
+    }));
+    const query = search.trim().toLowerCase();
+    return [...orderRows, ...expenseRows]
+      .filter(item => movementType === "all" || (movementType === "orders" ? item.type === "order" : item.type === "expense"))
+      .filter(item => !query || `${item.title} ${item.subtitle} ${item.detail} ${item.type === "order" ? item.token : item.category}`.toLowerCase().includes(query))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [data.orders, data.expenses, movementType, search]);
+
+  const totalPages = Math.max(1, Math.ceil(movements.length / PER_PAGE));
+  const pageItems = movements.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+  const exportReport = () => {
+    const rows = [
+      ["Tipo", "Fecha", "Descripción", "Detalle", "Monto"],
+      ...movements.map(item => [
+        item.type === "order" ? "Pedido" : "Gasto",
+        format(new Date(item.date), "yyyy-MM-dd HH:mm"),
+        item.title,
+        item.subtitle,
+        item.type === "order" ? item.amount : -item.amount,
+      ]),
+    ];
+    const csv = rows
+      .map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `contabilidad-${year}-${String(month).padStart(2, "0")}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const stats = [
+    {
+      label: "Ingresos",
+      value: formatPrice(summary.income),
+      hint: "Total del período",
+      trend: percentChange(summary.income, previous?.income || 0),
+      icon: RiArrowUpLine,
+      style: "bg-emerald-50 text-emerald-600",
+    },
+    {
+      label: "Gastos",
+      value: formatPrice(summary.expenses),
+      hint: "Total del período",
+      trend: percentChange(summary.expenses, previous?.expenses || 0),
+      icon: RiArrowDownLine,
+      style: "bg-rose-50 text-primary-500",
+    },
+    {
+      label: "Ganancia",
+      value: formatPrice(summary.profit),
+      hint: `${margin.toFixed(1)}% de margen sobre ingresos`,
+      trend: percentChange(summary.profit, previous?.profit || 0),
+      icon: RiMoneyDollarCircleLine,
+      style: "bg-violet-50 text-violet-600",
+    },
+    {
+      label: "Pedidos",
+      value: String(summary.orderCount),
+      hint: "Pedidos en el período",
+      trend: percentChange(summary.orderCount, previous?.orderCount || 0),
+      icon: RiShoppingBagLine,
+      style: "bg-blue-50 text-blue-600",
+    },
+  ];
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 lg:p-8">
-      <div className="rounded-[2rem] border border-slate-100 bg-white px-5 py-5 shadow-sm lg:px-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="min-h-screen bg-[#f8f9fc] px-4 py-6 sm:px-6 lg:px-7">
+      <div className="mx-auto max-w-[1500px] space-y-4">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-3xl font-extrabold leading-tight tracking-normal text-slate-900 sm:text-4xl">Contabilidad</p>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+            <div className="flex items-center gap-3">
+              <RiBarChartBoxLine className="text-primary-500" size={28} />
+              <h1 className="text-[28px] font-bold tracking-tight text-[#11182c]">Contabilidad</h1>
+            </div>
+            <p className="mt-1 text-sm text-slate-500">
               Revisa ingresos, egresos, ganancia, pedidos y movimientos del período seleccionado.
             </p>
           </div>
-
-          <Link
-            href="/dashboard/egresos"
-            className="inline-flex items-center gap-2 self-start rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-          >
-            <RiArrowDownLine size={16} /> Gestionar egresos <RiExternalLinkLine size={13} />
-          </Link>
-        </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[auto_1fr_auto] lg:items-center">
-        <div className="inline-flex w-fit rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
           <button
             type="button"
-            onClick={() => setMode("day")}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${mode === "day" ? TAB_STYLES.active : TAB_STYLES.idle}`}
+            onClick={exportReport}
+            className="inline-flex h-11 w-fit items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50"
           >
-            Por día
+            <RiDownload2Line size={17} /> Exportar reporte
           </button>
-          <button
-            type="button"
-            onClick={() => setMode("month")}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${mode === "month" ? TAB_STYLES.active : TAB_STYLES.idle}`}
-          >
-            Por mes
-          </button>
-        </div>
+        </header>
 
-        <div className="rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => changeMonth(-1)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50"
-              aria-label="Mes anterior"
-            >
-              <RiArrowLeftLine size={18} />
+        <div className="grid gap-3 lg:grid-cols-[200px_1fr]">
+          <div className="inline-flex rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+            {(["day", "month"] as AccountingMode[]).map(item => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setMode(item)}
+                className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                  mode === item ? "bg-[#0d1830] text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {item === "day" ? "Por día" : "Por mes"}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <button type="button" onClick={() => changeMonth(-1)}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50">
+              <RiArrowLeftSLine size={20} />
             </button>
-
+            <RiCalendarLine className="text-slate-500" size={18} />
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                <RiCalendarLine size={14} />
-                {isDayMode ? "Mes y día activo" : "Mes activo"}
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="truncate text-base font-bold capitalize text-slate-900">{data.monthLabel}</p>
+                <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-600">Período activo</span>
               </div>
-              <p className="mt-1 truncate text-base font-semibold text-slate-900">{data.monthLabel}</p>
-              <p className="text-xs text-slate-500">
-                {isDayMode ? `Día seleccionado: ${data.periodLabel}` : `Período activo: ${data.periodLabel}`}
+              <p className="text-xs text-slate-400">
+                {format(new Date(data.periodStart), "d MMM yyyy", { locale: es })} - {format(new Date(data.periodEnd), "d MMM yyyy", { locale: es })}
               </p>
             </div>
-
-            <button
-              type="button"
-              onClick={() => changeMonth(1)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50"
-              aria-label="Mes siguiente"
-            >
-              <RiArrowRightLine size={18} />
+            {loading && <RiLoader4Line className="animate-spin text-primary-500" size={18} />}
+            <button type="button" onClick={() => changeMonth(1)}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50">
+              <RiArrowRightSLine size={20} />
             </button>
           </div>
         </div>
 
-        <div className="hidden lg:flex items-center justify-end gap-2 text-sm text-slate-500">
-          {loading ? (
-            <span className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-2">
-              <RiLoader4Line className="animate-spin" size={16} />
-              Actualizando
-            </span>
-          ) : null}
-        </div>
+        {mode === "day" && <DayStrip days={data.days} selectedDay={day} onSelectDay={setDay} />}
+
+        <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          {stats.map(stat => <StatCard key={stat.label} {...stat} />)}
+        </section>
+
+        <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+          <div className="border-b border-slate-100 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Movimiento del período</h2>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {([
+                    ["all", "Todos"],
+                    ["orders", "Pedidos"],
+                    ["expenses", "Gastos"],
+                  ] as const).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setMovementType(value)}
+                      className={`rounded-lg px-4 py-2 text-xs font-semibold transition ${
+                        movementType === value ? "bg-[#0d1830] text-white" : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <div className="relative min-w-0 flex-1 lg:w-[285px]">
+                  <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
+                  <input
+                    value={search}
+                    onChange={event => setSearch(event.target.value)}
+                    placeholder="Buscar movimiento..."
+                    className="h-11 w-full rounded-xl border border-slate-200 pl-10 pr-3 text-sm outline-none focus:border-primary-300"
+                  />
+                </div>
+                <button type="button" onClick={() => setFiltersOpen(value => !value)}
+                  className={`inline-flex h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${
+                    filtersOpen ? "border-primary-200 bg-primary-50 text-primary-600" : "border-slate-200 text-slate-700"
+                  }`}>
+                  <RiFilter3Line size={17} /> Filtros
+                </button>
+              </div>
+            </div>
+            {filtersOpen && (
+              <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                <Link href="/dashboard/egresos" className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                  Gestionar egresos
+                </Link>
+                <button type="button" onClick={() => { setSearch(""); setMovementType("all"); }}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                  Limpiar filtros
+                </button>
+              </div>
+            )}
+          </div>
+
+          {pageItems.length === 0 ? (
+            <div className="py-16 text-center text-sm text-slate-400">No hay movimientos para mostrar.</div>
+          ) : (
+            <div className="divide-y divide-slate-100 px-4">
+              {pageItems.map(item => {
+                const date = new Date(item.date);
+                const isOrder = item.type === "order";
+                return (
+                  <article key={`${item.type}-${item.id}`} className="grid gap-3 py-3 lg:grid-cols-[58px_48px_minmax(260px,1fr)_120px_145px] lg:items-center">
+                    <div className="text-center">
+                      <p className="text-lg font-bold leading-none text-slate-900">{date.getDate()}</p>
+                      <p className="mt-1 text-[9px] font-semibold uppercase text-slate-500">{format(date, "MMM", { locale: es })}</p>
+                    </div>
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-full ${isOrder ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-primary-500"}`}>
+                      {isOrder ? <RiShoppingBagLine size={18} /> : <RiBankCardLine size={18} />}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-bold text-slate-900">{isOrder ? "Pedido" : "Egreso"}</p>
+                        {isOrder && <span className="text-xs font-semibold text-primary-500">#{item.token}</span>}
+                      </div>
+                      <p className="text-sm font-semibold text-slate-800">{item.title}</p>
+                      <p className="truncate text-xs text-slate-500">{item.subtitle}</p>
+                      <p className="truncate text-[10px] text-slate-400">{item.detail}</p>
+                    </div>
+                    <div>
+                      <span className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[10px] font-semibold ${
+                        isOrder ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-primary-500"
+                      }`}>
+                        <i className={`h-2 w-2 rounded-full ${isOrder ? "bg-emerald-500" : "bg-primary-500"}`} />
+                        {isOrder ? STATUS_LABELS[item.status] || item.status : "Gasto"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 lg:flex-col lg:items-end">
+                      <strong className={isOrder ? "text-emerald-600" : "text-primary-500"}>
+                        {isOrder ? "+" : "-"}{formatPrice(item.amount)}
+                      </strong>
+                      <Link
+                        href={isOrder ? `/dashboard/pedidos/${item.id}` : "/dashboard/egresos"}
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        <RiEyeLine size={14} /> Ver {isOrder ? "pedido" : "egreso"}
+                      </Link>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-center text-xs text-slate-500 sm:text-left">
+              Mostrando {pageItems.length ? (page - 1) * PER_PAGE + 1 : 0} a {Math.min(page * PER_PAGE, movements.length)} de {movements.length} movimientos
+            </p>
+            <div className="flex justify-center gap-2">
+              <button type="button" disabled={page <= 1} onClick={() => setPage(value => Math.max(1, value - 1))}
+                className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-slate-500 disabled:opacity-35">
+                <RiArrowLeftSLine size={18} />
+              </button>
+              <span className="flex h-9 min-w-9 items-center justify-center rounded-lg bg-primary-500 px-3 text-sm font-semibold text-white">{page}</span>
+              <button type="button" disabled={page >= totalPages} onClick={() => setPage(value => Math.min(totalPages, value + 1))}
+                className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-slate-500 disabled:opacity-35">
+                <RiArrowRightSLine size={18} />
+              </button>
+            </div>
+            <p className="text-center text-xs text-slate-500 sm:text-right">
+              Mostrar <span className="ml-2 rounded-lg border border-slate-200 px-3 py-2 font-semibold">{PER_PAGE}</span>
+            </p>
+          </div>
+        </section>
       </div>
-
-      {isDayMode && <DayStrip days={data.days} selectedDay={day} onSelectDay={setDay} />}
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Ingresos"
-          value={formatPrice(periodIncome)}
-          hint={isDayMode ? "Total del día seleccionado" : "Total del mes seleccionado"}
-          icon={RiArrowRightLine}
-        />
-        <StatCard
-          label="Egresos"
-          value={formatPrice(periodExpenses)}
-          hint={isDayMode ? "Gastos del día" : "Gastos del mes"}
-          icon={RiArrowDownLine}
-        />
-        <StatCard
-          label="Ganancia"
-          value={formatPrice(periodProfit)}
-          hint={`${margin.toFixed(1)}% de margen sobre ingresos`}
-          icon={RiMoneyDollarCircleLine}
-        />
-        <StatCard
-          label="Pedidos"
-          value={String(data.summary.orderCount)}
-          hint={isDayMode ? "Pedidos del día" : "Pedidos del mes"}
-          icon={RiShoppingBagLine}
-        />
-      </div>
-
-      <SectionCard
-        title="Movimiento del período"
-        subtitle="Pedidos y gastos"
-        right={
-          <div className="inline-flex w-fit rounded-2xl border border-slate-200 bg-white p-1">
-            <button
-              type="button"
-              onClick={() => setActiveTab("orders")}
-              className={`rounded-xl px-3 py-2 text-sm font-semibold transition sm:px-4 ${activeTab === "orders" ? TAB_STYLES.active : TAB_STYLES.idle}`}
-            >
-              Pedidos
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("expenses")}
-              className={`rounded-xl px-3 py-2 text-sm font-semibold transition sm:px-4 ${activeTab === "expenses" ? TAB_STYLES.active : TAB_STYLES.idle}`}
-            >
-              Gastos
-            </button>
-          </div>
-        }
-      >
-        {activeTab === "orders" ? (
-          <div className="rounded-2xl border border-slate-100 overflow-hidden">
-            <OrdersTable orders={ordersPageItems} />
-            <TablePager
-              page={ordersPage}
-              totalPages={ordersTotalPages}
-              total={data.orders.length}
-              onPrev={() => setOrdersPage((prev) => Math.max(1, prev - 1))}
-              onNext={() => setOrdersPage((prev) => Math.min(ordersTotalPages, prev + 1))}
-            />
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-slate-100 overflow-hidden">
-            <ExpensesTable expenses={expensesPageItems} />
-            <TablePager
-              page={expensesPage}
-              totalPages={expensesTotalPages}
-              total={data.expenses.length}
-              onPrev={() => setExpensesPage((prev) => Math.max(1, prev - 1))}
-              onNext={() => setExpensesPage((prev) => Math.min(expensesTotalPages, prev + 1))}
-            />
-          </div>
-        )}
-      </SectionCard>
     </div>
   );
 }

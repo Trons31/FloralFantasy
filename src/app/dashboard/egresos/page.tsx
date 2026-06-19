@@ -15,7 +15,14 @@ export const dynamic = "force-dynamic";
 export default async function EgresosPage({
   searchParams,
 }: {
-  searchParams: { year?: string; month?: string; day?: string; page?: string };
+  searchParams: {
+    year?: string;
+    month?: string;
+    day?: string;
+    page?: string;
+    q?: string;
+    category?: string;
+  };
 }) {
   const now = new Date();
   const year = Number.parseInt(searchParams.year || String(now.getFullYear()), 10);
@@ -36,13 +43,23 @@ export default async function EgresosPage({
   const monthFrom = startOfMonth(monthAnchor);
   const monthTo = endOfMonth(monthAnchor);
 
-  const dayTotal = await prisma.expense.count({ where: { date: { gte: selectedFrom, lte: selectedTo } } });
+  const dayWhere: any = { date: { gte: selectedFrom, lte: selectedTo } };
+  if (searchParams.q) {
+    dayWhere.OR = [
+      { description: { contains: searchParams.q, mode: "insensitive" } },
+      { registeredBy: { contains: searchParams.q, mode: "insensitive" } },
+      { category: { contains: searchParams.q, mode: "insensitive" } },
+    ];
+  }
+  if (searchParams.category) dayWhere.category = searchParams.category;
+
+  const dayTotal = await prisma.expense.count({ where: dayWhere });
   const totalPages = Math.max(1, Math.ceil(dayTotal / perPage));
   const currentPage = Math.min(page, totalPages);
 
-  const [dayExpenses, daySummary, monthExpenses] = await Promise.all([
+  const [dayExpenses, daySummary, monthExpenses, monthSummary] = await Promise.all([
     prisma.expense.findMany({
-      where: { date: { gte: selectedFrom, lte: selectedTo } },
+      where: dayWhere,
       select: {
         id: true,
         description: true,
@@ -59,7 +76,7 @@ export default async function EgresosPage({
       take: perPage,
     }),
     prisma.expense.aggregate({
-      where: { date: { gte: selectedFrom, lte: selectedTo } },
+      where: dayWhere,
       _sum: { amount: true },
       _count: { id: true },
     }),
@@ -67,26 +84,28 @@ export default async function EgresosPage({
       where: { date: { gte: monthFrom, lte: monthTo } },
       select: { date: true, amount: true },
     }),
+    prisma.expense.aggregate({
+      where: { date: { gte: monthFrom, lte: monthTo } },
+      _sum: { amount: true },
+      _count: { id: true },
+    }),
   ]);
 
   const dayMap = new Map<number, { count: number; amount: number }>();
-  monthExpenses.forEach((expense) => {
-    const expenseDate = new Date(expense.date);
-    const key = expenseDate.getDate();
+  monthExpenses.forEach(expense => {
+    const key = new Date(expense.date).getDate();
     const current = dayMap.get(key) || { count: 0, amount: 0 };
     current.count += 1;
     current.amount += expense.amount;
     dayMap.set(key, current);
   });
 
-  const days = eachDayOfInterval({ start: monthFrom, end: monthTo }).map((dayDate) => {
+  const days = eachDayOfInterval({ start: monthFrom, end: monthTo }).map(dayDate => {
     const stats = dayMap.get(dayDate.getDate()) || { count: 0, amount: 0 };
-    const label = format(dayDate, "EEE", { locale: es }).replace(/\./g, "").toUpperCase();
-
     return {
       date: dayDate.toISOString(),
       dayNumber: dayDate.getDate(),
-      label,
+      label: format(dayDate, "EEE", { locale: es }).replace(/\./g, ""),
       count: stats.count,
       amount: stats.amount,
     };
@@ -94,7 +113,7 @@ export default async function EgresosPage({
 
   return (
     <EgresosClient
-      expenses={dayExpenses.map((expense) => ({
+      expenses={dayExpenses.map(expense => ({
         ...expense,
         date: expense.date.toISOString(),
         createdAt: expense.createdAt.toISOString(),
@@ -102,6 +121,8 @@ export default async function EgresosPage({
       summary={{
         total: daySummary._sum.amount || 0,
         count: dayTotal,
+        monthTotal: monthSummary._sum.amount || 0,
+        monthCount: monthSummary._count.id,
       }}
       pagination={{ page: currentPage, perPage, total: dayTotal }}
       selection={{
@@ -113,6 +134,10 @@ export default async function EgresosPage({
         selectedDateValue: `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
       }}
       days={days}
+      filters={{
+        q: searchParams.q,
+        category: searchParams.category,
+      }}
     />
   );
 }

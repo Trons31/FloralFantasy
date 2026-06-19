@@ -1,120 +1,179 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAdminUser } from "@/lib/route-auth";
 
-function formatCOP(n: number) {
-  return new Intl.NumberFormat("es-CO", { style:"currency", currency:"COP", minimumFractionDigits:0 }).format(n);
+const REVENUE_STATUSES = ["PAID", "PROCESSING", "READY", "OUT_FOR_DELIVERY", "DELIVERED"] as const;
+
+function formatCOP(value: number) {
+  return new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    minimumFractionDigits: 0,
+  }).format(value);
 }
-function statusLabel(s: string) {
-  const m: Record<string,string> = {
-    PENDING:"Pendiente",
-    PENDING_PAYMENT_CONFIRMATION:"Pendiente de confirmación",
-    PAYMENT_INVALID:"Pago inválido",
-    PAID:"Pagado",
-    PROCESSING:"Procesando",
-    READY:"Listo",
-    OUT_FOR_DELIVERY:"En camino",
-    DELIVERED:"Entregado",
-    CANCELLED:"Cancelado",
+
+function formatDate(value: Date) {
+  return new Intl.DateTimeFormat("es-CO", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(value);
+}
+
+function formatDateTime(value: Date) {
+  return new Intl.DateTimeFormat("es-CO", {
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(value);
+}
+
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function statusLabel(status: string) {
+  const labels: Record<string, string> = {
+    PENDING: "Pendiente",
+    PENDING_PAYMENT_CONFIRMATION: "Pendiente de confirmación",
+    PAYMENT_INVALID: "Pago inválido",
+    PAID: "Pagado",
+    PROCESSING: "En producción",
+    READY: "Listo",
+    OUT_FOR_DELIVERY: "En ruta",
+    DELIVERED: "Entregado",
+    CANCELLED: "Cancelado",
   };
-  return m[s] || s;
+  return labels[status] || status;
 }
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const from  = searchParams.get("from");
-  const to    = searchParams.get("to");
-  const label = searchParams.get("label") || "Reporte";
+  if (!(await requireAdminUser())) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
 
-  const where: any = { status: { notIn: ["CANCELLED"] } };
-  if (from) where.createdAt = { ...where.createdAt, gte: new Date(from) };
-  if (to)   where.createdAt = { ...where.createdAt, lte: new Date(to) };
+  const fromParam = req.nextUrl.searchParams.get("from");
+  const toParam = req.nextUrl.searchParams.get("to");
+  const label = req.nextUrl.searchParams.get("label") || "Reporte financiero";
+  const from = fromParam ? new Date(fromParam) : new Date(new Date().setHours(0, 0, 0, 0));
+  const to = toParam ? new Date(toParam) : new Date(new Date().setHours(23, 59, 59, 999));
 
-  const expWhere: any = {};
-  if (from) expWhere.date = { ...expWhere.date, gte: new Date(from) };
-  if (to)   expWhere.date = { ...expWhere.date, lte: new Date(to) };
-
-  const [orders, expenses] = await Promise.all([
-    prisma.order.findMany({ where, include: { items: { include: { product: true } } }, orderBy: { createdAt: "desc" } }),
-    prisma.expense.findMany({ where: expWhere }),
+  const [orders, histories, expenses] = await Promise.all([
+    prisma.order.findMany({
+      where: { createdAt: { gte: from, lte: to }, status: { not: "CANCELLED" } },
+      select: {
+        id: true,
+        trackingToken: true,
+        customerName: true,
+        customerPhone: true,
+        status: true,
+        total: true,
+        createdAt: true,
+        items: {
+          select: {
+            quantity: true,
+            product: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.orderStatusHistory.findMany({
+      where: {
+        createdAt: { gte: from, lte: to },
+        status: { in: ["PROCESSING", "READY", "DELIVERED"] },
+      },
+      select: {
+        status: true,
+        createdAt: true,
+        order: { select: { id: true, trackingToken: true, deliveryPhotoUrl: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.expense.findMany({
+      where: { date: { gte: from, lte: to } },
+      select: {
+        description: true,
+        amount: true,
+        category: true,
+        date: true,
+        registeredBy: true,
+      },
+      orderBy: { date: "asc" },
+    }),
   ]);
 
-  const totalIncome   = orders.reduce((s, o) => s + o.total, 0);
-  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
-  const ganancia      = totalIncome - totalExpenses;
+  const prepared = Array.from(new Map(
+    histories
+      .filter(item => item.status === "PROCESSING" || item.status === "READY")
+      .map(item => [item.order.id, item])
+  ).values());
+  const delivered = Array.from(new Map(
+    histories.filter(item => item.status === "DELIVERED").map(item => [item.order.id, item])
+  ).values());
+  const income = orders
+    .filter(order => REVENUE_STATUSES.includes(order.status as typeof REVENUE_STATUSES[number]))
+    .reduce((sum, order) => sum + order.total, 0);
+  const expenseTotal = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const profit = income - expenseTotal;
 
   const html = `<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8"/>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${escapeHtml(label)}</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:Arial,sans-serif;font-size:12px;color:#1a1a1a;padding:32px}
-.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;border-bottom:2px solid #e8185a;padding-bottom:16px}
-.brand{font-size:22px;font-weight:bold;color:#e8185a}
-.brand-sub{font-size:11px;color:#999;margin-top:2px}
-.report-title{text-align:right}
-.report-title h2{font-size:16px;color:#333}
-.report-title p{font-size:10px;color:#999;margin-top:4px}
-.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
-.summary-card{background:#f9fafb;border:1px solid #f0f0f0;border-radius:8px;padding:14px}
-.summary-card .label{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
-.summary-card .value{font-size:18px;font-weight:bold}
-.green{color:#16a34a}.red{color:#dc2626}.pink{color:#e8185a}
-h3{font-size:13px;font-weight:bold;color:#333;margin-bottom:10px;margin-top:20px;padding-bottom:6px;border-bottom:1px solid #f0f0f0}
-table{width:100%;border-collapse:collapse;font-size:11px}
-th{background:#fdf2f8;color:#c40d47;font-weight:600;text-align:left;padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.4px}
-td{padding:8px 10px;border-bottom:1px solid #f9f9f9;vertical-align:top}
-tr:nth-child(even) td{background:#fafafa}
-.token{font-family:monospace;color:#e8185a;font-size:10px}
-.status{display:inline-block;padding:2px 7px;border-radius:20px;font-size:9px;font-weight:600}
-.sd{background:#dcfce7;color:#16a34a}.sp{background:#dbeafe;color:#2563eb}.ss{background:#fef3c7;color:#d97706}.so{background:#f3f4f6;color:#6b7280}
-.total-row td{font-weight:bold;background:#fdf2f8;color:#c40d47}
-.footer{margin-top:32px;padding-top:12px;border-top:1px solid #f0f0f0;text-align:center;font-size:10px;color:#bbb}
-@media print{@page{margin:20mm}}
-</style></head><body>
-<div class="header">
-  <div><div class="brand">Fantasía Floral</div><div class="brand-sub">Floristería</div></div>
-  <div class="report-title">
-    <h2>${label}</h2>
-    <p>Generado el ${new Date().toLocaleDateString("es-CO",{dateStyle:"long"})}</p>
-    ${from?`<p>Desde: ${new Date(from).toLocaleDateString("es-CO",{dateStyle:"medium"})}</p>`:""}
-    ${to?`<p>Hasta: ${new Date(to).toLocaleDateString("es-CO",{dateStyle:"medium"})}</p>`:""}
-  </div>
-</div>
-<div class="summary">
-  <div class="summary-card"><div class="label">Pedidos</div><div class="value">${orders.length}</div></div>
-  <div class="summary-card"><div class="label">Ingresos</div><div class="value green">${formatCOP(totalIncome)}</div></div>
-  <div class="summary-card"><div class="label">Egresos</div><div class="value red">${formatCOP(totalExpenses)}</div></div>
-  <div class="summary-card"><div class="label">Ganancia neta</div><div class="value ${ganancia>=0?"pink":"red"}">${formatCOP(ganancia)}</div></div>
-</div>
-<h3>Detalle de pedidos</h3>
-<table>
-  <thead><tr><th>Token</th><th>Cliente</th><th>Productos</th><th>Estado</th><th>Fecha</th><th style="text-align:right">Total</th></tr></thead>
-  <tbody>
-    ${orders.map(o=>`<tr>
-      <td class="token">${o.trackingToken}</td>
-      <td>${o.customerName}<br/><span style="color:#999;font-size:10px">${o.customerPhone}</span></td>
-      <td>${o.items.map(i=>`${i.quantity>1?`x${i.quantity} `:""}${i.product?.name||"-"}`).join(", ")}</td>
-      <td><span class="status ${o.status==="DELIVERED"?"sd":o.status==="PAID"?"sp":o.status==="PROCESSING"?"ss":"so"}">${statusLabel(o.status)}</span></td>
-      <td style="white-space:nowrap">${new Date(o.createdAt).toLocaleDateString("es-CO",{day:"2-digit",month:"short",year:"numeric"})}</td>
-      <td style="text-align:right;font-weight:600">${formatCOP(o.total)}</td>
-    </tr>`).join("")}
-    <tr class="total-row"><td colspan="5">TOTAL</td><td style="text-align:right">${formatCOP(totalIncome)}</td></tr>
-  </tbody>
-</table>
-${expenses.length>0?`
-<h3>Egresos registrados</h3>
-<table>
-  <thead><tr><th>Descripción</th><th>Categoría</th><th>Fecha</th><th style="text-align:right">Monto</th></tr></thead>
-  <tbody>
-    ${expenses.map(e=>`<tr>
-      <td>${e.description}</td><td>${e.category}</td>
-      <td>${new Date(e.date).toLocaleDateString("es-CO",{day:"2-digit",month:"short",year:"numeric"})}</td>
-      <td style="text-align:right;color:#dc2626;font-weight:600">${formatCOP(e.amount)}</td>
-    </tr>`).join("")}
-    <tr class="total-row"><td colspan="3">TOTAL EGRESOS</td><td style="text-align:right;color:#dc2626">${formatCOP(totalExpenses)}</td></tr>
-  </tbody>
-</table>`:""}
-<div class="footer">Fantasía Floral · Reporte generado automáticamente · ${new Date().toLocaleDateString("es-CO",{dateStyle:"long"})}</div>
-</body></html>`;
+  *{box-sizing:border-box} body{margin:0;padding:34px;font-family:Arial,sans-serif;color:#0f172a;background:#fff;font-size:11px}
+  .header{display:flex;justify-content:space-between;gap:24px;padding-bottom:18px;border-bottom:2px solid #f72d72}
+  .brand{font-size:22px;font-weight:800}.brand span{color:#f72d72}.muted{color:#64748b}.right{text-align:right}.title{font-size:14px;font-weight:700}
+  .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:22px 0}.card{border:1px solid #e2e8f0;border-radius:12px;padding:14px}
+  .card-label{font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.04em}.card-value{margin-top:6px;font-size:18px;font-weight:800}
+  .green{color:#059669}.red{color:#e11d48}.violet{color:#7c3aed}.blue{color:#2563eb}
+  h2{margin:22px 0 10px;font-size:14px} table{width:100%;border-collapse:collapse;border:1px solid #e2e8f0;page-break-inside:auto}
+  tr{page-break-inside:avoid;page-break-after:auto} th{padding:8px 9px;background:#f8fafc;color:#64748b;text-align:left;font-size:8px;text-transform:uppercase;letter-spacing:.04em}
+  td{padding:8px 9px;border-top:1px solid #e2e8f0;vertical-align:top}.token{color:#f72d72;font-weight:700}.amount{color:#e11d48;font-weight:700;text-align:right}
+  .badge{display:inline-block;padding:3px 7px;border-radius:999px;background:#f1f5f9;font-size:8px}.footer{margin-top:28px;padding-top:12px;border-top:1px solid #e2e8f0;text-align:center;color:#94a3b8;font-size:9px}
+  .empty{padding:18px;text-align:center;color:#94a3b8;border:1px solid #e2e8f0;border-radius:10px}
+  @media print{body{padding:0}@page{size:A4;margin:14mm}thead{display:table-header-group}}
+</style>
+</head>
+<body>
+  <header class="header">
+    <div><div class="brand">SUPER <span>ADMIN</span></div><div class="muted">Reporte financiero y operativo</div></div>
+    <div class="right"><div class="title">${escapeHtml(label)}</div><div class="muted">${formatDate(from)} - ${formatDate(to)}</div><div class="muted">Generado: ${formatDate(new Date())}</div></div>
+  </header>
 
-  return new NextResponse(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+  <section class="summary">
+    <div class="card"><div class="card-label">Ingresos</div><div class="card-value green">${formatCOP(income)}</div></div>
+    <div class="card"><div class="card-label">Egresos</div><div class="card-value red">${formatCOP(expenseTotal)}</div></div>
+    <div class="card"><div class="card-label">Balance</div><div class="card-value ${profit >= 0 ? "violet" : "red"}">${formatCOP(profit)}</div></div>
+    <div class="card"><div class="card-label">Pedidos</div><div class="card-value blue">${orders.length}</div><div class="muted">${delivered.length} entregados</div></div>
+  </section>
+
+  <h2>Pedidos del período</h2>
+  ${orders.length ? `<table><thead><tr><th>Token</th><th>Cliente</th><th>Productos</th><th>Estado</th><th>Fecha</th><th style="text-align:right">Total</th></tr></thead><tbody>${orders.map(order => `<tr><td class="token">${escapeHtml(order.trackingToken)}</td><td>${escapeHtml(order.customerName)}<br><span class="muted">${escapeHtml(order.customerPhone)}</span></td><td>${escapeHtml(order.items.map(item => `${item.quantity > 1 ? `${item.quantity}x ` : ""}${item.product.name}`).join(", "))}</td><td><span class="badge">${escapeHtml(statusLabel(order.status))}</span></td><td>${formatDateTime(order.createdAt)}</td><td style="text-align:right;font-weight:700">${formatCOP(order.total)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No hubo pedidos en el período.</div>`}
+
+  <h2>Actividad de preparación y entrega</h2>
+  ${histories.length ? `<table><thead><tr><th>Actividad</th><th>Pedido</th><th>Evidencia</th><th>Fecha</th></tr></thead><tbody>${histories.map(item => `<tr><td>${item.status === "DELIVERED" ? "Pedido entregado" : item.status === "READY" ? "Pedido listo" : "Pedido en preparación"}</td><td class="token">${escapeHtml(item.order.trackingToken)}</td><td>${item.order.deliveryPhotoUrl ? "Con evidencia" : "-"}</td><td>${formatDateTime(item.createdAt)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No hubo actividad operativa en el período.</div>`}
+
+  <h2>Egresos del período</h2>
+  ${expenses.length ? `<table><thead><tr><th>Descripción</th><th>Categoría</th><th>Responsable</th><th>Fecha</th><th style="text-align:right">Monto</th></tr></thead><tbody>${expenses.map(expense => `<tr><td>${escapeHtml(expense.description)}</td><td>${escapeHtml(expense.category)}</td><td>${escapeHtml(expense.registeredBy || "Sin responsable")}</td><td>${formatDateTime(expense.date)}</td><td class="amount">-${formatCOP(expense.amount)}</td></tr>`).join("")}<tr><td colspan="4" style="font-weight:700">TOTAL EGRESOS</td><td class="amount">-${formatCOP(expenseTotal)}</td></tr></tbody></table>` : `<div class="empty">No hubo egresos en el período.</div>`}
+
+  <footer class="footer">Reporte generado por Super Admin · Incluye información financiera y operativa del período seleccionado.</footer>
+</body>
+</html>`;
+
+  return new NextResponse(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
 }

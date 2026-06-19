@@ -6,28 +6,45 @@ import FloresClient from "@/components/client/FloresClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function FloresPage({ searchParams }: { searchParams: { categoria?: string; ocasion?: string; q?: string; flor?: string } }) {
-  const [products, categories, flowers] = await Promise.all([
+export default async function FloresPage({
+  searchParams,
+}: {
+  searchParams: { categoria?: string; ocasion?: string; q?: string; flor?: string };
+}) {
+  const [products, categories, flowers, occasions] = await Promise.all([
     prisma.product.findMany({
-      where: {
-        inStock: true,
-        ...(searchParams.categoria ? { category: { slug: searchParams.categoria } } : {}),
-        ...(searchParams.ocasion   ? { occasion: searchParams.ocasion } : {}),
-        ...(searchParams.q         ? { name: { contains: searchParams.q, mode: "insensitive" } } : {}),
-        ...(searchParams.flor      ? { flowers: { some: { flower: { type: searchParams.flor } } } } : {}),
+      where: { inStock: true },
+      include: {
+        images: { orderBy: { order: "asc" } },
+        category: true,
+        flowers: { include: { flower: true } },
       },
-      include: { images: { orderBy: { order: "asc" } }, category: true, flowers: { include: { flower: true } } },
-      orderBy: { featured: "desc" },
+      orderBy: [{ featured: "desc" }, { createdAt: "desc" }],
     }).catch(() => []),
-    prisma.category.findMany().catch(() => []),
+    prisma.category.findMany({ orderBy: { name: "asc" } }).catch(() => []),
     prisma.flower.findMany({ select: { type: true } }).catch(() => []),
+    prisma.occasion.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: "asc" },
+    }).catch(() => []),
   ]);
-  const flowerTypes = Array.from(new Set(flowers.map(f => f.type)));
-  const serialized  = products.map(p => ({ ...p, createdAt: p.createdAt.toISOString() }));
+
+  const flowerTypes = Array.from(new Set(flowers.map(flower => flower.type)));
+  const serialized = products.map(product => ({
+    ...product,
+    createdAt: product.createdAt.toISOString(),
+  }));
+
   return (
-    <main className="min-h-screen bg-[#fdfcf8]">
-      <Header />
-      <FloresClient products={serialized} categories={categories} flowerTypes={flowerTypes} />
+    <main className="min-h-screen bg-[#fffdfa]">
+      <Header forceLight />
+      <FloresClient
+        products={serialized}
+        categories={categories}
+        flowerTypes={flowerTypes}
+        occasions={occasions}
+        initialFilters={searchParams}
+      />
       <Footer />
       <CartDrawer />
     </main>

@@ -1,20 +1,30 @@
 "use client";
-import { useEffect, useState } from "react";
+
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
-  RiArrowUpLine,
+  RiAddCircleLine,
+  RiAlarmWarningLine,
   RiArrowDownLine,
+  RiArrowUpLine,
+  RiCalendarLine,
   RiCheckLine,
+  RiCheckboxCircleFill,
   RiFlowerLine,
+  RiHourglassLine,
   RiLoader4Line,
   RiLogoutBoxLine,
+  RiMapPin2Line,
+  RiNotification3Line,
+  RiPlayFill,
   RiRefreshLine,
   RiStackLine,
   RiStickyNoteLine,
-  RiAddCircleLine,
+  RiTimeLine,
+  RiUser3Line,
 } from "react-icons/ri";
-import { toast } from "sonner";
 
-type Addon = { id: string; addon: { name: string } };
+type Tab = "PAID" | "PROCESSING" | "READY";
 type FlowerLine = {
   id: string;
   name: string;
@@ -24,21 +34,19 @@ type FlowerLine = {
   quantity: number;
 };
 type ExtraFlower = { id: string; name: string; quantity: number };
-type Customization = {
-  bouquetSize?: "STANDARD" | "ENLARGED" | "REDUCED";
-  baseFlowers?: FlowerLine[];
-  extraFlowers?: ExtraFlower[];
-};
 type OrderItem = {
   id: string;
   quantity: number;
-  price: number;
-  addons: Addon[];
-  customization?: Customization | null;
+  addons: Array<{ id: string; addon: { name: string } }>;
+  customization?: {
+    bouquetSize?: "STANDARD" | "ENLARGED" | "REDUCED";
+    baseFlowers?: FlowerLine[];
+    extraFlowers?: ExtraFlower[];
+  } | null;
   product: {
     name: string;
-    images: { url: string; isMain: boolean }[];
-    flowers: { quantity: number; flower: { name: string; imageUrl?: string | null; type?: string | null } }[];
+    images: Array<{ url: string; isMain: boolean }>;
+    flowers: Array<{ quantity: number; flower: { name: string; imageUrl?: string | null; type?: string | null } }>;
   };
 };
 type Order = {
@@ -46,442 +54,308 @@ type Order = {
   trackingToken: string;
   customerName: string;
   address: string;
+  addressRef?: string | null;
   estimatedTime: string;
-  total: number;
   status: string;
   adminNote?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  statusHistory?: Array<{ id: string; status: string; note?: string | null; createdAt: string }>;
   items: OrderItem[];
 };
+
+const tabConfig: Array<{ value: Tab; label: string; Icon: React.ElementType }> = [
+  { value: "PAID", label: "Por preparar", Icon: RiHourglassLine },
+  { value: "PROCESSING", label: "En preparación", Icon: RiFlowerLine },
+  { value: "READY", label: "Terminados", Icon: RiCheckboxCircleFill },
+];
 
 export default function PreparadorView({ user, onLogout }: { user: any; onLogout: () => void }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"PAID" | "PROCESSING">("PAID");
+  const [activeTab, setActiveTab] = useState<Tab>("PAID");
 
   const load = async () => {
     setLoading(true);
-    const res = await fetch("/api/orders?status=PAID,PROCESSING");
-    const data = await res.json();
-    setOrders(Array.isArray(data) ? data.filter((o: any) => ["PAID", "PROCESSING"].includes(o.status)) : []);
-    setLoading(false);
+    try {
+      const response = await fetch("/api/orders?status=PAID,PROCESSING,READY");
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No fue posible cargar los pedidos");
+      setOrders(Array.isArray(data) ? data : []);
+    } catch (error: any) {
+      toast.error(error.message || "No fue posible cargar los pedidos");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, []);
 
   const updateStatus = async (orderId: string, status: "PROCESSING" | "READY") => {
     setUpdating(orderId);
-    const res = await fetch(`/api/orders/${orderId}/status`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, note: status === "PROCESSING" ? "Preparando pedido" : "Pedido listo para entrega" }),
-    });
-    if (res.ok) {
-      setOrders((p) =>
-        status === "READY" ? p.filter((o) => o.id !== orderId) : p.map((o) => (o.id === orderId ? { ...o, status } : o))
-      );
-      toast.success(status === "PROCESSING" ? "En preparacion" : "Marcado como listo");
+    try {
+      const response = await fetch(`/api/orders/${orderId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status,
+          note: status === "PROCESSING" ? "Preparación iniciada" : "Pedido terminado y listo para entrega",
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No fue posible actualizar el pedido");
+      const now = new Date().toISOString();
+      setOrders(current => current.map(order => order.id === orderId ? {
+        ...order,
+        status,
+        updatedAt: now,
+        statusHistory: [...(order.statusHistory || []), { id: `${orderId}-${now}`, status, createdAt: now }],
+      } : order));
+      setActiveTab(status);
+      toast.success(status === "PROCESSING" ? "Pedido en preparación" : "Pedido marcado como listo");
+    } catch (error: any) {
+      toast.error(error.message || "No fue posible actualizar el pedido");
+    } finally {
+      setUpdating(null);
     }
-    setUpdating(null);
   };
 
-  const paid = orders.filter((o) => o.status === "PAID");
-  const processing = orders.filter((o) => o.status === "PROCESSING");
-  const activeOrders = activeTab === "PAID" ? paid : processing;
+  const grouped = useMemo(() => ({
+    PAID: orders.filter(order => order.status === "PAID"),
+    PROCESSING: orders.filter(order => order.status === "PROCESSING"),
+    READY: orders.filter(order => order.status === "READY"),
+  }), [orders]);
+  const activeOrders = grouped[activeTab];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-4 py-3 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100">
-            <RiFlowerLine className="text-amber-600" size={20} />
+    <div className="min-h-screen bg-[#f6f8fb] pb-24 text-[#11182c]">
+      <header className="sticky top-0 z-20 border-b border-slate-100 bg-white/95 px-4 py-4 shadow-sm backdrop-blur">
+        <div className="mx-auto flex max-w-xl items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="grid h-14 w-14 place-items-center rounded-2xl bg-amber-50 text-amber-500"><RiFlowerLine size={29} /></span>
+            <div><h1 className="text-xl font-extrabold">Preparador</h1><p className="text-base text-slate-500">{user.name}</p></div>
           </div>
-          <div>
-            <p className="text-sm font-bold leading-none text-gray-900">Preparador</p>
-            <p className="text-xs text-gray-400">{user.name}</p>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={load} className="relative grid h-10 w-10 place-items-center rounded-xl text-slate-600 hover:bg-slate-50" aria-label="Actualizar pedidos">
+              <RiNotification3Line size={23} /><span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-primary-500 ring-2 ring-white" />
+            </button>
+            <button type="button" onClick={onLogout} className="grid h-10 w-10 place-items-center rounded-xl text-slate-400 hover:bg-red-50 hover:text-red-500" aria-label="Cerrar sesión"><RiLogoutBoxLine /></button>
+            <div className="rounded-2xl border border-primary-100 bg-primary-50 px-4 py-2 text-center"><span className="block text-[10px] font-semibold text-slate-600">Pedidos</span><strong className="text-primary-500">{orders.length}</strong></div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={load} className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-gray-100">
-            <RiRefreshLine size={18} />
-          </button>
-          <button onClick={onLogout} className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500">
-            <RiLogoutBoxLine size={18} />
-          </button>
-        </div>
-      </div>
+      </header>
 
-      <div className="mx-auto max-w-2xl px-4 py-6 pb-28">
+      <main className="mx-auto max-w-xl px-4 py-7">
+        <div className="mb-5">
+          <h2 className="text-2xl font-extrabold">{activeTab === "PAID" ? "Por preparar" : activeTab === "PROCESSING" ? "En preparación" : "Terminados"}</h2>
+          <p className="mt-1 flex items-center gap-2 text-sm text-slate-400">
+            {activeTab === "PROCESSING" && <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />}
+            {activeTab === "PAID" ? `Tienes ${activeOrders.length} pedido${activeOrders.length === 1 ? "" : "s"} pendiente${activeOrders.length === 1 ? "" : "s"}` :
+              activeTab === "PROCESSING" ? `Tienes ${activeOrders.length} pedido${activeOrders.length === 1 ? "" : "s"} en proceso` :
+              `${activeOrders.length} pedido${activeOrders.length === 1 ? "" : "s"} preparado${activeOrders.length === 1 ? "" : "s"}`}
+          </p>
+        </div>
+
         {loading ? (
-          <div className="flex justify-center py-20">
-            <RiLoader4Line className="animate-spin text-amber-500" size={32} />
-          </div>
-        ) : orders.length === 0 ? (
-          <div className="py-20 text-center">
-            <RiFlowerLine className="mx-auto mb-3 text-gray-200" size={56} />
-            <p className="font-medium text-gray-400">Sin pedidos pendientes</p>
-            <p className="mt-1 text-sm text-gray-300">Toca actualizar para revisar</p>
+          <div className="flex justify-center py-24"><RiLoader4Line className="animate-spin text-primary-500" size={34} /></div>
+        ) : activeOrders.length ? (
+          <div className="space-y-5">
+            {activeOrders.map(order => (
+              <OrderCard key={order.id} order={order} tab={activeTab} updating={updating === order.id} onAction={updateStatus} />
+            ))}
           </div>
         ) : (
-          <div className="space-y-4">
-            {activeOrders.length > 0 ? (
-              activeOrders.map((order) => (
-                <OrderCard
-                  key={order.id}
-                  order={order}
-                  updating={updating}
-                  action={
-                    activeTab === "PAID"
-                      ? { label: "Empezar a preparar", status: "PROCESSING", color: "bg-amber-500 hover:bg-amber-600", shadow: "shadow-amber-200" }
-                      : { label: "Marcar como listo", status: "READY", color: "bg-green-500 hover:bg-green-600", shadow: "shadow-green-200" }
-                  }
-                  onAction={updateStatus}
-                />
-              ))
-            ) : (
-              <div className="rounded-2xl border border-gray-100 bg-white py-16 text-center">
-                <RiFlowerLine className="mx-auto mb-3 text-gray-200" size={48} />
-                <p className="text-sm text-gray-400">Sin pedidos en esta sección</p>
-              </div>
-            )}
+          <EmptyState tab={activeTab} preparedToday={grouped.READY.length} />
+        )}
+      </main>
+
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-100 bg-white/95 px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_30px_rgba(15,23,42,.08)] backdrop-blur">
+        <div className="mx-auto grid max-w-xl grid-cols-3 gap-2">
+          {tabConfig.map(tab => {
+            const active = activeTab === tab.value;
+            const count = grouped[tab.value].length;
+            return (
+              <button key={tab.value} type="button" onClick={() => setActiveTab(tab.value)} className={`relative flex h-16 flex-col items-center justify-center gap-1 rounded-2xl text-[10px] font-semibold transition ${active ? "border border-primary-100 bg-primary-50 text-primary-500" : tab.value === "READY" ? "text-emerald-600" : "text-slate-500"}`}>
+                <tab.Icon size={22} />
+                <span>{tab.label}</span>
+                <span className={`absolute right-[24%] top-1 grid h-5 min-w-5 place-items-center rounded-full px-1 text-[9px] ${tab.value === "READY" ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-primary-500"}`}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+    </div>
+  );
+}
+
+function OrderCard({ order, tab, updating, onAction }: {
+  order: Order;
+  tab: Tab;
+  updating: boolean;
+  onAction: (id: string, status: "PROCESSING" | "READY") => void;
+}) {
+  const [section, setSection] = useState<"summary" | "flowers" | "notes">(tab === "PROCESSING" ? "flowers" : "summary");
+  const item = order.items[0];
+  const image = item?.product.images.find(image => image.isMain)?.url || item?.product.images[0]?.url;
+  const baseFlowers: FlowerLine[] = item?.customization?.baseFlowers?.length
+    ? item.customization.baseFlowers
+    : item?.product.flowers.map((entry, index) => ({
+      id: `${item.id}-${index}`,
+      name: entry.flower.name,
+      imageUrl: entry.flower.imageUrl,
+      type: entry.flower.type,
+      baseQuantity: entry.quantity,
+      quantity: entry.quantity,
+    })) || [];
+  const extras = item?.customization?.extraFlowers || [];
+  const size = item?.customization?.bouquetSize || "STANDARD";
+  const processingStart = order.statusHistory?.find(entry => entry.status === "PROCESSING")?.createdAt || order.updatedAt;
+
+  return (
+    <article className={`overflow-hidden rounded-3xl border bg-white shadow-[0_8px_30px_rgba(15,23,42,.06)] ${tab === "PROCESSING" ? "border-amber-200" : tab === "READY" ? "border-emerald-100" : "border-primary-100"}`}>
+      <div className="p-5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm font-bold text-primary-500">#{order.trackingToken}</span>
+          <span className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-[11px] font-semibold ${tab === "PROCESSING" ? "bg-orange-50 text-orange-600" : tab === "READY" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
+            <span className={`h-2 w-2 rounded-full ${tab === "READY" ? "bg-emerald-500" : "bg-amber-400"}`} />
+            {tab === "PAID" ? "Por preparar" : tab === "PROCESSING" ? "En preparación" : "Terminado"}
+          </span>
+        </div>
+
+        <div className="mt-5 grid grid-cols-[130px_1fr] gap-5">
+          <div className="h-36 overflow-hidden rounded-2xl bg-slate-50">
+            {image ? <img src={image} alt={item?.product.name || ""} className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center"><RiFlowerLine className="text-slate-200" size={40} /></div>}
+          </div>
+          <div className="flex min-w-0 flex-col justify-center">
+            <h3 className="text-xl font-extrabold">{item?.product.name || "Arreglo floral"}</h3>
+            <p className="mt-4 flex items-center gap-2 text-sm text-slate-500"><RiFlowerLine className="text-primary-500" />{baseFlowers[0]?.name || "Composición floral"} x{baseFlowers[0]?.quantity || 1}</p>
+            {tab === "PROCESSING" && <ElapsedTimer startedAt={processingStart} />}
+          </div>
+        </div>
+
+        {tab === "PAID" && (
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <InfoTile Icon={RiTimeLine} label="Tamaño del ramo" value={size === "ENLARGED" ? "Grande" : size === "REDUCED" ? "Reducido" : "Normal"} accent />
+            <InfoTile Icon={RiCalendarLine} label="Entrega estimada" value={order.estimatedTime} />
           </div>
         )}
       </div>
 
-      {/* Bottom tab bar */}
-      {!loading && orders.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-gray-100 bg-white/95 px-3 py-3 shadow-[0_-8px_24px_rgba(0,0,0,0.06)] backdrop-blur-md">
-          <div className="mx-auto max-w-2xl">
-            <div className="grid grid-cols-2 gap-2 rounded-2xl bg-gray-100 p-1.5">
-              <button
-                onClick={() => setActiveTab("PAID")}
-                className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all ${
-                  activeTab === "PAID" ? "bg-white text-blue-700 shadow-sm" : "text-gray-500"
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <span className={`h-2 w-2 rounded-full ${activeTab === "PAID" ? "bg-blue-500" : "bg-blue-300"}`} />
-                  Por preparar
-                </span>
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${activeTab === "PAID" ? "bg-blue-50 text-blue-700" : "bg-white text-gray-400"}`}>
-                  {paid.length}
-                </span>
-              </button>
-              <button
-                onClick={() => setActiveTab("PROCESSING")}
-                className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all ${
-                  activeTab === "PROCESSING" ? "bg-white text-amber-700 shadow-sm" : "text-gray-500"
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <span className={`h-2 w-2 rounded-full ${activeTab === "PROCESSING" ? "bg-amber-500 animate-pulse" : "bg-amber-300"}`} />
-                  En preparación
-                </span>
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${activeTab === "PROCESSING" ? "bg-amber-50 text-amber-700" : "bg-white text-gray-400"}`}>
-                  {processing.length}
-                </span>
-              </button>
-            </div>
-          </div>
+      <div className="mx-4 rounded-2xl bg-slate-50 p-1.5">
+        <div className="grid grid-cols-3">
+          {(["summary", "flowers", "notes"] as const).map(value => (
+            <button key={value} type="button" onClick={() => setSection(value)} className={`h-11 rounded-xl text-xs font-semibold transition ${section === value ? "bg-white text-primary-500 shadow-sm" : "text-slate-500"}`}>
+              {value === "summary" ? "Resumen" : value === "flowers" ? "Flores" : "Obs."}
+            </button>
+          ))}
         </div>
-      )}
-    </div>
+      </div>
+
+      <div className="p-5">
+        {section === "summary" && <Summary order={order} size={size} />}
+        {section === "flowers" && <FlowersList flowers={baseFlowers} extras={extras} processing={tab === "PROCESSING"} />}
+        {section === "notes" && <Notes order={order} addons={item?.addons || []} />}
+
+        {tab !== "READY" && (
+          <button type="button" onClick={() => onAction(order.id, tab === "PAID" ? "PROCESSING" : "READY")} disabled={updating} className="mt-5 inline-flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-[#ff8a00] to-[#ff9f0a] text-sm font-bold text-white shadow-[0_10px_25px_rgba(255,138,0,.25)] disabled:opacity-60">
+            {updating ? <RiLoader4Line className="animate-spin" /> : tab === "PAID" ? <RiPlayFill /> : <RiCheckLine />}
+            {updating ? "Actualizando..." : tab === "PAID" ? "Empezar a preparar" : "Marcar como listo"}
+          </button>
+        )}
+      </div>
+    </article>
   );
 }
 
-function OrderCard({
-  order,
-  updating,
-  action,
-  onAction,
-}: {
-  order: Order;
-  updating: string | null;
-  action: { label: string; status: any; color: string; shadow: string };
-  onAction: (id: string, status: any) => void;
-}) {
-  const isUpdating = updating === order.id;
-  const [activeSection, setActiveSection] = useState<"summary" | "flowers" | "notes">("summary");
-  const mainItem = order.items[0];
+function Summary({ order, size }: { order: Order; size: "STANDARD" | "ENLARGED" | "REDUCED" }) {
   const totalProducts = order.items.reduce((sum, item) => sum + item.quantity, 0);
-  const mainProductImg = mainItem?.product?.images?.find((i) => i.isMain)?.url || mainItem?.product?.images?.[0]?.url;
-
-  // Base flowers: prefer customization.baseFlowers, else fallback to product.flowers
-  const baseFlowers: FlowerLine[] =
-    mainItem?.customization?.baseFlowers?.length
-      ? mainItem.customization.baseFlowers
-      : mainItem?.product.flowers.map((f, idx) => ({
-          id: `${mainItem.id}-f-${idx}`,
-          name: f.flower?.name || "-",
-          imageUrl: f.flower?.imageUrl || null,
-          type: f.flower?.type || null,
-          baseQuantity: f.quantity,
-          quantity: f.quantity,
-        })) || [];
-
-  const extraFlowers: ExtraFlower[] = mainItem?.customization?.extraFlowers || [];
-  const baseDelta = baseFlowers.reduce((sum, flower) => {
-    const baseQty = flower.baseQuantity ?? flower.quantity;
-    return sum + (flower.quantity - baseQty);
-  }, 0);
-  const hasSizeOverride = Boolean(mainItem?.customization?.bouquetSize);
-  const inferredSize: "STANDARD" | "ENLARGED" | "REDUCED" =
-    mainItem?.customization?.bouquetSize ||
-    (extraFlowers.length > 0 || baseDelta > 0 ? "ENLARGED" : baseDelta < 0 ? "REDUCED" : "STANDARD");
-  const isEnlarged = inferredSize === "ENLARGED";
-  const isReduced = inferredSize === "REDUCED";
-  const sizeLabel = isEnlarged ? "Agrandado" : isReduced ? "Reducido" : "Normal";
-  const sizeDescription = isEnlarged
-    ? extraFlowers.length > 0
-      ? `Incluye ${extraFlowers.length} flor${extraFlowers.length !== 1 ? "es" : ""} adicional${extraFlowers.length !== 1 ? "es" : ""}`
-      : "Cantidad ampliada para el ramo"
-    : isReduced
-      ? "Cantidad reducida para el ramo"
-      : "Tamaño estándar";
-
+  const sizeLabel = size === "ENLARGED" ? "Agrandado" : size === "REDUCED" ? "Reducido" : "Normal";
   return (
-    <div className="overflow-hidden rounded-3xl bg-white shadow-[0_2px_16px_rgba(0,0,0,0.08)]">
-
-      {/* ── Header row ─────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-3 px-5 pt-5 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-50">
-            <RiFlowerLine className="text-amber-500" size={20} />
-          </div>
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-widest text-gray-400">PEDIDO</p>
-              <p className="text-sm font-semibold text-gray-800">
-                {totalProducts} producto{totalProducts !== 1 ? "s" : ""}
-              </p>
-            </div>
-          </div>
-
-        <button
-          type="button"
-          onClick={() => onAction(order.id, action.status)}
-          disabled={isUpdating}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-700 transition-all hover:bg-amber-100 disabled:opacity-50"
-        >
-          {isUpdating ? <RiLoader4Line className="animate-spin" size={14} /> : null}
-          {action.label}
-        </button>
+    <div className="grid grid-cols-2 gap-3">
+      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+        <span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-50 text-amber-500">
+          {size === "ENLARGED" ? <RiArrowUpLine /> : size === "REDUCED" ? <RiArrowDownLine /> : <RiFlowerLine />}
+        </span>
+        <p className="mt-3 text-[10px] text-slate-400">Tipo de pedido</p>
+        <strong className="mt-1 block text-sm">{sizeLabel}</strong>
       </div>
-
-      {/* ── Product block ───────────────────────────────── */}
-      <div className="mx-5 overflow-hidden rounded-2xl border border-gray-100 bg-gray-50">
-        <div className="flex gap-3 p-3">
-          {/* Image */}
-          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-white shadow-sm">
-            {mainProductImg ? (
-              <img src={mainProductImg} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <RiFlowerLine className="text-gray-200" size={22} />
-              </div>
-            )}
-          </div>
-
-          {/* Info */}
-          <div className="min-w-0 flex-1 py-0.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="truncate text-base font-black text-gray-900">
-                {mainItem?.product.name || "Producto"}
-              </h3>
-              {mainItem?.quantity > 1 && (
-                <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-black text-rose-500">
-                  x{mainItem.quantity}
-                </span>
-              )}
-            </div>
-
-            <p className="mt-1 text-xs text-gray-400 line-clamp-2">
-              {baseFlowers.length > 0
-                ? baseFlowers.map((f) => `${f.name} x${f.quantity}`).join(" · ")
-                : "Sin detalle de flores"}
-            </p>
-
-          </div>
-        </div>
-
-
-
-
+      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+        <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary-50 text-primary-500"><RiStackLine /></span>
+        <p className="mt-3 text-[10px] text-slate-400">Productos</p>
+        <strong className="mt-1 block text-sm">{totalProducts} producto{totalProducts === 1 ? "" : "s"}</strong>
       </div>
-
-      <div className="mx-5 mt-3 grid grid-cols-3 gap-2 rounded-2xl bg-gray-100 p-1.5">
-        <button
-          type="button"
-          onClick={() => setActiveSection("summary")}
-          className={`rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
-            activeSection === "summary" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-          }`}
-        >
-          Resumen
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveSection("flowers")}
-          className={`rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
-            activeSection === "flowers" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-          }`}
-        >
-          Flores
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveSection("notes")}
-          className={`rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
-            activeSection === "notes" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-          }`}
-        >
-          <span className="inline-flex items-center gap-1.5">
-            Obs.
-            {order.adminNote?.trim() && (
-              <span className="inline-block h-2 w-2 rounded-full bg-red-500 shadow-[0_0_0_2px_rgba(255,255,255,0.95)]" />
-            )}
-          </span>
-        </button>
-      </div>
-
-      {activeSection === "summary" && (
-        <div
-          className={`mx-5 mt-3 flex items-start gap-3 rounded-2xl border px-4 py-3 ${
-            isEnlarged
-              ? "border-green-100 bg-green-50 text-green-700"
-              : isReduced
-                ? "border-rose-100 bg-rose-50 text-rose-600"
-                : "border-gray-100 bg-gray-50 text-gray-600"
-          }`}
-        >
-          <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
-            isEnlarged ? "bg-green-100" : isReduced ? "bg-rose-100" : "bg-gray-100"
-          }`}>
-            {isEnlarged ? <RiArrowUpLine size={14} /> : isReduced ? <RiArrowDownLine size={14} /> : null}
+    </div>
+  );
+}
+function FlowersList({ flowers, extras, processing = false, compact = false }: { flowers: FlowerLine[]; extras: ExtraFlower[]; processing?: boolean; compact?: boolean }) {
+  return (
+    <div className="space-y-3">
+      {!compact && <h4 className="text-sm font-bold text-slate-500">Flores del ramo</h4>}
+      {flowers.map(flower => (
+        <div key={flower.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
+          {processing && <RiCheckboxCircleFill className="shrink-0 text-emerald-500" size={23} />}
+          <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-rose-50">
+            {flower.imageUrl ? <img src={flower.imageUrl} alt="" className="h-full w-full object-cover" /> : <RiFlowerLine className="text-primary-400" size={23} />}
           </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Tamaño del ramo</p>
-            <p className="text-sm font-bold">{sizeLabel}</p>
-            <p className="mt-0.5 text-xs font-medium opacity-80">{sizeDescription}</p>
-          </div>
+          <div className="min-w-0 flex-1"><strong className="block truncate text-xs">{flower.name}</strong><small className="text-[10px] text-slate-400">{flower.type || "Flor principal"}</small></div>
+          <div className="text-right"><strong className="text-sm">{processing ? `${flower.quantity} / ${flower.quantity}` : flower.quantity}</strong><small className={`block text-[9px] ${processing ? "text-emerald-600" : "text-slate-400"}`}>{processing ? "completado" : "unidades"}</small></div>
         </div>
-      )}
-
-      {/* ── Admin note ──────────────────────────────────── */}
-      {activeSection === "notes" && order.adminNote?.trim() && (
-        <div className="mx-5 mt-3 flex gap-3 rounded-2xl bg-amber-50 px-4 py-3">
-          <RiStickyNoteLine size={15} className="mt-0.5 shrink-0 text-amber-500" />
-          <div>
-            <p className="mb-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-500">Observaciones</p>
-            <p className="whitespace-pre-line text-sm leading-5 text-amber-900">{order.adminNote}</p>
-          </div>
+      ))}
+      {extras.map(flower => (
+        <div key={flower.id} className="flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3">
+          <RiAddCircleLine className="text-emerald-500" /><div className="flex-1"><strong className="text-xs">{flower.name}</strong><small className="block text-[9px] text-emerald-600">Flor adicional</small></div><strong className="text-sm">{flower.quantity}</strong>
         </div>
-      )}
-
-      {/* ── Flores del ramo ─────────────────────────────── */}
-      {activeSection === "flowers" && (
-      <div className="mx-5 mt-3 rounded-2xl border border-gray-100 bg-white p-4">
-        <p className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400">
-          <RiStackLine size={13} />
-          Flores del ramo
-        </p>
-
-        <div className="divide-y divide-gray-50">
-          {baseFlowers.map((flower) => {
-            const baseQty = flower.baseQuantity ?? flower.quantity;
-            const currentQty = flower.quantity;
-            const delta = currentQty - baseQty;
-
-            return (
-              <div key={flower.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
-                  {flower.imageUrl ? (
-                    <img src={flower.imageUrl} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-rose-50 to-amber-50">
-                      <RiFlowerLine size={16} className="text-gray-300" />
-                    </div>
-                  )}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold text-gray-900">{flower.name}</p>
-                  {flower.type && (
-                    <p className="text-xs text-gray-400">{flower.type}</p>
-                  )}
-                </div>
-
-                <div className="flex shrink-0 items-center gap-2">
-                  {/* Show base quantity if reduced (strikethrough style) */}
-                  {isReduced && delta < 0 && (
-                    <span className="text-xs text-gray-300 line-through">x{baseQty}</span>
-                  )}
-                  <span className={`rounded-full px-3 py-1 text-sm font-bold ${
-                    delta > 0 ? "bg-green-50 text-green-700" :
-                    delta < 0 ? "bg-rose-50 text-rose-600" :
-                    "bg-gray-100 text-gray-700"
-                  }`}>
-                    x{currentQty}
-                  </span>
-                  {delta !== 0 && (
-                    <span className={`text-xs font-semibold ${delta > 0 ? "text-green-600" : "text-rose-500"}`}>
-                      {delta > 0 ? `+${delta}` : delta}
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-
-          {baseFlowers.length === 0 && (
-            <p className="py-2 text-sm text-gray-400">Sin flores base detalladas</p>
-          )}
-        </div>
-      </div>
-      )}
-
-      {/* ── Flores extra (solo si agrandado) ────────────── */}
-      {activeSection === "flowers" && isEnlarged && extraFlowers.length > 0 && (
-        <div className="mx-5 mt-3 overflow-hidden rounded-2xl border border-green-100 bg-green-50/60">
-          <div className="flex items-center gap-2 border-b border-green-100 px-4 py-2.5">
-            <RiAddCircleLine size={14} className="text-green-600" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-green-700">
-              Flores adicionales por agrandado
-            </p>
-          </div>
-          <div className="divide-y divide-green-100 px-4">
-            {extraFlowers.map((ef) => (
-              <div key={ef.id} className="flex items-center justify-between py-2.5">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white shadow-sm">
-                    <RiFlowerLine size={14} className="text-green-500" />
-                  </div>
-                  <span className="text-sm font-semibold text-green-900">{ef.name}</span>
-                </div>
-                <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-bold text-green-700">
-                  x{ef.quantity}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── CTA button ──────────────────────────────────── */}
-      <div className="px-5 py-4 pt-4">
-        <button
-          onClick={() => onAction(order.id, action.status)}
-          disabled={isUpdating}
-          className={`flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-bold text-white shadow-lg transition-all ${action.color} ${action.shadow} disabled:opacity-50`}
-        >
-          {isUpdating
-            ? <><RiLoader4Line size={16} className="animate-spin" /> Actualizando...</>
-            : <><RiCheckLine size={16} /> {action.label}</>
-          }
-        </button>
-      </div>
-
+      ))}
+      {!flowers.length && !extras.length && <p className="py-5 text-center text-xs text-slate-400">Sin flores detalladas.</p>}
     </div>
   );
 }
 
+function Notes({ order, addons }: { order: Order; addons: Array<{ addon: { name: string } }> }) {
+  return (
+    <div className="space-y-3">
+      <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+        <h4 className="flex items-center gap-2 text-xs font-bold text-amber-700"><RiStickyNoteLine /> Notas del cliente</h4>
+        <p className="mt-2 whitespace-pre-line text-xs leading-5 text-slate-600">{order.adminNote || "Sin observaciones registradas."}</p>
+      </div>
+      {addons.length > 0 && <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4"><h4 className="text-xs font-bold text-violet-700">Adicionales</h4><p className="mt-2 text-xs text-slate-600">{addons.map(entry => entry.addon.name).join(", ")}</p></div>}
+    </div>
+  );
+}
+
+function ElapsedTimer({ startedAt }: { startedAt: string }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const seconds = Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 1000));
+  const minutes = Math.floor(seconds / 60);
+  const remaining = seconds % 60;
+  return (
+    <div className="mt-5 flex items-center gap-3">
+      <span className="grid h-12 w-12 place-items-center rounded-2xl border border-orange-100 text-orange-500 shadow-sm"><RiTimeLine size={25} /></span>
+      <div><p className="text-xs text-slate-500">Tiempo transcurrido</p><strong className="text-2xl text-orange-500">{String(minutes).padStart(2, "0")}:{String(remaining).padStart(2, "0")}</strong></div>
+    </div>
+  );
+}
+
+function InfoTile({ Icon, label, value, accent = false }: { Icon: React.ElementType; label: string; value: string; accent?: boolean }) {
+  return <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3"><Icon className="shrink-0 text-primary-500" size={22} /><div><p className="text-[10px] text-slate-500">{label}</p><strong className={`text-xs ${accent ? "text-orange-500" : ""}`}>{value}</strong></div></div>;
+}
+
+function EmptyState({ tab, preparedToday }: { tab: Tab; preparedToday: number }) {
+  return (
+    <div className="rounded-3xl bg-white px-5 py-12 text-center shadow-sm">
+      <span className="mx-auto grid h-24 w-24 place-items-center rounded-full bg-gradient-to-b from-rose-50 to-white"><RiFlowerLine className="text-primary-300" size={50} /></span>
+      <h3 className="mt-5 text-xl font-extrabold">{tab === "READY" ? "Trabajo completado" : "¡Todo al día!"}</h3>
+      <p className="mx-auto mt-2 max-w-xs text-sm leading-5 text-slate-400">{tab === "READY" ? "Los pedidos preparados aparecerán aquí." : "No hay pedidos pendientes en esta sección."}</p>
+      <div className="mt-8 flex items-center justify-between rounded-2xl border border-slate-100 p-4 text-left shadow-sm">
+        <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary-50 text-primary-500"><RiCalendarLine /></span>
+        <div className="flex-1 px-3"><p className="text-xs text-slate-500">Preparados hoy</p><strong>{preparedToday} pedidos</strong></div>
+        <RiRefreshLine className="text-primary-300" />
+      </div>
+    </div>
+  );
+}

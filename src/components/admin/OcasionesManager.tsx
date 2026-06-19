@@ -14,6 +14,7 @@ import {
 } from "react-icons/ri";
 import { toast } from "sonner";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 type OccasionImage = {
   id: string;
@@ -66,6 +67,8 @@ export default function OcasionesManager({ occasions: initial }: { occasions: Oc
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Occasion | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Occasion | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [imageSlots, setImageSlots] = useState<ImageSlot[]>([{ kind: "uploaded", url: "", publicId: "", isMain: true }]);
   const [uploadingSlots, setUploadingSlots] = useState<Set<number>>(new Set());
   const [form, setForm] = useState({
@@ -265,16 +268,21 @@ export default function OcasionesManager({ occasions: initial }: { occasions: Oc
     }
   };
 
-  const handleDelete = async (occasion: Occasion) => {
-    if (!confirm(`¿Eliminar la ocasión "${occasion.name}"?`)) return;
-    const res = await fetch(`/api/occasions/${occasion.id}`, { method: "DELETE" });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error(data.error || "No fue posible eliminar");
-      return;
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/occasions/${deleteTarget.id}`, { method: "DELETE" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "No fue posible eliminar la ocasión");
+      setOccasions(prev => prev.filter(item => item.id !== deleteTarget.id));
+      toast.success("Ocasión eliminada");
+      setDeleteTarget(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible eliminar la ocasión");
+    } finally {
+      setDeleting(false);
     }
-    setOccasions((prev) => prev.filter((item) => item.id !== occasion.id));
-    toast.success("Ocasión eliminada");
   };
 
   return (
@@ -355,7 +363,7 @@ export default function OcasionesManager({ occasions: initial }: { occasions: Oc
                         <RiEditLine size={15} /> Editar
                       </button>
                       <button
-                        onClick={() => handleDelete(occasion)}
+                        onClick={() => setDeleteTarget(occasion)}
                         className="inline-flex items-center justify-center rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 text-red-600 hover:bg-red-100 transition-colors"
                       >
                         <RiDeleteBinLine size={15} />
@@ -552,6 +560,16 @@ export default function OcasionesManager({ occasions: initial }: { occasions: Oc
           </div>
         </div>
       </ResponsiveModal>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Eliminar ocasión"
+        message={`Vas a eliminar ${deleteTarget?.name || "esta ocasión"}. Esta acción no se puede deshacer.`}
+        confirmText="Eliminar"
+        loading={deleting}
+        onClose={() => !deleting && setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+      />
+
     </>
   );
 }
