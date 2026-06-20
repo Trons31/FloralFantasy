@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import PhotoViewer from "@/components/client/PhotoViewer";
 import CreateOrderModal from "@/components/admin/CreateOrderModal";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
+import Pagination from "@/components/ui/Pagination";
 import { formatPrice } from "@/lib/utils";
 import {
   RiAddLine,
@@ -684,40 +685,14 @@ export default function PedidosListClient({
             </div>
           )}
 
-          <div className="flex flex-col gap-4 border-t border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-center text-xs text-slate-500 sm:text-left">
-              Mostrando {orders.length ? (pagination.page - 1) * pagination.perPage + 1 : 0} a{" "}
-              {Math.min(pagination.page * pagination.perPage, pagination.total)} de {pagination.total} pedidos
-            </p>
-            <div className="flex items-center justify-center gap-2">
-              <button type="button" disabled={pagination.page <= 1}
-                onClick={() => navigate(currentFilters({ page: String(pagination.page - 1) }))}
-                className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-slate-500 disabled:opacity-35">
-                <RiArrowLeftSLine size={18} />
-              </button>
-              {visiblePages(pagination.page, totalPages).map((item, index) =>
-                item === "ellipsis" ? (
-                  <span key={`ellipsis-${index}`} className="px-1 text-sm text-slate-400">...</span>
-                ) : (
-                  <button key={item} type="button"
-                    onClick={() => navigate(currentFilters({ page: String(item) }))}
-                    className={`flex h-9 min-w-9 items-center justify-center rounded-lg px-2 text-sm font-semibold ${
-                      item === pagination.page ? "bg-primary-500 text-white" : "bg-slate-50 text-slate-700 hover:bg-slate-100"
-                    }`}>
-                    {item}
-                  </button>
-                )
-              )}
-              <button type="button" disabled={pagination.page >= totalPages}
-                onClick={() => navigate(currentFilters({ page: String(pagination.page + 1) }))}
-                className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-slate-500 disabled:opacity-35">
-                <RiArrowRightSLine size={18} />
-              </button>
-            </div>
-            <p className="text-center text-xs text-slate-500 sm:text-right">
-              Mostrar <span className="ml-2 rounded-lg border border-slate-200 px-3 py-2 font-semibold">{pagination.perPage}</span>
-            </p>
-          </div>
+          <Pagination
+            page={pagination.page}
+            totalPages={totalPages}
+            totalItems={pagination.total}
+            perPage={pagination.perPage}
+            itemLabel="pedidos"
+            onPageChange={nextPage => navigate(currentFilters({ page: String(nextPage) }))}
+          />
         </section>
       </div>
 

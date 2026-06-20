@@ -21,6 +21,7 @@ import {
   RiShoppingBagLine,
 } from "react-icons/ri";
 import { formatPrice, STATUS_LABELS } from "@/lib/utils";
+import Pagination from "@/components/ui/Pagination";
 import type {
   AccountingMode,
   AccountingSummary,
@@ -75,16 +76,16 @@ function StatCard({
   style: string;
 }) {
   return (
-    <div className="flex min-h-[126px] items-center gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-      <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full ${style}`}>
-        <Icon size={25} />
+    <div className="flex min-h-[132px] flex-col items-start gap-2 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:min-h-[126px] sm:flex-row sm:items-center sm:gap-4 sm:p-5">
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full sm:h-14 sm:w-14 ${style}`}>
+        <Icon className="text-xl sm:text-2xl" />
       </div>
       <div className="min-w-0">
         <p className="text-xs font-medium text-slate-500">{label}</p>
-        <p className="mt-1 truncate text-xl font-bold text-[#11182c]">{value}</p>
-        <p className="mt-1 truncate text-[10px] text-slate-400">{hint}</p>
+        <p className="mt-1 max-w-full text-base font-bold leading-tight text-[#11182c] sm:truncate sm:text-xl">{value}</p>
+        <p className="mt-1 line-clamp-1 text-[9px] text-slate-400 sm:text-[10px]">{hint}</p>
         <p className={`mt-1.5 text-[10px] font-medium ${trend.down ? "text-rose-500" : "text-emerald-600"}`}>
-          {trend.down ? "↓" : "↑"} {trend.value}% <span className="font-normal text-slate-400">vs período anterior</span>
+          {trend.down ? "↓" : "↑"} {trend.value}% <span className="hidden font-normal text-slate-400 sm:inline">vs período anterior</span>
         </p>
       </div>
     </div>
@@ -399,7 +400,7 @@ export default function ContabilidadDashboard({ initialData }: { initialData: Ac
 
         {mode === "day" && <DayStrip days={data.days} selectedDay={day} onSelectDay={setDay} />}
 
-        <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
           {stats.map(stat => <StatCard key={stat.label} {...stat} />)}
         </section>
 
@@ -461,20 +462,20 @@ export default function ContabilidadDashboard({ initialData }: { initialData: Ac
           {pageItems.length === 0 ? (
             <div className="py-16 text-center text-sm text-slate-400">No hay movimientos para mostrar.</div>
           ) : (
-            <div className="divide-y divide-slate-100 px-4">
+            <div className="px-3 lg:divide-y lg:divide-slate-100 lg:px-4">
               {pageItems.map(item => {
                 const date = new Date(item.date);
                 const isOrder = item.type === "order";
                 return (
-                  <article key={`${item.type}-${item.id}`} className="grid gap-3 py-3 lg:grid-cols-[58px_48px_minmax(260px,1fr)_120px_145px] lg:items-center">
-                    <div className="text-center">
+                  <article key={`${item.type}-${item.id}`} className="my-3 grid grid-cols-[44px_minmax(0,1fr)] gap-x-3 gap-y-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm lg:my-0 lg:grid-cols-[58px_48px_minmax(260px,1fr)_120px_145px] lg:items-center lg:gap-3 lg:rounded-none lg:border-0 lg:bg-transparent lg:px-0 lg:py-3 lg:shadow-none">
+                    <div className="col-start-1 row-start-1 text-center lg:col-auto lg:row-auto">
                       <p className="text-lg font-bold leading-none text-slate-900">{date.getDate()}</p>
                       <p className="mt-1 text-[9px] font-semibold uppercase text-slate-500">{format(date, "MMM", { locale: es })}</p>
                     </div>
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-full ${isOrder ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-primary-500"}`}>
+                    <div className={`col-start-1 row-start-2 flex h-10 w-10 items-center justify-center rounded-full lg:col-auto lg:row-auto ${isOrder ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-primary-500"}`}>
                       {isOrder ? <RiShoppingBagLine size={18} /> : <RiBankCardLine size={18} />}
                     </div>
-                    <div className="min-w-0">
+                    <div className="col-start-2 row-span-2 min-w-0 lg:col-auto lg:row-auto">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-bold text-slate-900">{isOrder ? "Pedido" : "Egreso"}</p>
                         {isOrder && <span className="text-xs font-semibold text-primary-500">#{item.token}</span>}
@@ -483,7 +484,7 @@ export default function ContabilidadDashboard({ initialData }: { initialData: Ac
                       <p className="truncate text-xs text-slate-500">{item.subtitle}</p>
                       <p className="truncate text-[10px] text-slate-400">{item.detail}</p>
                     </div>
-                    <div>
+                    <div className="col-start-2 lg:col-auto">
                       <span className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[10px] font-semibold ${
                         isOrder ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-primary-500"
                       }`}>
@@ -491,7 +492,7 @@ export default function ContabilidadDashboard({ initialData }: { initialData: Ac
                         {isOrder ? STATUS_LABELS[item.status] || item.status : "Gasto"}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between gap-3 lg:flex-col lg:items-end">
+                    <div className="col-span-2 mt-1 flex items-center justify-between gap-3 border-t border-slate-100 pt-3 lg:col-auto lg:mt-0 lg:flex-col lg:items-end lg:border-0 lg:pt-0">
                       <strong className={isOrder ? "text-emerald-600" : "text-primary-500"}>
                         {isOrder ? "+" : "-"}{formatPrice(item.amount)}
                       </strong>
@@ -508,25 +509,14 @@ export default function ContabilidadDashboard({ initialData }: { initialData: Ac
             </div>
           )}
 
-          <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-center text-xs text-slate-500 sm:text-left">
-              Mostrando {pageItems.length ? (page - 1) * PER_PAGE + 1 : 0} a {Math.min(page * PER_PAGE, movements.length)} de {movements.length} movimientos
-            </p>
-            <div className="flex justify-center gap-2">
-              <button type="button" disabled={page <= 1} onClick={() => setPage(value => Math.max(1, value - 1))}
-                className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-slate-500 disabled:opacity-35">
-                <RiArrowLeftSLine size={18} />
-              </button>
-              <span className="flex h-9 min-w-9 items-center justify-center rounded-lg bg-primary-500 px-3 text-sm font-semibold text-white">{page}</span>
-              <button type="button" disabled={page >= totalPages} onClick={() => setPage(value => Math.min(totalPages, value + 1))}
-                className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-slate-500 disabled:opacity-35">
-                <RiArrowRightSLine size={18} />
-              </button>
-            </div>
-            <p className="text-center text-xs text-slate-500 sm:text-right">
-              Mostrar <span className="ml-2 rounded-lg border border-slate-200 px-3 py-2 font-semibold">{PER_PAGE}</span>
-            </p>
-          </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={movements.length}
+            perPage={PER_PAGE}
+            itemLabel="movimientos"
+            onPageChange={setPage}
+          />
         </section>
       </div>
     </div>

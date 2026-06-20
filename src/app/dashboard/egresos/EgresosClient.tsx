@@ -26,6 +26,7 @@ import {
 } from "react-icons/ri";
 import PhotoViewer from "@/components/client/PhotoViewer";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
+import Pagination from "@/components/ui/Pagination";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { formatPrice } from "@/lib/utils";
 
@@ -415,7 +416,7 @@ export default function EgresosClient({
           <DayCarousel days={days} selectedDay={selection.day} onSelectDay={day => navigate({ day, page: 1 })} />
         </section>
 
-        <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <section className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
           {[
             {
               label: "Total hoy",
@@ -435,17 +436,17 @@ export default function EgresosClient({
               detail: "Este mes",
               icon: RiReceiptLine,
             },
-          ].map(card => {
+          ].map((card, index) => {
             const Icon = card.icon;
             return (
-              <article key={card.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                <div className="flex items-center gap-4">
-                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary-50 text-primary-500">
-                    <Icon size={23} />
+              <article key={card.label} className={`rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5 ${index === 2 ? "col-span-2 sm:col-span-1" : ""}`}>
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary-50 text-primary-500 sm:h-12 sm:w-12">
+                    <Icon className="text-xl sm:text-2xl" />
                   </span>
                   <div className="min-w-0">
                     <p className="text-xs font-medium text-slate-500">{card.label}</p>
-                    <strong className="mt-1 block truncate text-xl font-bold text-slate-950 sm:text-2xl">{card.value}</strong>
+                    <strong className="mt-1 block text-base font-bold leading-tight text-slate-950 sm:truncate sm:text-2xl">{card.value}</strong>
                     <p className="mt-1 text-xs font-medium text-primary-500">{card.detail}</p>
                   </div>
                 </div>
@@ -460,9 +461,9 @@ export default function EgresosClient({
               event.preventDefault();
               navigate({ q: searchValue.trim() || undefined, page: 1 });
             }}
-            className="grid gap-3 md:grid-cols-[minmax(0,1fr)_260px]"
+            className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,.85fr)] gap-2 md:grid-cols-[minmax(0,1fr)_260px] md:gap-3"
           >
-            <label className="flex h-11 items-center gap-3 rounded-xl border border-slate-200 px-4 focus-within:border-primary-300 focus-within:ring-2 focus-within:ring-primary-50">
+            <label className="flex h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 px-3 focus-within:border-primary-300 focus-within:ring-2 focus-within:ring-primary-50 sm:gap-3 sm:px-4">
               <RiSearchLine className="shrink-0 text-slate-400" size={19} />
               <input
                 value={searchValue}
@@ -471,12 +472,12 @@ export default function EgresosClient({
                 placeholder="Buscar egresos..."
               />
             </label>
-            <label className="relative flex h-11 items-center gap-3 rounded-xl border border-slate-200 px-4">
+            <label className="relative flex h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 px-3 sm:gap-3 sm:px-4">
               <RiFilter3Line className="shrink-0 text-slate-500" size={18} />
               <select
                 value={filters.category || ""}
                 onChange={event => navigate({ category: event.target.value || undefined, page: 1 })}
-                className="min-w-0 flex-1 appearance-none bg-transparent pr-6 text-sm font-medium text-slate-700 outline-none"
+                className="min-w-0 flex-1 truncate appearance-none bg-transparent pr-5 text-xs font-medium text-slate-700 outline-none sm:text-sm"
               >
                 <option value="">Todas las categorias</option>
                 {CATEGORIES.map(category => <option key={category}>{category}</option>)}
@@ -503,11 +504,11 @@ export default function EgresosClient({
                 return (
                   <article
                     key={expense.id}
-                    className="grid gap-4 py-4 md:grid-cols-[minmax(260px,1.5fr)_minmax(150px,.75fr)_minmax(120px,.55fr)_auto] md:items-center"
+                    className="grid grid-cols-2 gap-3 py-4 md:grid-cols-[minmax(260px,1.5fr)_minmax(150px,.75fr)_minmax(120px,.55fr)_auto] md:items-center md:gap-4"
                   >
-                    <div className="flex min-w-0 items-start gap-3">
+                    <div className="col-span-2 flex min-w-0 items-start gap-3 md:col-auto">
                       <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ${style.circle}`}>
-                        <Icon size={23} />
+                        <Icon className="text-xl sm:text-2xl" />
                       </span>
                       <div className="min-w-0">
                         <h3 className="truncate text-sm font-bold text-slate-950 sm:text-base">{expense.description}</h3>
@@ -526,7 +527,7 @@ export default function EgresosClient({
                       </div>
                     </div>
 
-                    <div>
+                    <div className="min-w-0 rounded-xl bg-slate-50 p-3 md:rounded-none md:bg-transparent md:p-0">
                       <p className="mb-1.5 text-[10px] font-medium text-slate-500">Comprobante</p>
                       {photos.length ? (
                         <button
@@ -542,12 +543,12 @@ export default function EgresosClient({
                       )}
                     </div>
 
-                    <div>
+                    <div className="rounded-xl bg-slate-50 p-3 md:rounded-none md:bg-transparent md:p-0">
                       <p className="mb-1 text-[10px] font-medium text-slate-500">Monto</p>
                       <strong className="text-base font-bold text-primary-500">-{formatPrice(expense.amount)}</strong>
                     </div>
 
-                    <div className="flex items-center gap-2 md:justify-end">
+                    <div className="col-span-2 flex items-center justify-end gap-2 border-t border-slate-100 pt-3 md:col-auto md:border-0 md:pt-0">
                       <button
                         type="button"
                         onClick={() => openEdit(expense)}
@@ -582,34 +583,14 @@ export default function EgresosClient({
             </div>
           )}
 
-          <footer className="flex flex-col gap-3 border-t border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-            <p className="text-xs text-slate-500">
-              Mostrando {pagination.total ? (pagination.page - 1) * pagination.perPage + 1 : 0} a{" "}
-              {Math.min(pagination.page * pagination.perPage, pagination.total)} de {pagination.total} egresos
-            </p>
-            <div className="flex items-center justify-between gap-2 sm:justify-end">
-              <button
-                type="button"
-                disabled={pagination.page <= 1}
-                onClick={() => navigate({ page: pagination.page - 1 })}
-                className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-500 disabled:opacity-35"
-              >
-                <RiArrowLeftSLine />
-              </button>
-              <span className="grid h-9 min-w-9 place-items-center rounded-lg bg-primary-500 px-3 text-xs font-bold text-white">
-                {pagination.page}
-              </span>
-              <span className="text-xs text-slate-400">de {totalPages}</span>
-              <button
-                type="button"
-                disabled={pagination.page >= totalPages}
-                onClick={() => navigate({ page: pagination.page + 1 })}
-                className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-500 disabled:opacity-35"
-              >
-                <RiArrowRightSLine />
-              </button>
-            </div>
-          </footer>
+          <Pagination
+            page={pagination.page}
+            totalPages={totalPages}
+            totalItems={pagination.total}
+            perPage={pagination.perPage}
+            itemLabel="egresos"
+            onPageChange={nextPage => navigate({ page: nextPage })}
+          />
         </section>
       </div>
 

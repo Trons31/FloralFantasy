@@ -236,14 +236,14 @@ export default function AdminSidebar() {
             <motion.button
               type="button"
               aria-label="Cerrar menú"
-              className="absolute inset-0 bg-slate-950/55 backdrop-blur-[2px]"
+              className="absolute inset-0 bg-slate-950/55"
               onClick={() => setOpen(false)}
             />
             <motion.aside
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ type: "spring", stiffness: 330, damping: 34 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
               className="absolute inset-y-0 left-0 w-[min(82vw,16rem)] overflow-hidden shadow-2xl"
             >
               <button

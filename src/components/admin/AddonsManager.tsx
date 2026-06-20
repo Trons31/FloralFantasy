@@ -28,6 +28,7 @@ import {
 import { formatPrice } from "@/lib/utils";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import Pagination from "@/components/ui/Pagination";
 
 type AddonType = "BEBIDA" | "VINO" | "PELUCHE" | "DULCE" | "CANASTA" | "OTRO";
 type Addon = {
@@ -299,21 +300,17 @@ export default function AddonsManager({ initialAddons }: { initialAddons: Addon[
           </section>
         )}
 
-        <footer className="mt-5 flex flex-col items-center justify-between gap-4 rounded-2xl bg-white/70 px-3 py-4 text-xs text-slate-500 sm:flex-row">
-          <span>Mostrando {filtered.length ? (page - 1) * perPage + 1 : 0} a {Math.min(page * perPage, filtered.length)} de {filtered.length} adicionales</span>
-          <div className="flex items-center gap-2">
-            <button type="button" disabled={page === 1} onClick={() => setPage(current => Math.max(1, current - 1))} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 disabled:opacity-30"><RiArrowLeftSLine /></button>
-            {Array.from({ length: Math.min(totalPages, 5) }, (_, index) => index + 1).map(number => (
-              <button key={number} type="button" onClick={() => setPage(number)} className={`grid h-9 min-w-9 place-items-center rounded-lg px-2 font-semibold ${page === number ? "bg-primary-500 text-white" : "border border-slate-200 bg-white"}`}>{number}</button>
-            ))}
-            <button type="button" disabled={page === totalPages} onClick={() => setPage(current => Math.min(totalPages, current + 1))} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 disabled:opacity-30"><RiArrowRightSLine /></button>
-          </div>
-          <label className="flex items-center gap-2">Mostrar
-            <select value={perPage} onChange={event => setPerPage(Number(event.target.value))} className="h-9 rounded-lg border border-slate-200 bg-white px-3 outline-none">
-              {[8, 12, 16].map(value => <option key={value}>{value}</option>)}
-            </select>
-          </label>
-        </footer>
+          <Pagination
+          page={page}
+          totalPages={totalPages}
+          totalItems={filtered.length}
+          perPage={perPage}
+          itemLabel="adicionales"
+          onPageChange={setPage}
+          onPerPageChange={setPerPage}
+          perPageOptions={[8, 12, 16]}
+          className="mt-5 rounded-2xl border border-slate-200 shadow-sm"
+        />
       </div>
 
       <ResponsiveModal

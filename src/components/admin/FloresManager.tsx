@@ -24,6 +24,7 @@ import {
 } from "react-icons/ri";
 import { toast } from "sonner";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
+import Pagination from "@/components/ui/Pagination";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 const FLOWER_TYPES = [
@@ -376,20 +377,15 @@ export default function FloresManager({ flowers: initial }: { flowers: Flower[] 
           </section>
         )}
 
-        <footer className="flex flex-col gap-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-          <p>Mostrando {filtered.length ? (page - 1) * PER_PAGE + 1 : 0} - {Math.min(page * PER_PAGE, filtered.length)} de {filtered.length} flores</p>
-          <div className="flex items-center gap-2">
-            <button type="button" disabled={page <= 1} onClick={() => setPage(current => current - 1)} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white disabled:opacity-35"><RiArrowLeftSLine /></button>
-            {Array.from({ length: Math.min(totalPages, 5) }, (_, index) => {
-              const start = Math.max(1, Math.min(page - 2, totalPages - 4));
-              const number = start + index;
-              return number <= totalPages ? (
-                <button key={number} type="button" onClick={() => setPage(number)} className={`grid h-9 min-w-9 place-items-center rounded-lg px-2 font-semibold ${page === number ? "bg-primary-500 text-white" : "border border-slate-200 bg-white text-slate-600"}`}>{number}</button>
-              ) : null;
-            })}
-            <button type="button" disabled={page >= totalPages} onClick={() => setPage(current => current + 1)} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white disabled:opacity-35"><RiArrowRightSLine /></button>
-          </div>
-        </footer>
+          <Pagination
+          page={page}
+          totalPages={totalPages}
+          totalItems={filtered.length}
+          perPage={PER_PAGE}
+          itemLabel="flores"
+          onPageChange={setPage}
+          className="rounded-2xl border border-slate-200 shadow-sm"
+        />
       </div>
 
       <ResponsiveModal open={showForm} onClose={closeForm} title={editing ? "Editar flor" : "Registrar flor"} description="Completa la información que se usará al crear arreglos." panelClassName="sm:max-w-lg">

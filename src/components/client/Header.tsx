@@ -81,7 +81,7 @@ export default function Header({ forceLight = false }: { forceLight?: boolean })
 
       <AnimatePresence>
         {mobileOpen && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="border-t border-gray-100 bg-white md:hidden">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }} className="absolute inset-x-0 top-full border-t border-gray-100 bg-white shadow-sm md:hidden">
             <div className="flex flex-col px-4 py-4">
               {links.map(link => (
                 <Link key={`${link.href}-${link.label}`} href={link.href} onClick={() => setMobileOpen(false)} className="border-b border-gray-50 px-3 py-3 font-medium text-gray-700 last:border-0">

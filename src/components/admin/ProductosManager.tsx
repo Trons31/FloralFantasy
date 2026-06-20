@@ -11,6 +11,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import Pagination from "@/components/ui/Pagination";
 import { formatPrice, formatDeliveryLeadDays, getDeliveryDateLabel } from "@/lib/utils";
 
 const TIME_UNITS = [
@@ -417,14 +418,15 @@ export default function ProductosManager({
             </section>
           )}
 
-          <footer className="flex flex-col gap-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-            <p>Mostrando {filteredProducts.length ? (page - 1) * PER_PAGE + 1 : 0} - {Math.min(page * PER_PAGE, filteredProducts.length)} de {filteredProducts.length} productos</p>
-            <div className="flex items-center gap-2">
-              <button type="button" disabled={page <= 1} onClick={() => setPage(current => current - 1)} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white disabled:opacity-35"><RiArrowLeftLine /></button>
-              {Array.from({ length: Math.min(totalPages, 5) }, (_, index) => { const startPage = Math.max(1, Math.min(page - 2, totalPages - 4)); const number = startPage + index; return number <= totalPages ? <button key={number} type="button" onClick={() => setPage(number)} className={`grid h-9 min-w-9 place-items-center rounded-lg px-2 font-semibold ${page === number ? "bg-primary-500 text-white" : "border border-slate-200 bg-white text-slate-600"}`}>{number}</button> : null; })}
-              <button type="button" disabled={page >= totalPages} onClick={() => setPage(current => current + 1)} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white disabled:opacity-35"><RiArrowRightLine /></button>
-            </div>
-          </footer>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={filteredProducts.length}
+            perPage={PER_PAGE}
+            itemLabel="productos"
+            onPageChange={setPage}
+            className="rounded-2xl border border-slate-200 shadow-sm"
+          />
         </div>
       </div>
 
