@@ -242,10 +242,54 @@ export default function CheckoutPageClient() {
     }
   };
 
-  const handleProofChange = (file?: File) => {
+  async function optimizeProofFile(file: File) {
+    if (!file.type.startsWith("image/")) return file;
+    if (file.size <= 1.5 * 1024 * 1024) return file;
+
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = objectUrl;
+      });
+
+      const maxSide = 1600;
+      const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+      const width = Math.max(1, Math.round(image.width * scale));
+      const height = Math.max(1, Math.round(image.height * scale));
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return file;
+      ctx.drawImage(image, 0, 0, width, height);
+
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((value) => resolve(value), "image/jpeg", 0.82);
+      });
+
+      if (!blob) return file;
+      const safeName = file.name.replace(/\.[^.]+$/, "") || "comprobante";
+      return new File([blob], `${safeName}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  }
+
+  const handleProofChange = async (file?: File) => {
     if (!file) return;
-    setProofFile(file);
-    setProofPreview(URL.createObjectURL(file));
+    try {
+      const optimized = await optimizeProofFile(file);
+      setProofFile(optimized);
+      setProofPreview(URL.createObjectURL(optimized));
+    } catch {
+      setProofFile(file);
+      setProofPreview(URL.createObjectURL(file));
+    }
   };
 
   const uploadProof = async () => {

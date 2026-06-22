@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { uploadImage, deleteImage } from "@/lib/cloudinary";
 import { sendOrderConfirmation } from "@/lib/email";
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: "El comprobante debe ser una imagen válida" }, { status: 400 });
     }
 
-    if (file.size > 8 * 1024 * 1024) {
+    if (file.size > 12 * 1024 * 1024) {
       return NextResponse.json({ error: "La imagen supera el límite permitido" }, { status: 400 });
     }
 
@@ -55,10 +56,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       }
     }
 
-    const bytes = await file.arrayBuffer();
-    const base64 = `data:${file.type};base64,${Buffer.from(bytes).toString("base64")}`;
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const optimizedBuffer = await sharp(bytes)
+      .rotate()
+      .resize({
+        width: 1600,
+        height: 1600,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 82 })
+      .toBuffer();
+
+    const base64 = `data:image/webp;base64,${optimizedBuffer.toString("base64")}`;
     const result = await uploadImage(base64, {
       folder: "gardentech/payment-proofs",
+      transformation: [],
     });
 
     if (order.paymentProofPublicId && order.paymentProofPublicId !== result.publicId) {
