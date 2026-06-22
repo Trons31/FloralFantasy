@@ -6,6 +6,7 @@ export async function GET(req: NextRequest) {
   const order = await prisma.order.findUnique({
     where: { trackingToken: token },
     include: {
+      city: true,
       statusHistory: { orderBy: { createdAt: "asc" } },
       items: {
         include: {

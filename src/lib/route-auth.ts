@@ -7,7 +7,7 @@ import { authOptions } from "@/lib/auth";
 export const ADMIN_ROLES = ["ADMIN", "SUPER_ADMIN"] as const;
 export const OPERATION_ROLES = ["PREPARADOR", "REPARTIDOR", "CORREDOR"] as const;
 export const OPERATIONS_SESSION_COOKIE = "ff_ops_session";
-export const OPERATIONS_SESSION_TTL_SECONDS = 60 * 60 * 8;
+export const OPERATIONS_SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 type AdminRole = (typeof ADMIN_ROLES)[number];
 type OperationRole = (typeof OPERATION_ROLES)[number];

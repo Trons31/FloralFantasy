@@ -16,6 +16,7 @@ import {
   RiHistoryLine,
   RiLoader4Line,
   RiMapPin2Line,
+  RiImage2Line,
   RiSaveLine,
   RiSearchLine,
   RiShoppingBag3Line,
@@ -498,6 +499,29 @@ export default function OrderDetailEditor({ initialOrder }: { initialOrder: any 
           </div>
 
           <aside className="space-y-5">
+            {order.status === "DELIVERED" && (
+              <Section title="Foto de entrega" Icon={RiImage2Line}>
+                {order.deliveryPhotoUrl ? (
+                  <a
+                    href={order.deliveryPhotoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
+                  >
+                    <img
+                      src={order.deliveryPhotoUrl}
+                      alt={`Foto de entrega de ${order.trackingToken}`}
+                      className="h-64 w-full object-cover"
+                    />
+                  </a>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-400">
+                    Este pedido ya fue entregado, pero aún no tiene foto de evidencia registrada.
+                  </div>
+                )}
+              </Section>
+            )}
+
             <Section
               title="Resumen del pedido"
               Icon={RiFileList3Line}

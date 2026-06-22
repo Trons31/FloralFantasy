@@ -1,24 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { v2 as cloudinary } from "cloudinary";
+import { uploadImage } from "@/lib/cloudinary";
+import { optimizeImageFileToDataUrl } from "@/lib/image-optimization";
 import { requireOrderManagementUser } from "@/lib/route-auth";
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
 type ReceiptPhoto = { url: string; publicId?: string };
-
-function uploadBufferToCloudinary(buffer: Buffer) {
-  return new Promise<any>((resolve, reject) => {
-    cloudinary.uploader.upload_stream(
-      { folder: "gardentech/invoices" },
-      (err, result) => (err ? reject(err) : resolve(result))
-    ).end(buffer);
-  });
-}
 
 export async function POST(req: NextRequest) {
   const access = await requireOrderManagementUser(req);
@@ -60,9 +46,11 @@ export async function POST(req: NextRequest) {
   }
 
   if (!receiptPhotos.length && file) {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const result = await uploadBufferToCloudinary(buffer);
-    receiptPhotos = [{ url: result.secure_url, publicId: result.public_id }];
+    const result = await uploadImage(await optimizeImageFileToDataUrl(file), {
+      folder: "gardentech/invoices",
+      transformation: [],
+    });
+    receiptPhotos = [{ url: result.url, publicId: result.publicId }];
   }
 
   const storedPublicId =

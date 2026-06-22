@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { sendStatusUpdate } from "@/lib/email";
 import { STATUS_LABELS } from "@/lib/utils";
 import { requireOrderManagementUser } from "@/lib/route-auth";
+import { sendPushToRoles } from "@/lib/webpush";
 
 const VALID_STATUSES = new Set([
   "PENDING",
@@ -71,6 +72,35 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       customerName: existing.customerName,
       trackingToken: existing.trackingToken,
       statusLabel: STATUS_LABELS[status] || status,
+    }).catch(console.error);
+  }
+
+  if (status === "PAID") {
+    sendPushToRoles(["PREPARADOR"], {
+      type: "ORDER_READY_TO_PREPARE",
+      title: "Nuevo pedido para preparar",
+      body: `La guía #${existing.trackingToken} ya fue validada. Hay un nuevo pedido para preparar.`,
+      url: "/operaciones",
+      orderId: existing.id,
+      data: {
+        trackingToken: existing.trackingToken,
+        status,
+      },
+    }).catch(console.error);
+  }
+
+  if (status === "READY") {
+    sendPushToRoles(["REPARTIDOR"], {
+      type: "ORDER_READY_FOR_DELIVERY",
+      title: "Pedido listo para entregar",
+      body: `La guía #${existing.trackingToken} está lista para entrega. Revisa la información del pedido.`,
+      url: "/operaciones",
+      orderId: existing.id,
+      data: {
+        trackingToken: existing.trackingToken,
+        guide: existing.trackingToken,
+        status,
+      },
     }).catch(console.error);
   }
 

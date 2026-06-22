@@ -132,6 +132,17 @@ model AddOn {
   orderItems OrderItemAddOn[]
 }
 
+model City {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  orders    Order[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 enum AddOnType {
   BEBIDA
   VINO
@@ -150,6 +161,9 @@ model Order {
   customerEmail   String
   address         String
   addressRef      String?
+  cityId          String?
+  city            City?                @relation(fields: [cityId], references: [id])
+  giftMessage     String?
   total           Float
   deliveryFee     Float                @default(0)
   source          OrderSource          @default(CLIENT)

@@ -54,6 +54,7 @@ type Order = {
   customerName: string;
   address: string;
   addressRef?: string | null;
+  giftMessage?: string | null;
   estimatedTime: string;
   status: string;
   adminNote?: string | null;
@@ -316,6 +317,12 @@ function FlowersList({ flowers, extras, processing = false, compact = false }: {
 function Notes({ order, addons }: { order: Order; addons: Array<{ addon: { name: string } }> }) {
   return (
     <div className="space-y-2.5">
+      {order.giftMessage && (
+        <div className="rounded-2xl border border-rose-100 bg-rose-50 p-3.5">
+          <h4 className="flex items-center gap-2 text-[11px] font-bold text-rose-700"><RiFlowerLine /> Mensaje para la tarjeta</h4>
+          <p className="mt-2 whitespace-pre-line text-[11px] leading-5 text-slate-700">{order.giftMessage}</p>
+        </div>
+      )}
       <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3.5">
         <h4 className="flex items-center gap-2 text-[11px] font-bold text-amber-700"><RiStickyNoteLine /> Notas del cliente</h4>
         <p className="mt-2 whitespace-pre-line text-[11px] leading-5 text-slate-600">{order.adminNote || "Sin observaciones registradas."}</p>

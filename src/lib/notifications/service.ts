@@ -323,6 +323,13 @@ async function getAdminRecipients() {
   });
 }
 
+async function getRecipientsByRoles(roles: Role[]) {
+  return prisma.user.findMany({
+    where: { role: { in: roles } },
+    select: { id: true, role: true, name: true, email: true },
+  });
+}
+
 export async function queueNotification(
   input: QueueNotificationInput
 ): Promise<QueueNotificationsResult> {
@@ -494,6 +501,47 @@ export async function sendPushToAdmins(payload: {
           [`admin-notification`, admin.id, payload.type, payload.orderId ?? payload.title].join(":"),
         payload: {
           url: payload.url || "/dashboard/todos-pedidos",
+          data: payload.data,
+        },
+        availableAt: payload.availableAt,
+        maxAttempts: payload.maxAttempts,
+      })
+    );
+  }
+
+  return results;
+}
+
+export async function sendPushToRoles(
+  roles: Role[],
+  payload: {
+    type: string;
+    title: string;
+    body: string;
+    url?: string;
+    orderId?: string | null;
+    dedupeKey?: string;
+    data?: Record<string, string>;
+    availableAt?: Date;
+    maxAttempts?: number;
+  }
+) {
+  const recipients = await getRecipientsByRoles(roles);
+  const results: QueueNotificationsResult[] = [];
+
+  for (const recipient of recipients) {
+    results.push(
+      await queueNotification({
+        userId: recipient.id,
+        type: payload.type,
+        title: payload.title,
+        body: payload.body,
+        orderId: payload.orderId ?? null,
+        dedupeKey:
+          payload.dedupeKey ??
+          [`role-notification`, recipient.id, payload.type, payload.orderId ?? payload.title].join(":"),
+        payload: {
+          url: payload.url || "/operaciones",
           data: payload.data,
         },
         availableAt: payload.availableAt,

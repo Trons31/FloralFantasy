@@ -11,6 +11,8 @@ import {
   RiFileCopyLine,
   RiFilter3Line,
   RiFlowerLine,
+  RiEyeLine,
+  RiEyeOffLine,
   RiKeyLine,
   RiLink,
   RiLoader4Line,
@@ -51,7 +53,7 @@ type Member = {
   id: string;
   name: string;
   role: string;
-  pin: string | null;
+  pin?: string | null;
   email: string;
   createdAt: string;
 };
@@ -65,11 +67,13 @@ type LastAccess = {
 
 type FormState = {
   name: string;
+  email: string;
   role: string;
-  pin: string;
+  password: string;
+  confirmPassword: string;
 };
 
-const emptyForm: FormState = { name: "", role: "PREPARADOR", pin: "" };
+const emptyForm: FormState = { name: "", email: "", role: "PREPARADOR", password: "", confirmPassword: "" };
 
 function getRole(role: string) {
   return ROLES.find(item => item.value === role) || ROLES[0];
@@ -104,58 +108,6 @@ function formatLastAccess(value: string) {
   }).format(date)}`;
 }
 
-function PinInputs({
-  value,
-  onChange,
-  prefix,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  prefix: string;
-}) {
-  const digits = Array.from({ length: 4 }, (_, index) => value[index] || "");
-
-  const setDigit = (index: number, digit: string) => {
-    if (!/^\d?$/.test(digit)) return;
-    const next = [...digits];
-    next[index] = digit;
-    onChange(next.join(""));
-    if (digit && index < 3) document.getElementById(`${prefix}-${index + 1}`)?.focus();
-  };
-
-  return (
-    <div
-      className="flex justify-center gap-2 sm:gap-3"
-      onPaste={event => {
-        const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4);
-        if (!pasted) return;
-        event.preventDefault();
-        onChange(pasted);
-        document.getElementById(`${prefix}-${Math.min(pasted.length, 4) - 1}`)?.focus();
-      }}
-    >
-      {digits.map((digit, index) => (
-        <input
-          key={index}
-          id={`${prefix}-${index}`}
-          type="text"
-          inputMode="numeric"
-          maxLength={1}
-          value={digit}
-          onChange={event => setDigit(index, event.target.value)}
-          onKeyDown={event => {
-            if (event.key === "Backspace" && !digit && index > 0) {
-              document.getElementById(`${prefix}-${index - 1}`)?.focus();
-            }
-          }}
-          className="h-12 w-12 rounded-xl border-2 border-slate-200 text-center text-xl font-bold text-slate-900 outline-none transition focus:border-primary-500 sm:h-14 sm:w-14"
-          aria-label={`Digito ${index + 1} del PIN`}
-        />
-      ))}
-    </div>
-  );
-}
-
 export default function EquipoManager({
   members: initialMembers,
   lastAccess,
@@ -170,6 +122,8 @@ export default function EquipoManager({
   const [editing, setEditing] = useState<Member | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Member | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -182,17 +136,21 @@ export default function EquipoManager({
     });
   }, [members, roleFilter, search]);
 
-  const activePins = members.filter(member => /^\d{4}$/.test(member.pin || "")).length;
+  const activeCredentials = members.filter(member => Boolean(member.email)).length;
 
   const openCreate = () => {
     setEditing(null);
     setForm(emptyForm);
+    setShowPassword(false);
+    setShowConfirmPassword(false);
     setModalOpen(true);
   };
 
   const openEdit = (member: Member) => {
     setEditing(member);
-    setForm({ name: member.name, role: member.role, pin: "" });
+    setForm({ name: member.name, email: member.email || "", role: member.role, password: "", confirmPassword: "" });
+    setShowPassword(false);
+    setShowConfirmPassword(false);
     setModalOpen(true);
   };
 
@@ -201,6 +159,8 @@ export default function EquipoManager({
     setModalOpen(false);
     setEditing(null);
     setForm(emptyForm);
+    setShowPassword(false);
+    setShowConfirmPassword(false);
   };
 
   const saveMember = async () => {
@@ -208,12 +168,24 @@ export default function EquipoManager({
       toast.error("El nombre es obligatorio");
       return;
     }
-    if (!editing && form.pin.length !== 4) {
-      toast.error("Ingresa un PIN de 4 dígitos");
+    if (!form.email.trim()) {
+      toast.error("El correo es obligatorio");
       return;
     }
-    if (editing && form.pin && form.pin.length !== 4) {
-      toast.error("El nuevo PIN debe tener 4 dígitos");
+    if (!editing && form.password.length < 6) {
+      toast.error("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+    if (!editing && form.password !== form.confirmPassword) {
+      toast.error("Las contraseñas no coinciden");
+      return;
+    }
+    if (editing && form.password && form.password.length < 6) {
+      toast.error("La nueva contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+    if (editing && form.password && form.password !== form.confirmPassword) {
+      toast.error("Las contraseñas no coinciden");
       return;
     }
 
@@ -224,8 +196,9 @@ export default function EquipoManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name.trim(),
+          email: form.email.trim().toLowerCase(),
           role: form.role,
-          pin: form.pin || undefined,
+          password: form.password || undefined,
         }),
       });
       const data = await response.json();
@@ -287,15 +260,15 @@ export default function EquipoManager({
     },
     {
       label: "Con acceso",
-      value: String(activePins),
+      value: String(activeCredentials),
       detail: "Acceden a /operaciones",
       Icon: RiShieldCheckLine,
       color: "bg-emerald-50 text-emerald-600",
     },
     {
-      label: "PIN activos",
-      value: String(activePins),
-      detail: "Credenciales asignadas",
+      label: "Credenciales",
+      value: String(activeCredentials),
+      detail: "Correo y contraseña",
       Icon: RiKeyLine,
       color: "bg-violet-50 text-violet-600",
     },
@@ -319,7 +292,7 @@ export default function EquipoManager({
             <div className="min-w-0">
               <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Equipo</h1>
               <p className="mt-1 text-sm text-slate-500">
-                Gestiona preparadores, repartidores y corredores. Acceden con PIN en{" "}
+                Gestiona preparadores, repartidores y corredores. Acceden con correo y contraseña en{" "}
                 <span className="font-semibold text-primary-500">/operaciones</span>
               </p>
             </div>
@@ -353,7 +326,7 @@ export default function EquipoManager({
             <div>
               <h2 className="font-bold text-primary-700">Vista de operaciones</h2>
               <p className="mt-1 text-sm text-primary-800/80">
-                Comparte este enlace con tu equipo para que accedan al sistema con su PIN.
+                Comparte este enlace con tu equipo para que accedan al sistema con correo y contraseña.
               </p>
             </div>
           </div>
@@ -441,18 +414,9 @@ export default function EquipoManager({
                   </div>
 
                   <h3 className="mt-4 truncate text-xl font-bold text-slate-950">{member.name}</h3>
-                  <div className="mt-3 flex items-center gap-2">
-                    <div className="flex gap-1.5">
-                      {(member.pin || "----").split("").map((digit, index) => (
-                        <span
-                          key={index}
-                          className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-slate-50 font-mono text-base font-bold text-slate-800"
-                        >
-                          {digit}
-                        </span>
-                      ))}
-                    </div>
-                    <span className="text-xs font-medium text-slate-400">PIN</span>
+                  <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Correo</p>
+                    <p className="mt-1 truncate text-sm font-semibold text-slate-900">{member.email}</p>
                   </div>
 
                   <div className="mt-5 space-y-2.5 border-t border-slate-100 pt-4">
@@ -481,7 +445,7 @@ export default function EquipoManager({
               </span>
               <h2 className="mt-4 font-semibold text-slate-900">No encontramos miembros</h2>
               <p className="mt-1 text-sm text-slate-500">
-                {members.length ? "Prueba con otra búsqueda o rol." : "Agrega el primer miembro de tu equipo."}
+              {members.length ? "Prueba con otra búsqueda o rol." : "Agrega el primer miembro de tu equipo."}
               </p>
             </div>
           </section>
@@ -494,7 +458,7 @@ export default function EquipoManager({
           <div>
             <h2 className="text-sm font-bold text-slate-900">Seguridad del equipo</h2>
             <p className="mt-1 text-xs leading-5 text-slate-500 sm:text-sm">
-              Comparte los PIN únicamente con personas de confianza. Puedes editar o eliminar miembros cuando lo necesites.
+              Comparte las credenciales únicamente con personas de confianza. Puedes editar o eliminar miembros cuando lo necesites.
             </p>
           </div>
         </section>
@@ -504,7 +468,7 @@ export default function EquipoManager({
         open={modalOpen}
         onClose={closeModal}
         title={editing ? "Editar miembro" : "Agregar miembro"}
-        description={editing ? "Actualiza el nombre, rol o asigna un nuevo PIN." : "Crea las credenciales para acceder a operaciones."}
+        description={editing ? "Actualiza el nombre, correo, rol o asigna una nueva contraseña." : "Crea las credenciales para acceder a operaciones."}
         panelClassName="sm:max-w-lg"
       >
         <div className="space-y-5">
@@ -516,6 +480,17 @@ export default function EquipoManager({
               className="h-11 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary-300 focus:ring-2 focus:ring-primary-50"
               placeholder="Ej. Carlos"
               autoFocus
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold text-slate-700">Correo</span>
+            <input
+              type="email"
+              value={form.email}
+              onChange={event => setForm(current => ({ ...current, email: event.target.value }))}
+              className="h-11 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-primary-300 focus:ring-2 focus:ring-primary-50"
+              placeholder="tu@correo.com"
             />
           </label>
 
@@ -540,16 +515,51 @@ export default function EquipoManager({
             </div>
           </div>
 
-          <div>
-            <span className="mb-1 block text-xs font-semibold text-slate-700">
-              {editing ? "Nuevo PIN (opcional)" : "PIN de 4 dígitos"}
-            </span>
-            {editing && <p className="mb-3 text-xs text-slate-400">Déjalo vacío para conservar el PIN actual.</p>}
-            <PinInputs
-              value={form.pin}
-              onChange={pin => setForm(current => ({ ...current, pin }))}
-              prefix={editing ? "edit-team-pin" : "new-team-pin"}
-            />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold text-slate-700">
+                {editing ? "Nueva contraseña" : "Contraseña"}
+              </span>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={form.password}
+                  onChange={event => setForm(current => ({ ...current, password: event.target.value }))}
+                  className="h-11 w-full rounded-xl border border-slate-200 px-4 pr-12 text-sm outline-none transition focus:border-primary-300 focus:ring-2 focus:ring-primary-50"
+                  placeholder="Mínimo 6 caracteres"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(current => !current)}
+                  className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-400 transition hover:text-slate-600"
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showPassword ? <RiEyeOffLine size={18} /> : <RiEyeLine size={18} />}
+                </button>
+              </div>
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold text-slate-700">
+                {editing ? "Confirmar" : "Confirmar contraseña"}
+              </span>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={form.confirmPassword}
+                  onChange={event => setForm(current => ({ ...current, confirmPassword: event.target.value }))}
+                  className="h-11 w-full rounded-xl border border-slate-200 px-4 pr-12 text-sm outline-none transition focus:border-primary-300 focus:ring-2 focus:ring-primary-50"
+                  placeholder="Repite la contraseña"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(current => !current)}
+                  className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-400 transition hover:text-slate-600"
+                  aria-label={showConfirmPassword ? "Ocultar confirmación" : "Mostrar confirmación"}
+                >
+                  {showConfirmPassword ? <RiEyeOffLine size={18} /> : <RiEyeLine size={18} />}
+                </button>
+              </div>
+            </label>
           </div>
 
           <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">

@@ -7,7 +7,7 @@ export default async function EquipoPage() {
   const [team, lastAccessSetting] = await Promise.all([
     prisma.user.findMany({
       where: { role: { in: ["PREPARADOR", "REPARTIDOR", "CORREDOR"] } },
-      select: { id: true, name: true, email: true, role: true, pin: true, createdAt: true },
+      select: { id: true, name: true, email: true, role: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     }).catch(() => []),
     prisma.appSetting.findUnique({ where: { key: "operationsLastAccess" } }).catch(() => null),

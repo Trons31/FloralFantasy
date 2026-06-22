@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { v2 as cloudinary } from "cloudinary";
+import { deleteImage, uploadImage } from "@/lib/cloudinary";
+import { optimizeImageFileToDataUrl } from "@/lib/image-optimization";
 import { requireOrderManagementUser } from "@/lib/route-auth";
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const access = await requireOrderManagementUser(req);
@@ -53,16 +48,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ error: "Las fotos de la factura no son válidas" }, { status: 400 });
     }
   } else if (file && file.size > 0) {
-    const bytes  = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const upload: any = await new Promise((resolve, reject) =>
-      cloudinary.uploader.upload_stream(
-        { folder: "gardentech/invoices" },
-        (err, res) => err ? reject(err) : resolve(res)
-      ).end(buffer)
-    );
-    data.receiptPhotoUrl    = upload.secure_url;
-    data.receiptPublicId    = upload.public_id;
+    const upload = await uploadImage(await optimizeImageFileToDataUrl(file), {
+      folder: "gardentech/invoices",
+      transformation: [],
+    });
+    data.receiptPhotoUrl = upload.url;
+    data.receiptPublicId = upload.publicId;
   }
 
   const updated = await prisma.expense.update({
@@ -120,7 +111,7 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
       : [];
 
   for (const publicId of Array.from(new Set(publicIds))) {
-    await cloudinary.uploader.destroy(publicId).catch(() => {});
+    await deleteImage(publicId).catch(() => {});
   }
 
   await prisma.expense.delete({ where: { id: params.id } });

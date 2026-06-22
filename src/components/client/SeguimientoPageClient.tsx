@@ -268,13 +268,12 @@ function SearchView({
 
       <div className="mx-auto max-w-7xl space-y-7 px-5 py-9 sm:px-8 sm:py-12">
         <section>
-          <h2 className="font-display text-xl font-semibold text-slate-950">¿Qué puedes consultar?</h2>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <h2 className="font-display text-xl font-semibold text-slate-950">¿Cómo funciona el seguimiento?</h2>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
             {[
-              { Icon: RiTimeLine, title: "Estado en tiempo real", text: "Conoce en qué etapa se encuentra tu pedido.", color: "bg-rose-50 text-primary-500" },
-              { Icon: RiShieldCheckLine, title: "Pago asociado", text: "Verifica el estado del pago de tu pedido.", color: "bg-emerald-50 text-emerald-600" },
-              { Icon: RiFlowerLine, title: "Preparación", text: "Sigue el proceso de preparación de tu arreglo.", color: "bg-violet-50 text-violet-600" },
-              { Icon: RiTruckLine, title: "Entrega", text: "Consulta el avance y la hora estimada de entrega.", color: "bg-orange-50 text-orange-600" },
+              { Icon: RiSearchLine, title: "1. Ingresa tu guía", text: "Escribe el código que recibiste al comprar.", color: "bg-rose-50 text-primary-500" },
+              { Icon: RiTimeLine, title: "2. Revisa el estado", text: "Ves en qué etapa va tu pedido al instante.", color: "bg-emerald-50 text-emerald-600" },
+              { Icon: RiTruckLine, title: "3. Sigue la entrega", text: "Consulta el avance hasta que llegue a destino.", color: "bg-orange-50 text-orange-600" },
             ].map(({ Icon, title, text, color }) => (
               <article key={title} className="rounded-2xl border border-slate-100 bg-white p-5 text-center shadow-sm">
                 <span className={`mx-auto grid h-11 w-11 place-items-center rounded-xl ${color}`}><Icon size={23} /></span>
@@ -285,17 +284,37 @@ function SearchView({
           </div>
         </section>
 
-        <section className="grid overflow-hidden rounded-2xl bg-gradient-to-r from-rose-50 to-[#fff7f7] sm:grid-cols-[.9fr_1.1fr]">
-          <div className="relative min-h-[150px] overflow-hidden">
-            <img src="/flowers/ramo4.jpg" alt="" className="absolute inset-0 h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-[#080713]/48" />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#090713]/72 via-[#160d1c]/52 to-[#fff7f7]/15" />
-            <RiTruckLine className="absolute bottom-7 left-1/2 -translate-x-1/2 text-primary-300 drop-shadow-[0_3px_14px_rgba(0,0,0,.45)]" size={72} />
-          </div>
-          <div className="flex flex-col justify-center p-7">
-            <h2 className="font-display text-xl font-semibold">Flores que llegan con amor</h2>
-            <p className="mt-3 max-w-md text-xs leading-5 text-slate-500">Nos aseguramos de que tu pedido llegue en perfectas condiciones y en el tiempo prometido.</p>
-            <RiFlowerLine className="mt-3 text-primary-500" />
+        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-rose-50/70 p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-start gap-4">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary-50 text-primary-500">
+                <RiTruckLine size={24} />
+              </span>
+              <div className="min-w-0">
+                <h2 className="font-display text-lg font-semibold text-slate-950 sm:text-xl">Seguimiento claro de tu pedido</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                  En un vistazo puedes revisar el pago, la preparación y la entrega sin ocupar demasiado espacio en pantalla.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3 lg:w-[52%]">
+              {[
+                { Icon: RiShieldCheckLine, label: "Pago", text: "Estado del comprobante", color: "bg-emerald-50 text-emerald-600" },
+                { Icon: RiFlowerLine, label: "Preparación", text: "Avance del arreglo", color: "bg-violet-50 text-violet-600" },
+                { Icon: RiTruckLine, label: "Entrega", text: "Ruta y llegada", color: "bg-orange-50 text-orange-600" },
+              ].map(({ Icon, label, text, color }) => (
+                <div key={label} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/90 px-4 py-3">
+                  <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${color}`}>
+                    <Icon size={19} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-slate-900">{label}</p>
+                    <p className="text-[11px] leading-4 text-slate-500">{text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 

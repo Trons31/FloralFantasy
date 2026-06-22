@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { uploadImage, deleteImage } from "@/lib/cloudinary";
 import { sendOrderConfirmation } from "@/lib/email";
 import { sendPushToAdmins } from "@/lib/webpush";
+import { optimizeImageFileToDataUrl } from "@/lib/image-optimization";
 
 function isValidImage(file: File) {
   return file.type.startsWith("image/");
@@ -20,9 +20,27 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const email = String(formData.get("email") || "").trim();
     const address = String(formData.get("address") || "").trim();
     const addressRef = String(formData.get("addressRef") || "").trim();
+    const cityId = String(formData.get("cityId") || "").trim();
+    const giftMessage = String(formData.get("giftMessage") || "").trim();
 
     if (!file || !trackingToken) {
       return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
+    }
+
+    if (!paymentMethodId) {
+      return NextResponse.json({ error: "Selecciona un método de pago antes de subir el comprobante" }, { status: 400 });
+    }
+
+    if (giftMessage.length > 180) {
+      return NextResponse.json({ error: "El mensaje de la tarjeta no puede superar 180 caracteres" }, { status: 400 });
+    }
+
+    const city = await prisma.city.findFirst({
+      where: { id: cityId, isActive: true },
+      select: { id: true },
+    });
+    if (!city) {
+      return NextResponse.json({ error: "Selecciona una ciudad disponible" }, { status: 400 });
     }
 
     if (!isValidImage(file)) {
@@ -46,30 +64,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
     }
 
-    if (paymentMethodId) {
-      const method = await prisma.paymentMethod.findFirst({
-        where: { id: paymentMethodId, isActive: true },
-        select: { id: true },
-      });
-      if (!method) {
-        return NextResponse.json({ error: "Método de pago no válido" }, { status: 400 });
-      }
+    const method = await prisma.paymentMethod.findFirst({
+      where: { id: paymentMethodId, isActive: true },
+      select: { id: true },
+    });
+    if (!method) {
+      return NextResponse.json({ error: "Método de pago no válido" }, { status: 400 });
     }
 
-    const bytes = Buffer.from(await file.arrayBuffer());
-    const optimizedBuffer = await sharp(bytes)
-      .rotate()
-      .resize({
-        width: 1600,
-        height: 1600,
-        fit: "inside",
-        withoutEnlargement: true,
-      })
-      .webp({ quality: 82 })
-      .toBuffer();
-
-    const base64 = `data:image/webp;base64,${optimizedBuffer.toString("base64")}`;
-    const result = await uploadImage(base64, {
+    const result = await uploadImage(await optimizeImageFileToDataUrl(file), {
       folder: "gardentech/payment-proofs",
       transformation: [],
     });
@@ -86,6 +89,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         customerEmail: email || undefined,
         address: address || undefined,
         addressRef: addressRef || undefined,
+        cityId: city.id,
+        giftMessage: giftMessage || null,
         paymentMethodId: paymentMethodId || undefined,
         paymentProofUrl: result.url,
         paymentProofPublicId: result.publicId,
@@ -98,6 +103,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         },
       },
       include: {
+        city: true,
         paymentMethod: true,
         items: {
           include: {

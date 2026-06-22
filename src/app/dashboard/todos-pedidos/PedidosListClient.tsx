@@ -710,6 +710,7 @@ export default function PedidosListClient({
                 <p><span className="text-gray-400">Cliente:</span> <strong>{selectedOrder.customerName}</strong></p>
                 <p><span className="text-gray-400">Teléfono:</span> {selectedOrder.customerPhone}</p>
                 <p><span className="text-gray-400">Dirección:</span> {selectedOrder.address}</p>
+                {selectedOrder.city?.name && <p><span className="text-gray-400">Ciudad:</span> {selectedOrder.city.name}</p>}
                 {selectedOrder.addressRef && <p><span className="text-gray-400">Referencia:</span> {selectedOrder.addressRef}</p>}
                 <p><span className="text-gray-400">Estado:</span> <strong>{STATUS_CONFIG[selectedOrder.status]?.label || selectedOrder.status}</strong></p>
                 <p><span className="text-gray-400">Método:</span> {selectedOrder.paymentMethodTitle || "Sin método seleccionado"}</p>
@@ -727,6 +728,13 @@ export default function PedidosListClient({
                 <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
                   <p className="mb-2 text-sm font-semibold text-amber-800">Observaciones del pedido</p>
                   <p className="whitespace-pre-line text-sm text-amber-900">{selectedOrder.adminNote}</p>
+                </div>
+              )}
+
+              {selectedOrder.giftMessage && (
+                <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4">
+                  <p className="mb-2 text-sm font-semibold text-rose-800">Mensaje para la tarjeta</p>
+                  <p className="whitespace-pre-line text-sm text-rose-900">{selectedOrder.giftMessage}</p>
                 </div>
               )}
 

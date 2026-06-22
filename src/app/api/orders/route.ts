@@ -14,6 +14,8 @@ export async function POST(req: NextRequest) {
       email,
       address,
       addressRef,
+      cityId,
+      giftMessage,
       items,
       total,
       deliveryFee,
@@ -24,12 +26,30 @@ export async function POST(req: NextRequest) {
     } = body;
 
     const isAdminDraft = source === "ADMIN";
+    const cleanGiftMessage = typeof giftMessage === "string" ? giftMessage.trim() : "";
+    if (cleanGiftMessage.length > 180) {
+      return NextResponse.json({ error: "El mensaje de la tarjeta no puede superar 180 caracteres" }, { status: 400 });
+    }
     if (isAdminDraft && !(await requireAdminUser())) {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
     if ((!isAdminDraft && (!name || !phone || !address)) || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "Faltan datos obligatorios" }, { status: 400 });
+    }
+
+    let activeCityId: string | null = null;
+    if (cityId) {
+      const city = await prisma.city.findFirst({
+        where: { id: String(cityId), isActive: true },
+        select: { id: true },
+      });
+      if (!city) {
+        return NextResponse.json({ error: "La ciudad seleccionada no está disponible" }, { status: 400 });
+      }
+      activeCityId = city.id;
+    } else if (!isAdminDraft) {
+      return NextResponse.json({ error: "Selecciona una ciudad" }, { status: 400 });
     }
 
     const productIds = items.map((i: any) => i.productId);
@@ -57,6 +77,8 @@ export async function POST(req: NextRequest) {
         customerEmail: email ?? "",
         address: isAdminDraft ? (address ?? "") : address,
         addressRef: addressRef ?? "",
+        cityId: activeCityId,
+        giftMessage: cleanGiftMessage || null,
         total,
         deliveryFee,
         estimatedTime: estimatedTime || "1 dia",
@@ -89,6 +111,7 @@ export async function POST(req: NextRequest) {
         },
       },
       include: {
+        city: true,
         items: {
           include: {
             product: { include: { images: true, flowers: { include: { flower: true } } } },
@@ -164,6 +187,7 @@ export async function GET(req: NextRequest) {
     },
     orderBy: { createdAt: "desc" },
     include: {
+      city: true,
       paymentMethod: true,
       statusHistory: { orderBy: { createdAt: "asc" } },
       items: {

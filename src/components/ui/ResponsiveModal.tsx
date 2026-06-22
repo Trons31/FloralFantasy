@@ -41,7 +41,7 @@ export default function ResponsiveModal({
       role="presentation"
     >
       <div
-        className={`w-full sm:w-[min(100%,calc(100vw-2rem))] sm:max-w-3xl md:max-w-4xl lg:max-w-5xl max-h-[92vh] bg-white shadow-2xl overflow-hidden flex flex-col rounded-t-[2rem] sm:rounded-[2rem] ${panelClassName}`}
+        className={`w-full sm:w-[min(100%,calc(100vw-2rem))] sm:max-w-2xl md:max-w-3xl lg:max-w-3xl max-h-[92vh] bg-white shadow-2xl overflow-hidden flex flex-col rounded-t-[2rem] sm:rounded-[2rem] ${panelClassName}`}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

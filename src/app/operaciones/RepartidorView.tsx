@@ -11,7 +11,7 @@ import ResponsiveModal from "@/components/ui/ResponsiveModal";
 type Addon     = { id:string; addon:{ name:string } };
 type OrderItem = { id:string; quantity:number; addons:Addon[]; product:{ name:string; images:{url:string;isMain:boolean}[] } };
 type Order     = { id:string; trackingToken:string; customerName:string; address:string;
-  customerPhone?:string; addressRef?:string; estimatedTime:string; total:number; status:string;
+  customerPhone?:string; addressRef?:string; city?: { name: string } | null; estimatedTime:string; total:number; status:string;
   deliveryPhotoUrl?:string; items:OrderItem[] };
 
 const EXPENSE_CATS = ["Insumos","Flores","Transporte","Empaque","Otro"];
@@ -620,7 +620,7 @@ function DeliveryCard({ order, updating, action, onAction, onDeliver }: {
             <div className="mt-3 space-y-2">
               <div className="flex items-start gap-2 text-xs text-gray-500">
                 <RiMapPin2Line className="mt-0.5 shrink-0 text-gray-400" size={12} />
-                <span>{order.address}</span>
+                <span>{order.address}{order.city?.name ? `, ${order.city.name}` : ""}</span>
               </div>
               {order.addressRef ? (
                 <div className="flex items-start gap-2 text-xs text-gray-500">

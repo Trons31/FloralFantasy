@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { uploadImage } from "@/lib/cloudinary";
+import { optimizeImageFileToDataUrl } from "@/lib/image-optimization";
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions);
@@ -47,9 +48,10 @@ export async function POST(req: NextRequest) {
       if (!image.type.startsWith("image/")) {
         return NextResponse.json({ error: "La imagen debe ser válida" }, { status: 400 });
       }
-      const bytes = await image.arrayBuffer();
-      const base64 = `data:${image.type};base64,${Buffer.from(bytes).toString("base64")}`;
-      imageData = await uploadImage(base64, { folder: "gardentech/payment-methods" });
+      imageData = await uploadImage(await optimizeImageFileToDataUrl(image), {
+        folder: "gardentech/payment-methods",
+        transformation: [],
+      });
     }
 
     const method = await prisma.paymentMethod.create({
