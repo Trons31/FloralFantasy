@@ -41,6 +41,7 @@ model Flower {
   id          String          @id @default(cuid())
   name        String
   type        String
+  color       String?
   description String?
   imageUrl    String?
   createdAt   DateTime        @default(now())

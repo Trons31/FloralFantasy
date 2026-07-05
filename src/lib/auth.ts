@@ -32,6 +32,7 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        token.id = user.id;
         token.name = user.name ?? token.name;
         token.email = user.email ?? token.email;
 
@@ -39,21 +40,23 @@ export const authOptions: NextAuthOptions = {
         if (authEmail) {
           const dbUser = await prisma.user.findUnique({
             where: { email: authEmail },
-            select: { role: true, name: true, email: true },
+            select: { id: true, role: true, name: true, email: true },
           }).catch(() => null);
 
+          token.id = dbUser?.id ?? token.id;
           token.role = dbUser?.role ?? (user as any).role ?? token.role;
           token.name = dbUser?.name ?? token.name;
           token.email = dbUser?.email ?? token.email;
         } else {
           token.role = (user as any).role ?? token.role;
         }
-      } else if (!token.role && token.email) {
+      } else if (token.email) {
         const dbUser = await prisma.user.findUnique({
           where: { email: token.email },
-          select: { role: true, name: true, email: true },
+          select: { id: true, role: true, name: true, email: true },
         }).catch(() => null);
 
+        token.id = dbUser?.id ?? token.id;
         token.role = dbUser?.role ?? token.role;
         token.name = dbUser?.name ?? token.name;
         token.email = dbUser?.email ?? token.email;
@@ -62,6 +65,7 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
+        session.user.id = token.id as string | undefined;
         session.user.role = token.role as string;
         session.user.name = token.name ?? session.user.name;
         session.user.email = token.email ?? session.user.email;

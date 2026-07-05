@@ -135,11 +135,21 @@ export async function getAdminUser() {
   const role = user?.role;
   if (!isAdminRole(role)) return null;
 
+  const dbUser = user?.email
+    ? await prisma.user.findUnique({
+        where: { email: user.email },
+        select: { id: true, name: true, email: true, role: true },
+      }).catch(() => null)
+    : null;
+
+  const resolvedRole = dbUser?.role ?? role;
+  if (!isAdminRole(resolvedRole)) return null;
+
   return {
-    id: user?.email || user?.name || "admin",
-    name: user?.name || "",
-    email: user?.email || null,
-    role,
+    id: dbUser?.id || user?.id || "",
+    name: dbUser?.name || user?.name || "",
+    email: dbUser?.email || user?.email || null,
+    role: resolvedRole,
   };
 }
 
