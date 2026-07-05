@@ -114,7 +114,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       },
     });
 
-    sendPushToAdmins({
+    await sendPushToAdmins({
       type: "PAYMENT_PROOF_UPLOADED",
       orderId: updated.id,
       title: "Comprobante recibido",
@@ -124,16 +124,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         trackingToken: updated.trackingToken,
         status: updated.status,
       },
-    }).catch(console.error);
+    });
 
     if (updated.customerEmail) {
-      sendOrderConfirmation({
+      void sendOrderConfirmation({
         email: updated.customerEmail,
         customerName: updated.customerName,
         trackingToken: updated.trackingToken,
         total: updated.total,
         estimatedTime: updated.estimatedTime,
-      }).catch(console.error);
+      });
     }
 
     return NextResponse.json({

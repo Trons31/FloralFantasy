@@ -67,16 +67,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   });
 
   if (existing.customerEmail) {
-    sendStatusUpdate({
+    void sendStatusUpdate({
       email: existing.customerEmail,
       customerName: existing.customerName,
       trackingToken: existing.trackingToken,
       statusLabel: STATUS_LABELS[status] || status,
-    }).catch(console.error);
+    });
   }
 
   if (status === "PAID") {
-    sendPushToRoles(["PREPARADOR"], {
+    await sendPushToRoles(["PREPARADOR"], {
       type: "ORDER_READY_TO_PREPARE",
       title: "Nuevo pedido para preparar",
       body: `La guía #${existing.trackingToken} ya fue validada. Hay un nuevo pedido para preparar.`,
@@ -86,11 +86,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         trackingToken: existing.trackingToken,
         status,
       },
-    }).catch(console.error);
+    });
   }
 
   if (status === "READY") {
-    sendPushToRoles(["REPARTIDOR"], {
+    await sendPushToRoles(["REPARTIDOR"], {
       type: "ORDER_READY_FOR_DELIVERY",
       title: "Pedido listo para entregar",
       body: `La guía #${existing.trackingToken} está lista para entrega. Revisa la información del pedido.`,
@@ -101,7 +101,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         guide: existing.trackingToken,
         status,
       },
-    }).catch(console.error);
+    });
   }
 
   return NextResponse.json(order);

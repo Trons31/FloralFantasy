@@ -122,26 +122,24 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    Promise.all([
-      sendPushToAdmins({
-        type: "ORDER_CREATED",
-        orderId: order.id,
-        title: isAdminDraft ? "Link de pago generado" : "Nuevo pedido",
-        body: isAdminDraft
-          ? "El administrador generó un link de pago para un nuevo pedido."
-          : `${name || "Cliente"} realizó un pedido por ${new Intl.NumberFormat("es-CO", {
-              style: "currency",
-              currency: "COP",
-              minimumFractionDigits: 0,
-            }).format(total)}`,
-        url: "/dashboard/todos-pedidos",
-        data: {
-          trackingToken,
-          source: order.source,
-          status: initialStatus,
-        },
-      }),
-    ]).catch(console.error);
+    await sendPushToAdmins({
+      type: "ORDER_CREATED",
+      orderId: order.id,
+      title: isAdminDraft ? "Link de pago generado" : "Nuevo pedido",
+      body: isAdminDraft
+        ? "El administrador generó un link de pago para un nuevo pedido."
+        : `${name || "Cliente"} realizó un pedido por ${new Intl.NumberFormat("es-CO", {
+            style: "currency",
+            currency: "COP",
+            minimumFractionDigits: 0,
+          }).format(total)}`,
+      url: "/dashboard/todos-pedidos",
+      data: {
+        trackingToken,
+        source: order.source,
+        status: initialStatus,
+      },
+    });
 
     const paymentMethods = await prisma.paymentMethod.findMany({
       where: { isActive: true },
