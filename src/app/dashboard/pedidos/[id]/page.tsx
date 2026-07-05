@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { productFlowerInclude } from "@/lib/product-selects";
 import OrderDetailEditor from "@/components/admin/OrderDetailEditor";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
       statusHistory: { orderBy: { createdAt: "asc" } },
       items: {
         include: {
-          product: { include: { images: true, flowers: { include: { flower: true } } } },
+          product: { include: { images: true, flowers: productFlowerInclude } },
           addons: { include: { addon: true } },
         },
       },

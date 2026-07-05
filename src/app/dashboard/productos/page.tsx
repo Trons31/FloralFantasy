@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { productFlowerInclude } from "@/lib/product-selects";
 import ProductosManager from "@/components/admin/ProductosManager";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,7 @@ export default async function ProductosPage() {
       include: {
         images: { orderBy: { order: "asc" } },
         category: true,
-        flowers: { include: { flower: true } },
+        flowers: productFlowerInclude,
       },
       orderBy: { createdAt: "desc" },
     }).catch(() => []),

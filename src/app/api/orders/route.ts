@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { productFlowerInclude } from "@/lib/product-selects";
 import { generateTrackingToken } from "@/lib/tokens";
 import { sendPushToAdmins } from "@/lib/webpush";
 import { STATUS_LABELS } from "@/lib/utils";
@@ -114,7 +115,7 @@ export async function POST(req: NextRequest) {
         city: true,
         items: {
           include: {
-            product: { include: { images: true, flowers: { include: { flower: true } } } },
+            product: { include: { images: true, flowers: productFlowerInclude } },
             addons: { include: { addon: true } },
           },
         },
@@ -192,7 +193,7 @@ export async function GET(req: NextRequest) {
       statusHistory: { orderBy: { createdAt: "asc" } },
       items: {
         include: {
-          product: { include: { images: true, flowers: { include: { flower: true } } } },
+          product: { include: { images: true, flowers: productFlowerInclude } },
           addons: { include: { addon: true } },
         },
       },

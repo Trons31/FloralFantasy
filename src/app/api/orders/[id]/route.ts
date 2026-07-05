@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { productFlowerInclude } from "@/lib/product-selects";
 import { requireAdminUser } from "@/lib/route-auth";
 import { formatDeliveryLeadDays, maxDeliveryLeadDays } from "@/lib/utils";
 
@@ -11,7 +12,7 @@ async function getOrderDetails(id: string) {
       statusHistory: { orderBy: { createdAt: "asc" } },
       items: {
         include: {
-          product: { include: { images: true, flowers: { include: { flower: true } } } },
+          product: { include: { images: true, flowers: productFlowerInclude } },
           addons: { include: { addon: true } },
         },
       },
@@ -72,7 +73,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const productIds = items.map((item: any) => item.productId).filter(Boolean);
     const products = await prisma.product.findMany({
       where: { id: { in: productIds } },
-      include: { flowers: { include: { flower: true } } },
+      include: { flowers: productFlowerInclude },
     });
 
     const productMap = new Map(products.map((product) => [product.id, product]));

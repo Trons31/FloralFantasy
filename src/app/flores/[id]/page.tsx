@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { productFlowerInclude } from "@/lib/product-selects";
 import { notFound } from "next/navigation";
 import Header from "@/components/client/Header";
 import Footer from "@/components/client/Footer";
@@ -24,7 +25,7 @@ export default async function ProductPage({ params }: { params: { id: string } }
     include: {
       images: { orderBy: { order: "asc" } },
       category: true,
-      flowers: { include: { flower: true } },
+      flowers: productFlowerInclude,
     },
   }).catch(() => null);
   if (!product) notFound();
@@ -42,7 +43,7 @@ export default async function ProductPage({ params }: { params: { id: string } }
       include: {
         images: { orderBy: { order: "asc" } },
         category: true,
-        flowers: { include: { flower: true } },
+        flowers: productFlowerInclude,
       },
       take: 40,
     }).catch(() => []),

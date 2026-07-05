@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { productFlowerInclude } from "@/lib/product-selects";
 import Header from "@/components/client/Header";
 import HeroSection from "@/components/client/HeroSection";
 import FeaturedProducts from "@/components/client/FeaturedProducts";
@@ -29,7 +30,7 @@ export default async function HomePage() {
     }).catch(() => []),
     prisma.product.findMany({
       where: { featured: true, inStock: true },
-      include: { images: { orderBy: { order: "asc" } }, category: true, flowers: { include: { flower: true } } },
+      include: { images: { orderBy: { order: "asc" } }, category: true, flowers: productFlowerInclude },
       take: 8,
     }).catch(() => []),
   ]);
@@ -38,7 +39,7 @@ export default async function HomePage() {
   if (featured.length === 0) {
     featured = await prisma.product.findMany({
       where: { inStock: true },
-      include: { images: { orderBy: { order: "asc" } }, category: true, flowers: { include: { flower: true } } },
+      include: { images: { orderBy: { order: "asc" } }, category: true, flowers: productFlowerInclude },
       orderBy: { createdAt: "desc" },
       take: 8,
     }).catch(() => []);

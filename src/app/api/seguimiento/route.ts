@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { productFlowerInclude } from "@/lib/product-selects";
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
   if (!token) return NextResponse.json({ error: "Token requerido" }, { status: 400 });
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
       statusHistory: { orderBy: { createdAt: "asc" } },
       items: {
         include: {
-          product: { include: { images: true, flowers: { include: { flower: true } } } },
+          product: { include: { images: true, flowers: productFlowerInclude } },
           addons: { include: { addon: true } },
         },
       },

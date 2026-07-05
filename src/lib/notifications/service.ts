@@ -1,4 +1,4 @@
-import {
+﻿import {
   NotificationChannel,
   NotificationDeliveryStatus,
   NotificationQueueStatus,
@@ -221,7 +221,7 @@ async function processSingleOutboxEntry(entryId: string) {
     await upsertDeliveryResult(outbox.notificationId, NotificationChannel.WEB_PUSH, outbox.attemptCount, result);
 
     if (result.attempted && !result.success && !result.permanentFailure) {
-      throw new Error(result.error || "No se pudo enviar la notificación por Web Push");
+      throw new Error(result.error || "No se pudo enviar la notificaciÃ³n por Web Push");
     }
 
     await prisma.notificationOutbox.update({
@@ -246,7 +246,7 @@ async function processSingleOutboxEntry(entryId: string) {
     return { processed: true, sent: true, retried: false, failed: false };
   } catch (error) {
     const attemptCount = outbox.attemptCount;
-    const message = error instanceof Error ? error.message : "No se pudo procesar la notificación";
+    const message = error instanceof Error ? error.message : "No se pudo procesar la notificaciÃ³n";
     const exhausted = attemptCount >= MAX_PROCESSING_ATTEMPTS;
 
     await prisma.notificationOutbox.update({
@@ -335,9 +335,104 @@ export async function queueNotification(
 ): Promise<QueueNotificationsResult> {
   const now = new Date();
 
-  return prisma.$transaction(async (tx) => {
-    if (input.dedupeKey) {
-      const existing = await tx.notification.findUnique({
+  if (input.dedupeKey) {
+    const existing = await prisma.notification.findUnique({
+      where: {
+        userId_dedupeKey: {
+          userId: input.userId,
+          dedupeKey: input.dedupeKey,
+        },
+      },
+      select: {
+        id: true,
+        userId: true,
+        sequence: true,
+        status: true,
+      },
+    });
+
+    if (existing) {
+      return {
+        notificationId: existing.id,
+        userId: existing.userId,
+        sequence: existing.sequence,
+        status: existing.status,
+        deduped: true,
+      };
+    }
+  }
+
+  const state = await prisma.userNotificationState.upsert({
+    where: { userId: input.userId },
+    create: {
+      userId: input.userId,
+      lastSequence: 1,
+    },
+    update: {
+      lastSequence: {
+        increment: 1,
+      },
+    },
+    select: {
+      lastSequence: true,
+    },
+  });
+
+  try {
+    const notification = await prisma.notification.create({
+      data: {
+        userId: input.userId,
+        orderId: input.orderId ?? undefined,
+        sequence: state.lastSequence,
+        type: input.type,
+        title: input.title,
+        body: input.body,
+        payload: serializePayload(input.payload),
+        dedupeKey: input.dedupeKey ?? null,
+        status: NotificationStatus.QUEUED,
+        queuedAt: now,
+      },
+      select: {
+        id: true,
+        userId: true,
+        sequence: true,
+        status: true,
+      },
+    });
+
+    await prisma.notificationOutbox.create({
+      data: {
+        notificationId: notification.id,
+        userId: input.userId,
+        status: NotificationQueueStatus.QUEUED,
+        nextAttemptAt: now,
+      },
+    });
+
+    await prisma.notificationDelivery.create({
+      data: {
+        notificationId: notification.id,
+        channel: NotificationChannel.INBOX_SYNC,
+        status: NotificationDeliveryStatus.SENT,
+        attempt: 1,
+        sentAt: now,
+      },
+    });
+
+    return {
+      notificationId: notification.id,
+      userId: notification.userId,
+      sequence: notification.sequence,
+      status: notification.status,
+      deduped: false,
+    };
+  } catch (error) {
+    if (
+      input.dedupeKey &&
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const existing = await prisma.notification.findUnique({
         where: {
           userId_dedupeKey: {
             userId: input.userId,
@@ -363,105 +458,8 @@ export async function queueNotification(
       }
     }
 
-    const state = await tx.userNotificationState.upsert({
-      where: { userId: input.userId },
-      create: {
-        userId: input.userId,
-        lastSequence: 1,
-      },
-      update: {
-        lastSequence: {
-          increment: 1,
-        },
-      },
-      select: {
-        lastSequence: true,
-      },
-    });
-
-    try {
-      const notification = await tx.notification.create({
-        data: {
-          userId: input.userId,
-          orderId: input.orderId ?? undefined,
-          sequence: state.lastSequence,
-          type: input.type,
-          title: input.title,
-          body: input.body,
-          payload: serializePayload(input.payload),
-          dedupeKey: input.dedupeKey ?? null,
-          status: NotificationStatus.QUEUED,
-          queuedAt: now,
-        },
-        select: {
-          id: true,
-          userId: true,
-          sequence: true,
-          status: true,
-        },
-      });
-
-      await tx.notificationOutbox.create({
-        data: {
-          notificationId: notification.id,
-          userId: input.userId,
-          status: NotificationQueueStatus.QUEUED,
-          nextAttemptAt: now,
-        },
-      });
-
-      await tx.notificationDelivery.create({
-        data: {
-          notificationId: notification.id,
-          channel: NotificationChannel.INBOX_SYNC,
-          status: NotificationDeliveryStatus.SENT,
-          attempt: 1,
-          sentAt: now,
-        },
-      });
-
-      return {
-        notificationId: notification.id,
-        userId: notification.userId,
-        sequence: notification.sequence,
-        status: notification.status,
-        deduped: false,
-      };
-    } catch (error) {
-      if (
-        input.dedupeKey &&
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
-        const existing = await tx.notification.findUnique({
-          where: {
-            userId_dedupeKey: {
-              userId: input.userId,
-              dedupeKey: input.dedupeKey,
-            },
-          },
-          select: {
-            id: true,
-            userId: true,
-            sequence: true,
-            status: true,
-          },
-        });
-
-        if (existing) {
-          return {
-            notificationId: existing.id,
-            userId: existing.userId,
-            sequence: existing.sequence,
-            status: existing.status,
-            deduped: true,
-          };
-        }
-      }
-
-      throw error;
-    }
-  });
+    throw error;
+  }
 }
 
 export async function queueNotifications(inputs: QueueNotificationInput[]) {
@@ -686,7 +684,7 @@ export async function enqueuePaymentReminderNotifications() {
         userId: admin.id,
         type: "PAYMENT_REMINDER",
         title: "Pedido pendiente por validar",
-        body: `${order.customerName} sigue esperando validación del pago`,
+        body: `${order.customerName} sigue esperando validaciÃ³n del pago`,
         orderId: order.id,
         dedupeKey: reminderKey,
         payload: {

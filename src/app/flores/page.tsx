@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { productFlowerInclude } from "@/lib/product-selects";
 import Header from "@/components/client/Header";
 import Footer from "@/components/client/Footer";
 import CartDrawer from "@/components/client/CartDrawer";
@@ -17,7 +18,7 @@ export default async function FloresPage({
       include: {
         images: { orderBy: { order: "asc" } },
         category: true,
-        flowers: { include: { flower: true } },
+        flowers: productFlowerInclude,
       },
       orderBy: [{ featured: "desc" }, { createdAt: "desc" }],
     }).catch(() => []),
