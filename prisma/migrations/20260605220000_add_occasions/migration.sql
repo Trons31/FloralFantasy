@@ -33,4 +33,3 @@ CREATE INDEX "OccasionImage_occasionId_idx" ON "OccasionImage"("occasionId");
 
 -- AddForeignKey
 ALTER TABLE "OccasionImage" ADD CONSTRAINT "OccasionImage_occasionId_fkey" FOREIGN KEY ("occasionId") REFERENCES "Occasion"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-

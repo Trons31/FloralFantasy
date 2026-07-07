@@ -1,4 +1,4 @@
-﻿import crypto from "crypto";
+import crypto from "crypto";
 import { getServerSession } from "next-auth";
 import type { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -188,4 +188,3 @@ export async function requireAdminUser() {
 export async function requireOrderManagementUser(req: NextRequest) {
   return getPrivilegedUser(req);
 }
-

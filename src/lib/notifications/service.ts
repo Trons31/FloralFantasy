@@ -1,4 +1,4 @@
-﻿import {
+import {
   NotificationChannel,
   NotificationDeliveryStatus,
   NotificationQueueStatus,
@@ -221,7 +221,7 @@ async function processSingleOutboxEntry(entryId: string) {
     await upsertDeliveryResult(outbox.notificationId, NotificationChannel.WEB_PUSH, outbox.attemptCount, result);
 
     if (result.attempted && !result.success && !result.permanentFailure) {
-      throw new Error(result.error || "No se pudo enviar la notificaciÃ³n por Web Push");
+      throw new Error(result.error || "No se pudo enviar la notificación por Web Push");
     }
 
     await prisma.notificationOutbox.update({
@@ -246,7 +246,7 @@ async function processSingleOutboxEntry(entryId: string) {
     return { processed: true, sent: true, retried: false, failed: false };
   } catch (error) {
     const attemptCount = outbox.attemptCount;
-    const message = error instanceof Error ? error.message : "No se pudo procesar la notificaciÃ³n";
+    const message = error instanceof Error ? error.message : "No se pudo procesar la notificación";
     const exhausted = attemptCount >= MAX_PROCESSING_ATTEMPTS;
 
     await prisma.notificationOutbox.update({
@@ -684,7 +684,7 @@ export async function enqueuePaymentReminderNotifications() {
         userId: admin.id,
         type: "PAYMENT_REMINDER",
         title: "Pedido pendiente por validar",
-        body: `${order.customerName} sigue esperando validaciÃ³n del pago`,
+        body: `${order.customerName} sigue esperando validación del pago`,
         orderId: order.id,
         dedupeKey: reminderKey,
         payload: {

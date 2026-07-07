@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -66,7 +66,7 @@ export default function OperacionesClient({ initialUser = null }: OperacionesPag
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "No fue posible iniciar sesiÃ³n");
+        throw new Error(data.error || "No fue posible iniciar sesión");
       }
 
       if (data?.user?.role) {
@@ -76,10 +76,10 @@ export default function OperacionesClient({ initialUser = null }: OperacionesPag
         return;
       }
 
-      throw new Error("No fue posible iniciar sesiÃ³n");
+      throw new Error("No fue posible iniciar sesión");
     } catch (err: any) {
-      setError(err?.message || "No fue posible iniciar sesiÃ³n");
-      toast.error(err?.message || "No fue posible iniciar sesiÃ³n");
+      setError(err?.message || "No fue posible iniciar sesión");
+      toast.error(err?.message || "No fue posible iniciar sesión");
     } finally {
       setLoading(false);
     }
@@ -142,14 +142,14 @@ export default function OperacionesClient({ initialUser = null }: OperacionesPag
               Acceso seguro para operaciones
             </div>
             <h1 className="max-w-2xl text-4xl font-semibold leading-[0.95] tracking-tight xl:text-6xl">
-              Entra con tu correo y contraseÃ±a
-              <span className="block text-rose-300">y mantÃ©n la sesiÃ³n activa</span>
+              Entra con tu correo y contraseña
+              <span className="block text-rose-300">y mantén la sesión activa</span>
             </h1>
             <p className="mt-4 max-w-xl text-sm leading-6 text-white/72 sm:text-base sm:leading-7">
-              Cuando ingreses, el sistema te pedirÃ¡ permiso para notificaciones y asÃ­ podrÃ¡s recibir pedidos nuevos, cambios de estado y avisos de entrega.
+              Cuando ingreses, el sistema te pedirá permiso para notificaciones y así podrás recibir pedidos nuevos, cambios de estado y avisos de entrega.
             </p>
             <div className="mt-6 flex flex-wrap gap-2 text-xs text-white/72">
-              <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 backdrop-blur">SesiÃ³n persistente</span>
+              <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 backdrop-blur">Sesión persistente</span>
               <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 backdrop-blur">Alertas en tiempo real</span>
               <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 backdrop-blur">Flujo operativo</span>
             </div>
@@ -165,9 +165,9 @@ export default function OperacionesClient({ initialUser = null }: OperacionesPag
                   <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-orange-500 text-white shadow-lg shadow-rose-500/20">
                     <RiFlowerLine size={22} />
                   </div>
-                  <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Iniciar sesiÃ³n</h2>
+                  <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Iniciar sesión</h2>
                   <p className="mt-1.5 max-w-sm text-sm leading-5 text-slate-500">
-                    Usa tu correo y contraseÃ±a de equipo para entrar.
+                    Usa tu correo y contraseña de equipo para entrar.
                   </p>
                 </div>
                 <div className="hidden rounded-2xl bg-rose-50 p-2.5 text-rose-500 sm:block">
@@ -193,14 +193,14 @@ export default function OperacionesClient({ initialUser = null }: OperacionesPag
                 </label>
 
                 <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-slate-700">ContraseÃ±a</span>
+                  <span className="mb-1 block text-sm font-medium text-slate-700">Contraseña</span>
                   <div className="relative">
                     <RiLockLine className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                      placeholder="••••••••"
                       autoComplete="current-password"
                       required
                       className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-11 py-3 pr-12 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-rose-400 focus:bg-white focus:ring-4 focus:ring-rose-100"
@@ -234,7 +234,7 @@ export default function OperacionesClient({ initialUser = null }: OperacionesPag
                   ) : (
                     <>
                       <RiLockLine size={18} />
-                      Iniciar sesiÃ³n
+                      Iniciar sesión
                     </>
                   )}
                 </button>
@@ -246,7 +246,3 @@ export default function OperacionesClient({ initialUser = null }: OperacionesPag
     </div>
   );
 }
-
-
-
-

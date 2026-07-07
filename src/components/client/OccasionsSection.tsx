@@ -133,4 +133,3 @@ export default function OccasionsSection({ occasions }: { occasions: Occasion[] 
     </section>
   );
 }
-

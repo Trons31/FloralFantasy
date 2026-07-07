@@ -368,8 +368,3 @@ function EmptyState({ tab, preparedToday }: { tab: Tab; preparedToday: number })
     </div>
   );
 }
-
-
-
-
-

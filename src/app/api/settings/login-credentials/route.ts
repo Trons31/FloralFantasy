@@ -24,11 +24,11 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (newPassword.length < 6) {
-      return NextResponse.json({ error: "La nueva contrasena debe tener al menos 6 caracteres" }, { status: 400 });
+      return NextResponse.json({ error: "La nueva contraseña debe tener al menos 6 caracteres" }, { status: 400 });
     }
 
     if (newPassword !== confirmPassword) {
-      return NextResponse.json({ error: "Las contrasenas no coinciden" }, { status: 400 });
+      return NextResponse.json({ error: "Las contraseñas no coinciden" }, { status: 400 });
     }
 
     const user = await prisma.user.findUnique({
@@ -37,12 +37,12 @@ export async function PATCH(req: NextRequest) {
     });
 
     if (!user || !["ADMIN", "SUPER_ADMIN"].includes(user.role)) {
-      return NextResponse.json({ error: "Usuario no valido" }, { status: 404 });
+      return NextResponse.json({ error: "Usuario no válido" }, { status: 404 });
     }
 
     const valid = await bcrypt.compare(currentPassword, user.password);
     if (!valid) {
-      return NextResponse.json({ error: "La contrasena actual es incorrecta" }, { status: 401 });
+      return NextResponse.json({ error: "La contraseña actual es incorrecta" }, { status: 401 });
     }
 
     if (newEmail !== currentSessionEmail) {

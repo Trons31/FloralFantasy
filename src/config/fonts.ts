@@ -28,6 +28,3 @@ export const cinzel = Cinzel({
     subsets: ['latin'],
     weight: ['600', '900'],
 })
-
-
-

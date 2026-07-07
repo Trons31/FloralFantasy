@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   const receiptPhotosRaw = formData.get("receiptPhotos") as string | null;
 
   if (!description || !amount) {
-    return NextResponse.json({ error: "DescripciÃ³n y monto son requeridos" }, { status: 400 });
+    return NextResponse.json({ error: "Descripción y monto son requeridos" }, { status: 400 });
   }
 
   let receiptPhotos: ReceiptPhoto[] = [];
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
           }));
       }
     } catch {
-      return NextResponse.json({ error: "Las fotos de la factura no son vÃ¡lidas" }, { status: 400 });
+      return NextResponse.json({ error: "Las fotos de la factura no son válidas" }, { status: 400 });
     }
   }
 

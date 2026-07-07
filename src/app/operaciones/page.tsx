@@ -1,4 +1,4 @@
-﻿import { cookies } from "next/headers";
+import { cookies } from "next/headers";
 import OperacionesClient from "@/components/operations/OperacionesClient";
 import { OPERATIONS_SESSION_COOKIE, getOperationsUserFromCookieValue } from "@/lib/route-auth";
 

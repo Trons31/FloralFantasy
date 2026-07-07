@@ -65,18 +65,18 @@ export default function LoginPage() {
             </div>
 
             <h1 className="max-w-2xl text-4xl font-semibold leading-[0.95] tracking-tight sm:text-5xl lg:text-6xl">
-              Gestiona tu floristeria
-              <span className="block text-fuchsia-300">con una experiencia mas limpia</span>
+              Gestiona tu floristería
+              <span className="block text-fuchsia-300">con una experiencia más limpia</span>
             </h1>
 
             <p className="mt-4 max-w-xl text-sm leading-6 text-white/72 sm:text-base sm:leading-7">
-              Entra con tu correo y contrasena para revisar pedidos, validar pagos y mover todo el flujo del negocio sin friccion.
+              Entra con tu correo y contraseña para revisar pedidos, validar pagos y mover todo el flujo del negocio sin fricción.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-2 text-xs text-white/72">
               <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 backdrop-blur">Pedidos claros</span>
               <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 backdrop-blur">Acceso protegido</span>
-              <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 backdrop-blur">Flujo rapido</span>
+              <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 backdrop-blur">Flujo rápido</span>
             </div>
           </section>
 
@@ -87,9 +87,9 @@ export default function LoginPage() {
                   <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-500 to-rose-500 text-white shadow-lg shadow-fuchsia-500/20">
                     <RiFlowerLine size={22} />
                   </div>
-                  <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Iniciar sesion</h2>
+                  <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Iniciar sesión</h2>
                   <p className="mt-1.5 max-w-sm text-sm leading-5 text-slate-500">
-                    Usa tu correo y contrasena para acceder al panel.
+                    Usa tu correo y contraseña para acceder al panel.
                   </p>
                 </div>
                 <div className="hidden rounded-2xl bg-fuchsia-50 p-2.5 text-fuchsia-500 sm:block">
@@ -121,7 +121,7 @@ export default function LoginPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Contrasena</label>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Contraseña</label>
                   <div className="relative">
                     <RiLockLine className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input
@@ -163,7 +163,7 @@ export default function LoginPage() {
                   ) : (
                     <>
                       <RiLockLine size={18} />
-                      Iniciar sesion
+                      Iniciar sesión
                     </>
                   )}
                 </button>

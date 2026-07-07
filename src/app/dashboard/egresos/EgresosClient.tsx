@@ -275,7 +275,7 @@ export default function EgresosClient({
   const saveExpense = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!form.description.trim() || !form.amount || Number(form.amount) <= 0) {
-      toast.error("Completa la descripcion y un monto valido");
+      toast.error("Completa la descripción y un monto válido");
       return;
     }
 
@@ -603,7 +603,7 @@ export default function EgresosClient({
       >
         <form onSubmit={saveExpense} className="space-y-4">
           <label className="block">
-            <span className="mb-1.5 block text-xs font-semibold text-slate-700">Descripcion</span>
+            <span className="mb-1.5 block text-xs font-semibold text-slate-700">Descripción</span>
             <input
               value={form.description}
               onChange={event => setForm(current => ({ ...current, description: event.target.value }))}
