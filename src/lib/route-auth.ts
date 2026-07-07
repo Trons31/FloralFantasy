@@ -1,4 +1,4 @@
-import crypto from "crypto";
+﻿import crypto from "crypto";
 import { getServerSession } from "next-auth";
 import type { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -110,6 +110,24 @@ export function clearOperationsSessionCookie(response: NextResponse) {
   return response;
 }
 
+export async function getOperationsUserFromCookieValue(token?: string | null): Promise<RouteUser | null> {
+  if (!token) return null;
+
+  const payload = decodeSession(token);
+  if (!payload) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { id: payload.id },
+    select: { id: true, name: true, email: true, role: true },
+  }).catch(() => null);
+
+  if (!user || !isOperationRole(user.role) || user.role !== payload.role) {
+    return null;
+  }
+
+  return user;
+}
+
 async function getOperationsUser(req: NextRequest): Promise<RouteUser | null> {
   const raw = req.cookies.get(OPERATIONS_SESSION_COOKIE)?.value;
   if (!raw) return null;
@@ -170,3 +188,4 @@ export async function requireAdminUser() {
 export async function requireOrderManagementUser(req: NextRequest) {
   return getPrivilegedUser(req);
 }
+
