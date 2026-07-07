@@ -67,6 +67,9 @@ export default function ProductosManager({
   const [newCatName,  setNewCatName]  = useState("");
   const [localCats,   setLocalCats]   = useState(categories);
   const PER_PAGE = 12;
+  const filterButtonBase = "h-10 shrink-0 rounded-xl px-5 text-xs font-bold tracking-[-0.01em] transition";
+  const filterButtonIdle = "border border-slate-200 bg-white text-slate-700 hover:border-primary-200 hover:text-primary-500";
+  const filterSelectClass = "h-10 shrink-0 rounded-xl border border-slate-200 bg-white px-5 text-xs font-bold tracking-[-0.01em] text-slate-700 outline-none transition hover:border-primary-200 hover:text-primary-500 focus:border-primary-300";
 
   const { register, handleSubmit, reset, watch, setValue } = useForm<any>({
     defaultValues: { preparationTimeValue: 0, preparationTimeUnit: "MINUTES", deliveryLeadDays: 0, inStock: true },
@@ -356,15 +359,15 @@ export default function ProductosManager({
           {showFilters && (
             <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
               <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <button type="button" onClick={() => setFilter("ALL")} className={`h-10 shrink-0 rounded-xl px-5 text-xs font-semibold ${filter === "ALL" ? "bg-primary-500 text-white" : "border border-slate-200 text-slate-600"}`}>Todos</button>
-                <button type="button" onClick={() => setFilter("PREMIUM")} className={`h-10 shrink-0 rounded-xl px-5 text-xs font-semibold ${filter === "PREMIUM" ? "bg-primary-500 text-white" : "border border-slate-200 text-slate-600"}`}>Premium</button>
-                <button type="button" onClick={() => setFilter("ECONOMIC")} className={`h-10 shrink-0 rounded-xl px-5 text-xs font-semibold ${filter === "ECONOMIC" ? "bg-primary-500 text-white" : "border border-slate-200 text-slate-600"}`}>Económicos</button>
+                <button type="button" onClick={() => setFilter("ALL")} className={`${filterButtonBase} ${filter === "ALL" ? "bg-primary-500 text-white" : filterButtonIdle}`}>Todos</button>
+                <button type="button" onClick={() => setFilter("PREMIUM")} className={`${filterButtonBase} ${filter === "PREMIUM" ? "bg-primary-500 text-white" : filterButtonIdle}`}>Premium</button>
+                <button type="button" onClick={() => setFilter("ECONOMIC")} className={`${filterButtonBase} ${filter === "ECONOMIC" ? "bg-primary-500 text-white" : filterButtonIdle}`}>Económicos</button>
                 {localCats.slice(0, 4).map(category => (
-                  <button key={category.id} type="button" onClick={() => setFilter(category.id)} className={`h-10 shrink-0 rounded-xl px-5 text-xs font-semibold ${filter === category.id ? "bg-primary-500 text-white" : "border border-slate-200 text-slate-600"}`}>{category.name}</button>
+                  <button key={category.id} type="button" onClick={() => setFilter(category.id)} className={`${filterButtonBase} ${filter === category.id ? "bg-primary-500 text-white" : filterButtonIdle}`}>{category.name}</button>
                 ))}
                 {(localCats.length > 4 || occasions.length > 0) && (
-                  <label className="relative flex h-10 shrink-0 items-center rounded-xl border border-slate-200 px-4">
-                    <select value={[...localCats.slice(4).map(item => item.id), ...occasions.map(item => item.slug)].includes(filter) ? filter : ""} onChange={event => setFilter(event.target.value || "ALL")} className="appearance-none bg-transparent pr-6 text-xs font-semibold text-slate-600 outline-none">
+                  <label className="relative flex shrink-0 items-center">
+                    <select value={[...localCats.slice(4).map(item => item.id), ...occasions.map(item => item.slug)].includes(filter) ? filter : ""} onChange={event => setFilter(event.target.value || "ALL")} className={`${filterSelectClass} appearance-none pr-10`}>
                       <option value="">Más filtros</option>
                       {localCats.slice(4).map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
                       {occasions.map(occasion => <option key={occasion.id} value={occasion.slug}>{occasion.name}</option>)}
@@ -373,7 +376,7 @@ export default function ProductosManager({
                   </label>
                 )}
               </div>
-              <select value={sort} onChange={event => setSort(event.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-600 outline-none">
+              <select value={sort} onChange={event => setSort(event.target.value)} className={`${filterSelectClass} min-w-[170px]`}>
                 <option value="recent">Más recientes</option>
                 <option value="sales">Más vendidos</option>
                 <option value="priceAsc">Precio menor</option>

@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   RiAddLine,
-  RiArrowRightSLine,
   RiCheckLine,
   RiDeleteBinLine,
   RiEditLine,
@@ -93,6 +92,8 @@ export default function FloresManager({ flowers: initial }: { flowers: Flower[] 
   const [previewUrl, setPreviewUrl] = useState("");
   const [form, setForm] = useState({ name: "", color: DEFAULT_COLOR, description: "", imageUrl: "" });
   const [deleteTarget, setDeleteTarget] = useState<Flower | null>(null);
+  const filterScrollRef = useRef<HTMLDivElement | null>(null);
+  const filterDragRef = useRef({ active: false, dragged: false, startX: 0, scrollLeft: 0 });
   const [lastUpdated, setLastUpdated] = useState(() => {
     const newest = initial.reduce<Date | null>((latest, flower) => {
       const date = new Date(flower.createdAt);
@@ -130,7 +131,6 @@ export default function FloresManager({ flowers: initial }: { flowers: Flower[] 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const pageItems = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
   const assignedColorCount = new Set(flowers.map(flower => flower.color).filter(Boolean)).size;
-  const visibleColors = colors.slice(0, 8);
 
   useEffect(() => {
     setPage(1);
@@ -273,6 +273,35 @@ export default function FloresManager({ flowers: initial }: { flowers: Flower[] 
   };
 
   const colorDot = (color?: string | null) => COLOR_DOT_CLASSES[color || ""] || "bg-slate-300";
+  const selectColor = (color: string) => {
+    if (filterDragRef.current.dragged) return;
+    setSelectedColor(color);
+  };
+  const startFilterDrag = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = filterScrollRef.current;
+    if (!target) return;
+    filterDragRef.current = {
+      active: true,
+      dragged: false,
+      startX: event.pageX - target.offsetLeft,
+      scrollLeft: target.scrollLeft,
+    };
+  };
+  const moveFilterDrag = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = filterScrollRef.current;
+    if (!target || !filterDragRef.current.active) return;
+    event.preventDefault();
+    const x = event.pageX - target.offsetLeft;
+    const walk = x - filterDragRef.current.startX;
+    if (Math.abs(walk) > 4) filterDragRef.current.dragged = true;
+    target.scrollLeft = filterDragRef.current.scrollLeft - walk;
+  };
+  const stopFilterDrag = () => {
+    filterDragRef.current.active = false;
+    window.setTimeout(() => {
+      filterDragRef.current.dragged = false;
+    }, 0);
+  };
 
   return (
     <div className="min-h-full bg-slate-50/70 p-3 sm:p-5 lg:p-7">
@@ -337,25 +366,23 @@ export default function FloresManager({ flowers: initial }: { flowers: Flower[] 
         </section>
 
         {showFilters && (
-          <section className="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-3 pb-1 shadow-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <button type="button" onClick={() => setSelectedColor("ALL")} className={`h-10 shrink-0 rounded-xl px-5 text-xs font-semibold transition ${selectedColor === "ALL" ? "bg-primary-500 text-white" : "border border-slate-200 bg-white text-slate-600"}`}>
+          <section
+            ref={filterScrollRef}
+            onMouseDown={startFilterDrag}
+            onMouseMove={moveFilterDrag}
+            onMouseUp={stopFilterDrag}
+            onMouseLeave={stopFilterDrag}
+            className="flex cursor-grab gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-3 pb-2 shadow-sm active:cursor-grabbing [scrollbar-color:#f72d72_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-primary-400 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100"
+          >
+            <button type="button" onClick={() => selectColor("ALL")} className={`h-10 shrink-0 rounded-xl px-5 text-xs font-semibold transition ${selectedColor === "ALL" ? "bg-primary-500 text-white" : "border border-slate-200 bg-white text-slate-600"}`}>
               Todos
             </button>
-            {visibleColors.map(color => (
-              <button key={color} type="button" onClick={() => setSelectedColor(color)} className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-xl px-5 text-xs font-semibold transition ${selectedColor === color ? "bg-primary-500 text-white" : "border border-slate-200 bg-white text-slate-600"}`}>
+            {colors.map(color => (
+              <button key={color} type="button" onClick={() => selectColor(color)} className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-xl px-5 text-xs font-semibold transition ${selectedColor === color ? "bg-primary-500 text-white" : "border border-slate-200 bg-white text-slate-600"}`}>
                 <span className={`h-2.5 w-2.5 rounded-full ${colorDot(color)}`} />
                 {color}
               </button>
             ))}
-            {colors.length > visibleColors.length && (
-              <label className="relative ml-auto flex h-10 shrink-0 items-center rounded-xl border border-slate-200 bg-white px-4">
-                <select value={visibleColors.includes(selectedColor) || selectedColor === "ALL" ? "" : selectedColor} onChange={event => setSelectedColor(event.target.value || "ALL")} className="appearance-none bg-transparent pr-6 text-xs font-semibold text-slate-600 outline-none">
-                  <option value="">Más colores</option>
-                  {colors.slice(8).map(color => <option key={color}>{color}</option>)}
-                </select>
-                <RiArrowRightSLine className="pointer-events-none absolute right-3 rotate-90 text-slate-400" />
-              </label>
-            )}
           </section>
         )}
 

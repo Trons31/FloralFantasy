@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { RiCloseLine, RiNotification3Line, RiSmartphoneLine, RiShieldCheckLine } from "react-icons/ri";
+import { RiCloseLine, RiNotification3Line, RiShieldCheckLine, RiSmartphoneLine } from "react-icons/ri";
+import { getFcmRegistrationToken } from "@/lib/firebase-client";
 
 function base64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -16,21 +17,20 @@ function base64ToUint8Array(base64String: string) {
 }
 
 export default function PushNotificationsPrompt() {
-const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [supported, setSupported] = useState(false);
   const [installed, setInstalled] = useState(false);
 
   useEffect(() => {
-    const canUsePush =
+    const canUseNotifications =
       typeof window !== "undefined" &&
       "Notification" in window &&
-      "serviceWorker" in navigator &&
-      "PushManager" in window;
+      "serviceWorker" in navigator;
 
-    setSupported(canUsePush);
+    setSupported(canUseNotifications);
 
-    if (!canUsePush) return;
+    if (!canUseNotifications) return;
 
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
@@ -38,9 +38,22 @@ const [visible, setVisible] = useState(false);
 
     setInstalled(standalone);
 
+    if (Notification.permission === "granted") {
+      void getFcmRegistrationToken()
+        .then((token) => {
+          if (!token) return null;
+          return fetch("/api/fcm-tokens", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token }),
+          });
+        })
+        .catch(() => null);
+    }
+
     navigator.serviceWorker
       .register("/sw.js")
-      .then((registration) => registration.pushManager.getSubscription())
+      .then((registration) => registration.pushManager?.getSubscription?.() ?? null)
       .then((subscription) => {
         if (subscription) return;
         if (Notification.permission !== "denied") {
@@ -53,6 +66,61 @@ const [visible, setVisible] = useState(false);
         }
       });
   }, []);
+
+  const registerFcmToken = async () => {
+    const token = await getFcmRegistrationToken().catch(() => null);
+    if (!token) return false;
+
+    const res = await fetch("/api/fcm-tokens", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+
+    return res.ok;
+  };
+
+  const registerWebPushToken = async () => {
+    if (!("PushManager" in window)) {
+      throw new Error("Este navegador no soporta Web Push");
+    }
+
+    const registration = await navigator.serviceWorker.ready;
+    const existing = await registration.pushManager.getSubscription();
+    if (existing) {
+      const res = await fetch("/api/push-tokens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(existing.toJSON()),
+      });
+      if (!res.ok) {
+        throw new Error("No se pudo registrar la suscripción");
+      }
+      return true;
+    }
+
+    const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    if (!publicKey) {
+      throw new Error("Falta la clave pública VAPID");
+    }
+
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: base64ToUint8Array(publicKey),
+    });
+
+    const res = await fetch("/api/push-tokens", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(subscription.toJSON()),
+    });
+
+    if (!res.ok) {
+      throw new Error("No se pudo registrar la suscripción");
+    }
+
+    return true;
+  };
 
   const handleEnable = async () => {
     if (!supported) {
@@ -70,40 +138,9 @@ const [visible, setVisible] = useState(false);
         throw new Error("Debes permitir las notificaciones");
       }
 
-      const registration = await navigator.serviceWorker.ready;
-      const existing = await registration.pushManager.getSubscription();
-      if (existing) {
-        const res = await fetch("/api/push-tokens", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(existing.toJSON()),
-        });
-        if (!res.ok) {
-          throw new Error("No se pudo registrar la suscripción");
-        }
-        setVisible(false);
-        toast.success("Notificaciones activadas");
-        return;
-      }
-
-      const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-      if (!publicKey) {
-        throw new Error("Falta la clave pública VAPID");
-      }
-
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: base64ToUint8Array(publicKey),
-      });
-
-      const res = await fetch("/api/push-tokens", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(subscription.toJSON()),
-      });
-
-      if (!res.ok) {
-        throw new Error("No se pudo registrar la suscripción");
+      const fcmRegistered = await registerFcmToken();
+      if (!fcmRegistered) {
+        await registerWebPushToken();
       }
 
       setVisible(false);
@@ -141,9 +178,9 @@ const [visible, setVisible] = useState(false);
 
           <div className="mt-3 flex items-center gap-2 text-[11px] text-gray-500">
             <RiSmartphoneLine className="text-sm text-pink-500" />
-            <span>PWA lista para instalar</span>
+            <span>FCM primero</span>
             <RiShieldCheckLine className="text-sm text-emerald-500" />
-            <span>Sin duplicados</span>
+            <span>Web Push como respaldo</span>
           </div>
 
           <button

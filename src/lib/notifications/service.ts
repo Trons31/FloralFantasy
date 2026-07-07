@@ -7,6 +7,7 @@ import {
   Role,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { sendFcmToUser } from "@/lib/fcm-notifications";
 import { sendWebPushToUser } from "@/lib/push-notifications";
 import type {
   QueueNotificationInput,
@@ -217,11 +218,18 @@ async function processSingleOutboxEntry(entryId: string) {
       },
     };
 
-    const result = await sendWebPushToUser(outbox.notification.userId, pushPayload);
-    await upsertDeliveryResult(outbox.notificationId, NotificationChannel.WEB_PUSH, outbox.attemptCount, result);
+    const fcmResult = await sendFcmToUser(outbox.notification.userId, pushPayload);
+    await upsertDeliveryResult(outbox.notificationId, NotificationChannel.FCM, outbox.attemptCount, fcmResult);
 
-    if (result.attempted && !result.success && !result.permanentFailure) {
-      throw new Error(result.error || "No se pudo enviar la notificación por Web Push");
+    let webPushResult: TransportDispatchResult | null = null;
+    if (!fcmResult.success) {
+      webPushResult = await sendWebPushToUser(outbox.notification.userId, pushPayload);
+      await upsertDeliveryResult(outbox.notificationId, NotificationChannel.WEB_PUSH, outbox.attemptCount, webPushResult);
+    }
+
+    if (!fcmResult.success && !webPushResult?.success) {
+      const errors = [fcmResult.error, webPushResult?.error].filter(Boolean).join(" | ");
+      throw new Error(errors || "No se pudo enviar la notificación");
     }
 
     await prisma.notificationOutbox.update({
@@ -230,7 +238,7 @@ async function processSingleOutboxEntry(entryId: string) {
         status: NotificationQueueStatus.SENT,
         processingStartedAt: null,
         sentAt: new Date(),
-        lastError: result.success || !result.attempted || result.permanentFailure ? null : result.error,
+        lastError: null,
       },
     });
 
@@ -239,7 +247,7 @@ async function processSingleOutboxEntry(entryId: string) {
       data: {
         status: NotificationStatus.SENT,
         sentAt: new Date(),
-        lastError: result.success || !result.attempted || result.permanentFailure ? null : result.error,
+        lastError: null,
       },
     });
 
@@ -334,6 +342,7 @@ export async function queueNotification(
   input: QueueNotificationInput
 ): Promise<QueueNotificationsResult> {
   const now = new Date();
+  const availableAt = input.availableAt && input.availableAt > now ? input.availableAt : now;
 
   if (input.dedupeKey) {
     const existing = await prisma.notification.findUnique({
@@ -405,7 +414,7 @@ export async function queueNotification(
         notificationId: notification.id,
         userId: input.userId,
         status: NotificationQueueStatus.QUEUED,
-        nextAttemptAt: now,
+        nextAttemptAt: availableAt,
       },
     });
 
@@ -551,6 +560,76 @@ export async function sendPushToRoles(
   return results;
 }
 
+export async function repairSkippedWebPushNotificationsWithTokens(limit = 100) {
+  const skippedDeliveries = await prisma.notificationDelivery.findMany({
+    where: {
+      channel: NotificationChannel.WEB_PUSH,
+      status: NotificationDeliveryStatus.SKIPPED,
+      lastError: { contains: "Sin suscripciones" },
+      notification: {
+        user: { pushTokens: { some: {} } },
+        outbox: { is: { status: NotificationQueueStatus.SENT } },
+      },
+    },
+    select: {
+      notificationId: true,
+      notification: {
+        select: {
+          id: true,
+          outbox: { select: { id: true } },
+        },
+      },
+    },
+    take: limit,
+  });
+
+  let repaired = 0;
+  const now = new Date();
+
+  for (const delivery of skippedDeliveries) {
+    const outboxId = delivery.notification.outbox?.id;
+    if (!outboxId) continue;
+
+    await prisma.notificationOutbox.update({
+      where: { id: outboxId },
+      data: {
+        status: NotificationQueueStatus.RETRYING,
+        processingStartedAt: null,
+        nextAttemptAt: now,
+        sentAt: null,
+        lastError: "Reintentando Web Push porque el usuario ya tiene suscripción registrada",
+      },
+    });
+
+    await prisma.notification.update({
+      where: { id: delivery.notification.id },
+      data: {
+        status: NotificationStatus.RETRYING,
+        sentAt: null,
+        lastError: "Reintentando Web Push porque el usuario ya tiene suscripción registrada",
+      },
+    });
+
+    await prisma.notificationDelivery.update({
+      where: {
+        notificationId_channel: {
+          notificationId: delivery.notificationId,
+          channel: NotificationChannel.WEB_PUSH,
+        },
+      },
+      data: {
+        status: NotificationDeliveryStatus.PENDING,
+        lastError: null,
+        sentAt: null,
+        failedAt: null,
+      },
+    });
+
+    repaired += 1;
+  }
+
+  return repaired;
+}
 export async function repairStuckNotificationOutbox() {
   const staleBefore = new Date(Date.now() - STALE_PROCESSING_MINUTES * 60_000);
 

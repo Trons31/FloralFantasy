@@ -14,6 +14,7 @@ import {
   RiFileList3Line,
   RiFlowerLine,
   RiHistoryLine,
+  RiNotification3Line,
   RiLoader4Line,
   RiMapPin2Line,
   RiImage2Line,
@@ -124,6 +125,14 @@ export default function OrderDetailEditor({ initialOrder }: { initialOrder: any 
   const [deliveryFee, setDeliveryFee] = useState(String(initialOrder.deliveryFee || 0));
   const [manualAdjustment, setManualAdjustment] = useState(String(initialOrder.manualAdjustment || 0));
   const [adminNote, setAdminNote] = useState(initialOrder.adminNote || "");
+  const [reminderSaving, setReminderSaving] = useState(false);
+  const [reminder, setReminder] = useState({
+    recipient: "me",
+    scheduleMode: "delay",
+    delayMinutes: "30",
+    timeOfDay: "09:00",
+    note: "",
+  });
 
   useEffect(() => {
     Promise.all([
@@ -304,6 +313,54 @@ export default function OrderDetailEditor({ initialOrder }: { initialOrder: any 
       toast.error(error.message || "No fue posible actualizar el estado");
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const createReminder = async () => {
+    if (!reminder.note.trim()) {
+      toast.error("Escribe la nota del recordatorio");
+      return;
+    }
+
+    const delayMinutes = Number(reminder.delayMinutes);
+    if (reminder.scheduleMode === "delay" && (!Number.isFinite(delayMinutes) || delayMinutes < 1)) {
+      toast.error("El tiempo debe ser de al menos 1 minuto");
+      return;
+    }
+
+    if (reminder.scheduleMode === "time" && !reminder.timeOfDay) {
+      toast.error("Escoge la hora del recordatorio");
+      return;
+    }
+
+    setReminderSaving(true);
+    try {
+      const response = await fetch(`/api/orders/${order.id}/reminders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipient: reminder.recipient,
+          scheduleMode: reminder.scheduleMode,
+          delayMinutes: reminder.scheduleMode === "delay" ? delayMinutes : undefined,
+          timeOfDay: reminder.scheduleMode === "time" ? reminder.timeOfDay : undefined,
+          note: reminder.note,
+        }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.error || "No fue posible programar el recordatorio");
+
+      setReminder(current => ({ ...current, note: "" }));
+      const scheduled = new Date(data.scheduledFor).toLocaleString("es-CO", {
+        day: "numeric",
+        month: "short",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+      toast.success(`Recordatorio programado para ${scheduled}`);
+    } catch (error: any) {
+      toast.error(error?.message || "No fue posible programar el recordatorio");
+    } finally {
+      setReminderSaving(false);
     }
   };
 
@@ -565,6 +622,86 @@ export default function OrderDetailEditor({ initialOrder }: { initialOrder: any 
                     <button type="button" onClick={() => changeStatus("CANCELLED")} disabled={updatingStatus} className="h-9 rounded-xl border border-red-200 text-[10px] font-semibold text-red-600">Cancelar pedido</button>
                   </div>
                 )}
+              </div>
+            </Section>
+
+            <Section title="Recordatorio especial" Icon={RiNotification3Line}>
+              <div className="space-y-3">
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-semibold text-slate-500">Recordar a</span>
+                  <select
+                    value={reminder.recipient}
+                    onChange={event => setReminder(current => ({ ...current, recipient: event.target.value }))}
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-primary-300"
+                  >
+                    <option value="me">A mí</option>
+                    <option value="admins">Administradores</option>
+                    <option value="preparadores">Preparadores</option>
+                    <option value="repartidores">Repartidores</option>
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-semibold text-slate-500">Programar por</span>
+                  <select
+                    value={reminder.scheduleMode}
+                    onChange={event => setReminder(current => ({ ...current, scheduleMode: event.target.value }))}
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-primary-300"
+                  >
+                    <option value="delay">En cuánto tiempo</option>
+                    <option value="time">A una hora del día</option>
+                  </select>
+                </label>
+
+                {reminder.scheduleMode === "delay" ? (
+                  <label className="block">
+                    <span className="mb-1 block text-[10px] font-semibold text-slate-500">En cuánto tiempo</span>
+                    <div className="grid grid-cols-[1fr_auto] gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        max={43200}
+                        value={reminder.delayMinutes}
+                        onChange={event => setReminder(current => ({ ...current, delayMinutes: event.target.value }))}
+                        className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs outline-none focus:border-primary-300"
+                      />
+                      <span className="grid h-10 place-items-center rounded-xl bg-slate-50 px-3 text-[10px] font-semibold text-slate-500">
+                        minutos
+                      </span>
+                    </div>
+                  </label>
+                ) : (
+                  <label className="block">
+                    <span className="mb-1 block text-[10px] font-semibold text-slate-500">Hora del día</span>
+                    <input
+                      type="time"
+                      value={reminder.timeOfDay}
+                      onChange={event => setReminder(current => ({ ...current, timeOfDay: event.target.value }))}
+                      className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold outline-none focus:border-primary-300"
+                    />
+                    <p className="mt-1 text-[10px] text-slate-400">Si la hora ya pasó, se programa para mañana.</p>
+                  </label>
+                )}
+
+                <label className="block">
+                  <span className="mb-1 block text-[10px] font-semibold text-slate-500">Nota</span>
+                  <textarea
+                    value={reminder.note}
+                    onChange={event => setReminder(current => ({ ...current, note: event.target.value }))}
+                    placeholder="Ej: Confirmar color antes de preparar..."
+                    className="min-h-20 w-full resize-y rounded-xl border border-slate-200 bg-white p-3 text-xs outline-none focus:border-primary-300"
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={createReminder}
+                  disabled={reminderSaving}
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 text-xs font-semibold text-white disabled:opacity-60"
+                >
+                  {reminderSaving ? <RiLoader4Line className="animate-spin" /> : <RiNotification3Line />}
+                  Programar recordatorio
+                </button>
               </div>
             </Section>
 

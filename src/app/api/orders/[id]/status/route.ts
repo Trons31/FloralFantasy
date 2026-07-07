@@ -43,27 +43,30 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const existing = await prisma.order.findUnique({
     where: { id: params.id },
-    select: { id: true, customerEmail: true, customerName: true, trackingToken: true },
+    select: { id: true, status: true, customerEmail: true, customerName: true, trackingToken: true },
   });
   if (!existing) {
     return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
   }
 
+  const statusNote =
+    note ||
+    (status === "PAYMENT_INVALID"
+      ? "Comprobante de pago inválido. Se requiere corrección o reenvío."
+      : STATUS_LABELS[status] || status);
+
   const order = await prisma.order.update({
     where: { id: params.id },
+    data: { status },
+  });
+
+  const statusHistory = await prisma.orderStatusHistory.create({
     data: {
+      orderId: existing.id,
       status,
-      statusHistory: {
-        create: {
-          status,
-          note:
-            note ||
-            (status === "PAYMENT_INVALID"
-              ? "Comprobante de pago inválido. Se requiere corrección o reenvío."
-              : STATUS_LABELS[status] || status),
-        },
-      },
+      note: statusNote,
     },
+    select: { id: true },
   });
 
   if (existing.customerEmail) {
@@ -82,8 +85,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       body: `La guía #${existing.trackingToken} ya fue validada. Hay un nuevo pedido para preparar.`,
       url: "/operaciones",
       orderId: existing.id,
+      dedupeKey: `order:${existing.id}:status:${status}:history:${statusHistory.id}`,
       data: {
         trackingToken: existing.trackingToken,
+        previousStatus: existing.status,
         status,
       },
     });
@@ -96,9 +101,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       body: `La guía #${existing.trackingToken} está lista para entrega. Revisa la información del pedido.`,
       url: "/operaciones",
       orderId: existing.id,
+      dedupeKey: `order:${existing.id}:status:${status}:history:${statusHistory.id}`,
       data: {
         trackingToken: existing.trackingToken,
         guide: existing.trackingToken,
+        previousStatus: existing.status,
         status,
       },
     });

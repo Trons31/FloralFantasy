@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorizedCronRequest } from "@/lib/cron";
-import { processNotificationQueue, repairStuckNotificationOutbox } from "@/lib/webpush";
+import { processNotificationQueue, repairSkippedWebPushNotificationsWithTokens, repairStuckNotificationOutbox } from "@/lib/webpush";
 
 async function run(req: NextRequest) {
   if (!isAuthorizedCronRequest(req)) {
@@ -8,11 +8,13 @@ async function run(req: NextRequest) {
   }
 
   const repaired = await repairStuckNotificationOutbox();
+  const repairedSkippedPush = await repairSkippedWebPushNotificationsWithTokens();
   const result = await processNotificationQueue();
 
   return NextResponse.json({
     ok: true,
     repaired,
+    repairedSkippedPush,
     ...result,
     scheduleHint: "Programa este endpoint en cron-job.org cada 5 minutos.",
   });
