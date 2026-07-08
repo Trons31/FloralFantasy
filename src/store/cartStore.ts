@@ -11,6 +11,8 @@ export interface CartFlower {
   name: string;
   type: string;
   quantity: number;
+  quantityMin?: number;
+  quantityMax?: number;
 }
 
 export interface CartItem {

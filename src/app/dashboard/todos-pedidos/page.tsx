@@ -39,7 +39,7 @@ function statusFilter(status?: string) {
     case "PENDING":
       return { in: ["PENDING", "PENDING_PAYMENT_CONFIRMATION"] };
     case "PRODUCTION":
-      return { in: ["PAID", "PROCESSING", "READY"] };
+      return "PROCESSING";
     case "PAID":
     case "PAYMENT_INVALID":
     case "OUT_FOR_DELIVERY":
@@ -193,7 +193,7 @@ export default async function TodosPedidosPage({
     return {
       total: groups.reduce((sum, group) => sum + group._count.id, 0),
       pending: count("PENDING", "PENDING_PAYMENT_CONFIRMATION"),
-      production: count("PAID", "PROCESSING", "READY"),
+      production: count("PROCESSING"),
       route: count("OUT_FOR_DELIVERY"),
       delivered: count("DELIVERED"),
       cancelled: count("CANCELLED"),

@@ -20,6 +20,28 @@ const TIME_UNITS = [
   { value: "DAYS",    label: "Días"    },
 ];
 
+const COLOR_DOT_CLASSES: Record<string, string> = {
+  Rojo: "bg-red-500",
+  Rosado: "bg-pink-300",
+  Fucsia: "bg-fuchsia-500",
+  Blanco: "bg-white border border-slate-300",
+  Amarillo: "bg-yellow-300",
+  Naranja: "bg-orange-400",
+  Morado: "bg-purple-500",
+  Lila: "bg-violet-300",
+  Lavanda: "bg-purple-200",
+  Azul: "bg-blue-500",
+  Verde: "bg-emerald-500",
+  Crema: "bg-amber-100 border border-amber-200",
+  Champaña: "bg-yellow-100 border border-yellow-200",
+  Coral: "bg-rose-400",
+  Salmón: "bg-orange-200",
+  "Vino tinto": "bg-red-900",
+  Bicolor: "bg-gradient-to-r from-primary-400 to-yellow-300",
+  Multicolor: "bg-gradient-to-r from-red-400 via-yellow-300 to-blue-400",
+  Otro: "bg-slate-300",
+};
+
 type Product = {
   id: string; name: string; description: string; price: number;
   categoryId: string; occasion?: string | null;
@@ -28,14 +50,14 @@ type Product = {
   requiresSpecialOrder: boolean; inStock: boolean; featured: boolean;
   images: { id: string; url: string; publicId: string; isMain: boolean; order: number }[];
   category: { id: string; name: string };
-  flowers: { id: string; flower: { id: string; name: string; type: string }; quantity: number }[];
+  flowers: { id: string; flower: Flower; quantity: number; quantityMin?: number | null; quantityMax?: number | null }[];
   sales: number; createdAt?: string;
 };
 
 type Category = { id: string; name: string; slug: string };
 type Occasion = { id: string; name: string; slug: string; subtitle?: string | null };
-type Flower   = { id: string; name: string; type: string };
-type SelectedFlower = { flowerId: string; quantity: number };
+type Flower = { id: string; name: string; type: string; color?: string | null };
+type SelectedFlower = { flowerId: string; quantity: number; quantityMin: number; quantityMax: number };
 
 // Slot de imagen: puede tener un File pendiente (nueva) o una URL ya subida (edición)
 type ImageSlot =
@@ -105,6 +127,18 @@ export default function ProductosManager({
 
   const slugify = (s: string) =>
     s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g,"-").replace(/[^a-z0-9-]/g,"");
+
+  const flowerRange = (item: { quantity?: number | null; quantityMin?: number | null; quantityMax?: number | null }) => {
+    const fallback = Math.max(1, Number(item.quantity) || 1);
+    const min = Math.max(1, Number(item.quantityMin ?? fallback) || fallback);
+    const max = Math.max(min, Number(item.quantityMax ?? fallback) || fallback);
+    return { min, max };
+  };
+
+  const formatFlowerRange = (item: { quantity?: number | null; quantityMin?: number | null; quantityMax?: number | null }) => {
+    const { min, max } = flowerRange(item);
+    return min === max ? `${min}` : `${min}-${max}`;
+  };
 
   const handleCreateCat = async () => {
     if (!newCatName.trim()) return;
@@ -207,7 +241,10 @@ export default function ProductosManager({
             requiresSpecialOrder:p.requiresSpecialOrder, inStock:p.inStock, featured:p.featured });
     // Imágenes ya subidas se cargan como "uploaded", no como pending.
     setImageSlots(p.images.map(i => ({ kind: "uploaded", url: i.url, publicId: i.publicId })));
-    setSelectedFlowers(p.flowers.map(f => ({ flowerId: f.flower.id, quantity: f.quantity || 1 })));
+    setSelectedFlowers(p.flowers.map(f => {
+      const { min, max } = flowerRange(f);
+      return { flowerId: f.flower.id, quantity: max, quantityMin: min, quantityMax: max };
+    }));
     setShowForm(true);
   };
 
@@ -253,7 +290,10 @@ export default function ProductosManager({
           inStock: product.inStock,
           featured: false,
           images: product.images.map(image => ({ url: image.url, publicId: image.publicId })),
-          flowerRelations: product.flowers.map(item => ({ flowerId: item.flower.id, quantity: item.quantity })),
+          flowerRelations: product.flowers.map(item => {
+            const { min, max } = flowerRange(item);
+            return { flowerId: item.flower.id, quantity: max, quantityMin: min, quantityMax: max };
+          }),
         }),
       });
       const saved = await response.json();
@@ -269,19 +309,28 @@ export default function ProductosManager({
   const toggleFlower = (id: string) =>
     setSelectedFlowers(prev => {
       const exists = prev.find(item => item.flowerId === id);
-      return exists ? prev.filter(item => item.flowerId !== id) : [...prev, { flowerId: id, quantity: 1 }];
+      return exists ? prev.filter(item => item.flowerId !== id) : [...prev, { flowerId: id, quantity: 1, quantityMin: 1, quantityMax: 1 }];
     });
 
-  const updateFlowerQty = (id: string, quantity: number) =>
+  const updateFlowerRange = (id: string, field: "quantityMin" | "quantityMax", quantity: number) =>
     setSelectedFlowers(prev =>
       prev
-        .map(item =>
-          item.flowerId === id ? { ...item, quantity: Math.max(1, quantity) } : item
-        )
-        .filter(item => item.quantity > 0)
+        .map(item => {
+          if (item.flowerId !== id) return item;
+          const nextValue = Math.max(1, Number.isFinite(quantity) ? Math.floor(quantity) : 1);
+          const quantityMin = field === "quantityMin" ? nextValue : item.quantityMin;
+          const quantityMax = Math.max(quantityMin, field === "quantityMax" ? nextValue : item.quantityMax);
+          return { ...item, quantity: quantityMax, quantityMin, quantityMax };
+        })
+        .filter(item => item.quantityMax > 0)
     );
 
   const selectedFlowerQty = (id: string) => selectedFlowers.find(item => item.flowerId === id)?.quantity || 0;
+  const selectedFlowerRange = (id: string) => {
+    const selected = selectedFlowers.find(item => item.flowerId === id);
+    return selected ? flowerRange(selected) : { min: 0, max: 0 };
+  };
+  const colorDot = (color?: string | null) => COLOR_DOT_CLASSES[color || ""] || "bg-slate-300";
 
   // Helper: obtener la URL de display de un slot (preview local o URL de Cloudinary)
   const slotDisplayUrl = (slot: ImageSlot): string => {
@@ -388,7 +437,9 @@ export default function ProductosManager({
           {pageItems.length ? (
             <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {pageItems.map(product => {
-                const flowerCount = product.flowers.reduce((sum, item) => sum + item.quantity, 0);
+                const flowerMin = product.flowers.reduce((sum, item) => sum + flowerRange(item).min, 0);
+                const flowerMax = product.flowers.reduce((sum, item) => sum + flowerRange(item).max, 0);
+                const flowerCount = flowerMin === flowerMax ? String(flowerMax) : `${flowerMin}-${flowerMax}`;
                 return (
                   <article key={product.id} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
                     <div className="relative aspect-[16/8] overflow-hidden bg-slate-50">
@@ -401,7 +452,7 @@ export default function ProductosManager({
                       <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-slate-500"><RiFlowerLine className="text-primary-500" />{product.flowers.map(item => item.flower.name).join(", ") || product.category?.name}</p>
                       <strong className="mt-3 block text-lg font-bold text-slate-950">{formatPrice(product.price)}</strong>
                       <div className="mt-2 flex flex-wrap items-center gap-3 text-[10px] text-slate-500">
-                        <span className="inline-flex items-center gap-1"><RiFlowerLine />{flowerCount} flores</span>
+                        <span className="inline-flex items-center gap-1"><RiFlowerLine />{flowerCount} flores aprox.</span>
                         <span className="inline-flex items-center gap-1 text-emerald-600"><RiTimeLine />{formatDeliveryLeadDays(product.deliveryLeadDays)}</span>
                         {product.sales > 0 && <span className="inline-flex items-center gap-1"><RiFireLine />{product.sales}</span>}
                       </div>
@@ -618,7 +669,7 @@ export default function ProductosManager({
                   <div className="space-y-2 p-3 bg-gray-50 rounded-xl border border-gray-100 max-h-56 overflow-y-auto">
                     {flowers.map(f => {
                       const selected = selectedFlowerQty(f.id) > 0;
-                      const qty = selectedFlowerQty(f.id) || 1;
+                      const range = selectedFlowerRange(f.id);
                       return (
                         <div
                           key={f.id}
@@ -628,38 +679,59 @@ export default function ProductosManager({
                             <button
                               type="button"
                               onClick={() => toggleFlower(f.id)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border-2 transition-all ${
+                              className={`flex min-w-0 flex-1 flex-col items-start gap-1 rounded-xl border-2 px-3 py-2 text-left text-xs font-medium transition-all ${
                                 selected ? "bg-primary-600 text-white border-primary-600" : "bg-white text-gray-600 border-gray-200 hover:border-primary-300"
                               }`}
                             >
-                              <RiFlowerLine size={11} />
-                              {f.name}
-                              <span className="opacity-70">({f.type})</span>
+                              <span className="flex max-w-full items-center gap-1.5">
+                                <RiFlowerLine size={11} className="shrink-0" />
+                                <span className="truncate font-semibold">{f.name}</span>
+                                <span className="shrink-0 opacity-70">({f.type})</span>
+                              </span>
+                              <span className={`flex max-w-full items-center gap-1.5 text-[10px] ${selected ? "text-white/80" : "text-gray-400"}`}>
+                                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${colorDot(f.color)}`} />
+                                <span className="truncate">Color: {f.color || "Sin color"}</span>
+                              </span>
                             </button>
                             {selected && (
-                              <div className="flex items-center gap-2 shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => updateFlowerQty(f.id, qty - 1)}
-                                  className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-600 flex items-center justify-center hover:border-primary-300"
-                                >
-                                  <RiSubtractLine size={12} />
-                                </button>
-                                <span className="min-w-6 text-center text-sm font-semibold text-gray-900">{qty}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => updateFlowerQty(f.id, qty + 1)}
-                                  className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-600 flex items-center justify-center hover:border-primary-300"
-                                >
-                                  <RiAddLine size={12} />
-                                </button>
+                              <div className="grid shrink-0 gap-1.5">
+                                {([
+                                  { label: "Desde", field: "quantityMin" as const, value: range.min },
+                                  { label: "Hasta", field: "quantityMax" as const, value: range.max },
+                                ]).map(control => (
+                                  <div key={control.field} className="flex items-center justify-end gap-1.5">
+                                    <span className="w-10 text-right text-[9px] font-semibold text-gray-400">{control.label}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => updateFlowerRange(f.id, control.field, control.value - 1)}
+                                      className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-600 flex items-center justify-center hover:border-primary-300"
+                                    >
+                                      <RiSubtractLine size={12} />
+                                    </button>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      inputMode="numeric"
+                                      value={control.value}
+                                      onChange={event => updateFlowerRange(f.id, control.field, Number(event.target.value))}
+                                      className="h-7 w-10 rounded-lg border border-gray-200 bg-white text-center text-sm font-semibold text-gray-900 outline-none transition focus:border-primary-300 focus:ring-2 focus:ring-primary-50"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => updateFlowerRange(f.id, control.field, control.value + 1)}
+                                      className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-600 flex items-center justify-center hover:border-primary-300"
+                                    >
+                                      <RiAddLine size={12} />
+                                    </button>
+                                  </div>
+                                ))}
                               </div>
                             )}
                           </div>
                           {selected && (
                             <p className="mt-2 text-[11px] text-gray-500 flex items-center gap-1">
                               <RiCheckLine size={11} className="text-primary-500" />
-                              {qty} flor{qty === 1 ? "" : "es"} de {f.name}
+                              {range.min === range.max ? range.max : `${range.min} a ${range.max}`} flor{range.max === 1 ? "" : "es"} aprox. de {f.name}
                             </p>
                           )}
                         </div>

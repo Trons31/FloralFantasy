@@ -30,6 +30,7 @@ import {
 import { toast } from "sonner";
 import { DEFAULT_DELIVERY_FEE } from "@/lib/site-settings";
 import { formatDeliveryLeadDays } from "@/lib/utils";
+import { formatFlowerQuantityRange } from "@/lib/flower-quantities";
 
 const schema = z.object({
   name: z.string().min(2, "Nombre muy corto"),
@@ -193,6 +194,8 @@ export default function CheckoutPageClient() {
                 name: pf.flower?.name || "Flor",
                 type: pf.flower?.type || "",
                 quantity: pf.quantity || 1,
+                quantityMin: pf.quantityMin || pf.quantity || 1,
+                quantityMax: pf.quantityMax || pf.quantity || 1,
               }))
             : [],
           customization: item.customization || null,
@@ -562,13 +565,13 @@ export default function CheckoutPageClient() {
                         {Array.isArray(item.customization?.baseFlowers) && item.customization.baseFlowers.length > 0 && (
                           <p className="text-[11px] text-gray-400 mt-1">
                             {item.customization.baseFlowers
-                              .map((flower: any) => `${flower.name} x${flower.quantity}`)
+                              .map((flower: any) => `${flower.name} x${formatFlowerQuantityRange(flower)}`)
                               .join(", ")}
                           </p>
                         )}
                         {Array.isArray(item.flowers) && item.flowers.length > 0 && (
                           <p className="text-[11px] text-gray-400 mt-1">
-                            {item.flowers.map((flower: any) => `${flower.name} x${flower.quantity || 1}`).join(", ")}
+                            {item.flowers.map((flower: any) => `${flower.name} x${formatFlowerQuantityRange(flower)}`).join(", ")}
                           </p>
                         )}
                       </div>

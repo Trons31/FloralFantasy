@@ -10,6 +10,7 @@ import {
   RiCalendarLine,
   RiCheckLine,
   RiCheckboxCircleFill,
+  RiCalendarCheckLine,
   RiFlowerLine,
   RiHourglassLine,
   RiLoader4Line,
@@ -22,14 +23,20 @@ import {
   RiTimeLine,
   RiUser3Line,
 } from "react-icons/ri";
+import { formatFlowerQuantityRange, getFlowerQuantityRange } from "@/lib/flower-quantities";
+import { formatScheduleDate, getEstimatedDeliveryDate, localDateKey, parseLocalDateKey } from "@/lib/order-schedule";
 
-type Tab = "PAID" | "PROCESSING" | "READY";
+type Tab = "PAID" | "PROCESSING" | "READY" | "FUTURE";
 type FlowerLine = {
   id: string;
   name: string;
   imageUrl?: string | null;
   type?: string | null;
   baseQuantity?: number;
+  baseQuantityMin?: number;
+  baseQuantityMax?: number;
+  quantityMin?: number;
+  quantityMax?: number;
   quantity: number;
 };
 type ExtraFlower = { id: string; name: string; quantity: number };
@@ -44,8 +51,9 @@ type OrderItem = {
   } | null;
   product: {
     name: string;
+    deliveryLeadDays?: number | null;
     images: Array<{ url: string; isMain: boolean }>;
-    flowers: Array<{ quantity: number; flower: { name: string; imageUrl?: string | null; type?: string | null } }>;
+    flowers: Array<{ quantity: number; quantityMin?: number | null; quantityMax?: number | null; flower: { name: string; imageUrl?: string | null; type?: string | null } }>;
   };
 };
 type Order = {
@@ -68,6 +76,7 @@ const tabConfig: Array<{ value: Tab; label: string; Icon: React.ElementType }> =
   { value: "PAID", label: "Por preparar", Icon: RiHourglassLine },
   { value: "PROCESSING", label: "En preparación", Icon: RiFlowerLine },
   { value: "READY", label: "Terminados", Icon: RiCheckboxCircleFill },
+  { value: "FUTURE", label: "Futuros", Icon: RiCalendarCheckLine },
 ];
 
 export default function PreparadorView({ user, onLogout }: { user: any; onLogout: () => void }) {
@@ -75,6 +84,11 @@ export default function PreparadorView({ user, onLogout }: { user: any; onLogout
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("PAID");
+  const [selectedFutureDate, setSelectedFutureDate] = useState(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return localDateKey(tomorrow);
+  });
 
   const load = async () => {
     setLoading(true);
@@ -125,8 +139,33 @@ export default function PreparadorView({ user, onLogout }: { user: any; onLogout
     PAID: orders.filter(order => order.status === "PAID"),
     PROCESSING: orders.filter(order => order.status === "PROCESSING"),
     READY: orders.filter(order => order.status === "READY"),
+    FUTURE: orders.filter(order => {
+      const deliveryKey = localDateKey(getEstimatedDeliveryDate(order));
+      const todayKey = localDateKey(new Date());
+      return deliveryKey > todayKey;
+    }),
   }), [orders]);
   const activeOrders = grouped[activeTab];
+  const futureDays = useMemo(() => {
+    const counts = new Map<string, number>();
+    grouped.FUTURE.forEach(order => {
+      const key = localDateKey(getEstimatedDeliveryDate(order));
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    return Array.from({ length: 30 }, (_, index) => {
+      const date = new Date(tomorrow);
+      date.setDate(tomorrow.getDate() + index);
+      const key = localDateKey(date);
+      return { key, date, count: counts.get(key) || 0 };
+    });
+  }, [grouped.FUTURE]);
+  const selectedFutureOrders = useMemo(
+    () => grouped.FUTURE.filter(order => localDateKey(getEstimatedDeliveryDate(order)) === selectedFutureDate),
+    [grouped.FUTURE, selectedFutureDate]
+  );
 
   return (
     <div className="min-h-screen bg-[#f6f8fb] pb-24 text-[#11182c]">
@@ -150,17 +189,25 @@ export default function PreparadorView({ user, onLogout }: { user: any; onLogout
 
       <main className="mx-auto max-w-xl px-4 py-7">
         <div className="mb-5">
-          <h2 className="text-[20px] font-bold leading-tight">{activeTab === "PAID" ? "Por preparar" : activeTab === "PROCESSING" ? "En preparación" : "Terminados"}</h2>
+          <h2 className="text-[20px] font-bold leading-tight">{activeTab === "PAID" ? "Por preparar" : activeTab === "PROCESSING" ? "En preparación" : activeTab === "FUTURE" ? "Pedidos futuros" : "Terminados"}</h2>
           <p className="mt-1 flex items-center gap-2 text-[12px] text-slate-400">
             {activeTab === "PROCESSING" && <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />}
             {activeTab === "PAID" ? `Tienes ${activeOrders.length} pedido${activeOrders.length === 1 ? "" : "s"} pendiente${activeOrders.length === 1 ? "" : "s"}` :
               activeTab === "PROCESSING" ? `Tienes ${activeOrders.length} pedido${activeOrders.length === 1 ? "" : "s"} en proceso` :
+              activeTab === "FUTURE" ? `${grouped.FUTURE.length} pedido${grouped.FUTURE.length === 1 ? "" : "s"} de mañana a 30 días` :
               `${activeOrders.length} pedido${activeOrders.length === 1 ? "" : "s"} preparado${activeOrders.length === 1 ? "" : "s"}`}
           </p>
         </div>
 
         {loading ? (
           <div className="flex justify-center py-24"><RiLoader4Line className="animate-spin text-primary-500" size={34} /></div>
+        ) : activeTab === "FUTURE" ? (
+          <FutureOrders
+            days={futureDays}
+            selectedDate={selectedFutureDate}
+            onSelectDate={setSelectedFutureDate}
+            orders={selectedFutureOrders}
+          />
         ) : activeOrders.length ? (
           <div className="space-y-5">
             {activeOrders.map(order => (
@@ -173,21 +220,98 @@ export default function PreparadorView({ user, onLogout }: { user: any; onLogout
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-100 bg-white/95 px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-10px_30px_rgba(15,23,42,.08)] backdrop-blur">
-        <div className="mx-auto grid max-w-xl grid-cols-3 gap-2">
+        <div className="mx-auto grid max-w-xl grid-cols-4 gap-1.5">
           {tabConfig.map(tab => {
             const active = activeTab === tab.value;
             const count = grouped[tab.value].length;
             return (
-              <button key={tab.value} type="button" onClick={() => setActiveTab(tab.value)} className={`relative flex h-16 flex-col items-center justify-center gap-1 rounded-2xl text-[10px] font-semibold transition ${active ? "border border-primary-100 bg-primary-50 text-primary-500" : tab.value === "READY" ? "text-emerald-600" : "text-slate-500"}`}>
-                <tab.Icon size={22} />
+              <button key={tab.value} type="button" onClick={() => setActiveTab(tab.value)} className={`relative flex h-16 flex-col items-center justify-center gap-1 rounded-2xl text-[9px] font-semibold transition ${active ? "border border-primary-100 bg-primary-50 text-primary-500" : tab.value === "READY" ? "text-emerald-600" : "text-slate-500"}`}>
+                <tab.Icon size={21} />
                 <span>{tab.label}</span>
-                <span className={`absolute right-[24%] top-1 grid h-5 min-w-5 place-items-center rounded-full px-1 text-[9px] ${tab.value === "READY" ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-primary-500"}`}>{count}</span>
+                <span className={`absolute right-[18%] top-1 grid h-5 min-w-5 place-items-center rounded-full px-1 text-[9px] ${tab.value === "READY" ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-primary-500"}`}>{count}</span>
               </button>
             );
           })}
         </div>
       </nav>
     </div>
+  );
+}
+
+function FutureOrders({
+  days,
+  selectedDate,
+  onSelectDate,
+  orders,
+}: {
+  days: Array<{ key: string; date: Date; count: number }>;
+  selectedDate: string;
+  onSelectDate: (date: string) => void;
+  orders: Order[];
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-3xl border border-slate-100 bg-white p-3 shadow-sm">
+        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {days.map(day => {
+            const active = day.key === selectedDate;
+            return (
+              <button
+                key={day.key}
+                type="button"
+                onClick={() => onSelectDate(day.key)}
+                className={`min-w-[78px] rounded-2xl border px-2.5 py-2 text-center transition ${active ? "border-primary-200 bg-primary-50 text-primary-600" : day.count ? "border-amber-100 bg-amber-50 text-amber-700" : "border-slate-100 bg-slate-50 text-slate-400"}`}
+              >
+                <span className="block text-[10px] font-semibold capitalize">{formatScheduleDate(day.date).split(",")[0]}</span>
+                <strong className="mt-0.5 block text-sm">{day.date.getDate()}</strong>
+                <span className="mt-0.5 block text-[9px]">{day.count} ped.</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="rounded-3xl bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Fecha seleccionada</p>
+            <h3 className="text-sm font-bold capitalize">{formatScheduleDate(parseLocalDateKey(selectedDate))}</h3>
+          </div>
+          <span className="rounded-full bg-primary-50 px-3 py-1 text-[10px] font-bold text-primary-500">{orders.length} pedidos</span>
+        </div>
+
+        {orders.length ? (
+          <div className="space-y-3">
+            {orders.map(order => <FutureOrderCard key={order.id} order={order} />)}
+          </div>
+        ) : (
+          <div className="py-10 text-center">
+            <RiCalendarLine className="mx-auto text-slate-200" size={42} />
+            <p className="mt-2 text-sm font-semibold text-slate-500">Sin pedidos para este día</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FutureOrderCard({ order }: { order: Order }) {
+  const productName = order.items[0]?.product?.name || "Pedido floral";
+  const deliveryDate = getEstimatedDeliveryDate(order);
+  return (
+    <article className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-bold text-primary-500">#{order.trackingToken}</p>
+          <h4 className="mt-0.5 truncate text-sm font-bold text-slate-900">{productName}</h4>
+          <p className="mt-1 truncate text-[11px] text-slate-500">{order.customerName} · {order.address}</p>
+        </div>
+        <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[9px] font-bold text-amber-600">{order.status}</span>
+      </div>
+      <p className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-slate-500">
+        <RiCalendarLine className="text-primary-500" /> Entrega estimada: {formatScheduleDate(deliveryDate)}
+      </p>
+    </article>
   );
 }
 
@@ -202,14 +326,21 @@ function OrderCard({ order, tab, updating, onAction }: {
   const image = item?.product.images.find(image => image.isMain)?.url || item?.product.images[0]?.url;
   const baseFlowers: FlowerLine[] = item?.customization?.baseFlowers?.length
     ? item.customization.baseFlowers
-    : item?.product.flowers.map((entry, index) => ({
-      id: `${item.id}-${index}`,
-      name: entry.flower.name,
-      imageUrl: entry.flower.imageUrl,
-      type: entry.flower.type,
-      baseQuantity: entry.quantity,
-      quantity: entry.quantity,
-    })) || [];
+    : item?.product.flowers.map((entry, index) => {
+      const range = getFlowerQuantityRange(entry);
+      return {
+        id: `${item.id}-${index}`,
+        name: entry.flower.name,
+        imageUrl: entry.flower.imageUrl,
+        type: entry.flower.type,
+        baseQuantity: range.max,
+        baseQuantityMin: range.min,
+        baseQuantityMax: range.max,
+        quantity: range.max,
+        quantityMin: range.min,
+        quantityMax: range.max,
+      };
+    }) || [];
   const extras = item?.customization?.extraFlowers || [];
   const size = item?.customization?.bouquetSize || "STANDARD";
   const processingStart = order.statusHistory?.find(entry => entry.status === "PROCESSING")?.createdAt || order.updatedAt;
@@ -231,7 +362,7 @@ function OrderCard({ order, tab, updating, onAction }: {
           </div>
           <div className="flex min-w-0 flex-col justify-center">
             <h3 className="text-[17px] font-bold leading-tight">{item?.product.name || "Arreglo floral"}</h3>
-            <p className="mt-2 flex items-center gap-2 text-[11px] text-slate-500"><RiFlowerLine className="text-primary-500" size={13} />{baseFlowers[0]?.name || "Composición floral"} x{baseFlowers[0]?.quantity || 1}</p>
+            <p className="mt-2 flex items-center gap-2 text-[11px] text-slate-500"><RiFlowerLine className="text-primary-500" size={13} />{baseFlowers[0]?.name || "Composición floral"} x{baseFlowers[0] ? formatFlowerQuantityRange(baseFlowers[0]) : 1}</p>
           </div>
         </div>
 
@@ -301,7 +432,7 @@ function FlowersList({ flowers, extras, processing = false, compact = false }: {
             {flower.imageUrl ? <img src={flower.imageUrl} alt="" className="h-full w-full object-cover" /> : <RiFlowerLine className="text-primary-400" size={23} />}
           </div>
           <div className="min-w-0 flex-1"><strong className="block truncate text-xs">{flower.name}</strong><small className="text-[9px] text-slate-400">{flower.type || "Flor principal"}</small></div>
-          <div className="text-right"><strong className="text-xs">{processing ? `${flower.quantity} / ${flower.quantity}` : flower.quantity}</strong><small className={`block text-[8px] ${processing ? "text-emerald-600" : "text-slate-400"}`}>{processing ? "completado" : "unidades"}</small></div>
+          <div className="text-right"><strong className="text-xs">{processing ? `${formatFlowerQuantityRange(flower)} / ${formatFlowerQuantityRange(flower)}` : formatFlowerQuantityRange(flower)}</strong><small className={`block text-[8px] ${processing ? "text-emerald-600" : "text-slate-400"}`}>{processing ? "completado" : "aprox."}</small></div>
         </div>
       ))}
       {extras.map(flower => (

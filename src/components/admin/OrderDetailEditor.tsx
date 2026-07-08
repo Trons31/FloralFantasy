@@ -27,6 +27,7 @@ import {
   RiWhatsappLine,
 } from "react-icons/ri";
 import { formatDeliveryLeadDays, formatPrice, STATUS_LABELS } from "@/lib/utils";
+import { formatFlowerQuantityRange, getFlowerQuantityRange } from "@/lib/flower-quantities";
 
 type Addon = { id: string; name: string; price: number; inStock: boolean; type?: string };
 type Flower = { id: string; name: string; type: string };
@@ -37,7 +38,7 @@ type Product = {
   price: number;
   deliveryLeadDays?: number;
   images: Array<{ url: string; isMain: boolean }>;
-  flowers?: Array<{ flower: Flower; quantity: number }>;
+  flowers?: Array<{ flower: Flower; quantity: number; quantityMin?: number | null; quantityMax?: number | null }>;
 };
 type Size = "STANDARD" | "REDUCED" | "ENLARGED";
 type EditorItem = {
@@ -49,7 +50,7 @@ type EditorItem = {
   customization: {
     bouquetSize: Size;
     sizeModes: { reduced: boolean; enlarged: boolean };
-    baseFlowers: Array<{ id: string; name: string; baseQuantity: number; quantity: number }>;
+    baseFlowers: Array<{ id: string; name: string; baseQuantity: number; quantity: number; baseQuantityMin?: number; baseQuantityMax?: number; quantityMin?: number; quantityMax?: number }>;
     extraFlowers: Array<{ id: string; name: string; quantity: number }>;
   };
 };
@@ -75,12 +76,19 @@ const flowLabel: Record<string, string> = {
 const imageOf = (product: Product) =>
   product.images?.find(image => image.isMain)?.url || product.images?.[0]?.url || "";
 
-const baseFlowersOf = (product: Product) => (product.flowers || []).map(item => ({
-  id: item.flower.id,
-  name: item.flower.name,
-  baseQuantity: item.quantity || 1,
-  quantity: item.quantity || 1,
-}));
+const baseFlowersOf = (product: Product) => (product.flowers || []).map(item => {
+  const range = getFlowerQuantityRange(item);
+  return {
+    id: item.flower.id,
+    name: item.flower.name,
+    baseQuantity: range.max,
+    baseQuantityMin: range.min,
+    baseQuantityMax: range.max,
+    quantity: range.max,
+    quantityMin: range.min,
+    quantityMax: range.max,
+  };
+});
 
 function normalizeItems(order: any): EditorItem[] {
   return (order.items || []).map((item: any, index: number) => {
@@ -472,7 +480,7 @@ export default function OrderDetailEditor({ initialOrder }: { initialOrder: any 
                       <MiniSection title="Flores base" Icon={RiFlowerLine}>
                         {item.customization.baseFlowers.map(flower => (
                           <div key={flower.id} className="flex items-center justify-between gap-2 border-b border-slate-100 py-2 text-xs last:border-0">
-                            <span><strong className="block">{flower.name}</strong><small className="text-slate-400">Base: {flower.baseQuantity}</small></span>
+                            <span><strong className="block">{flower.name}</strong><small className="text-slate-400">Base: {formatFlowerQuantityRange({ baseQuantity: flower.baseQuantity, baseQuantityMin: flower.baseQuantityMin, baseQuantityMax: flower.baseQuantityMax })}</small></span>
                             {item.customization.bouquetSize === "REDUCED" ? (
                               <Counter
                                 value={flower.quantity}

@@ -6,6 +6,7 @@ import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import { DEFAULT_DELIVERY_FEE } from "@/lib/site-settings";
 import { toast } from "sonner";
 import { formatPrice, formatDeliveryLeadDays } from "@/lib/utils";
+import { formatFlowerQuantityRange, getFlowerQuantityRange } from "@/lib/flower-quantities";
 
 interface ProductImage { url: string; isMain: boolean }
 interface Addon { id: string; name: string; price: number; type: string; inStock: boolean }
@@ -16,7 +17,7 @@ interface Product {
   price: number;
   description: string;
   images: ProductImage[];
-  flowers?: { flower: Flower; quantity: number }[];
+  flowers?: { flower: Flower; quantity: number; quantityMin?: number | null; quantityMax?: number | null }[];
   occasion?: string;
   deliveryLeadDays?: number;
 }
@@ -32,7 +33,7 @@ interface CartItem {
       reduced: boolean;
       enlarged: boolean;
     };
-    baseFlowers: { id: string; name: string; baseQuantity: number; quantity: number }[];
+    baseFlowers: { id: string; name: string; baseQuantity: number; quantity: number; baseQuantityMin?: number; baseQuantityMax?: number; quantityMin?: number; quantityMax?: number }[];
     extraFlowers: { id: string; name: string; quantity: number }[];
   };
 }
@@ -44,12 +45,19 @@ interface Props {
 }
 
 function buildBaseFlowers(product: Product) {
-  return (product.flowers || []).map(({ flower, quantity }) => ({
+  return (product.flowers || []).map(({ flower, quantity, quantityMin, quantityMax }) => {
+    const range = getFlowerQuantityRange({ quantity, quantityMin, quantityMax });
+    return {
     id: flower.id,
     name: flower.name,
-    baseQuantity: quantity || 1,
-    quantity: quantity || 1,
-  }));
+    baseQuantity: range.max,
+    baseQuantityMin: range.min,
+    baseQuantityMax: range.max,
+    quantity: range.max,
+    quantityMin: range.min,
+    quantityMax: range.max,
+  };
+  });
 }
 
 function formatNames(items: { name: string }[]) {
@@ -593,7 +601,7 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                                     <div className="min-w-0">
                                       <p className="text-sm font-semibold text-gray-900 truncate">{flower.name}</p>
                                       <p className="text-[11px] text-gray-400">
-                                        Base: {flower.baseQuantity}
+                                        Base: {formatFlowerQuantityRange({ baseQuantity: flower.baseQuantity, baseQuantityMin: flower.baseQuantityMin, baseQuantityMax: flower.baseQuantityMax })}
                                         {flower.quantity > flower.baseQuantity
                                           ? " · aumentada"
                                           : flower.quantity < flower.baseQuantity

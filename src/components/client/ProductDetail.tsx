@@ -30,6 +30,7 @@ import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { useCartStore } from "@/store/cartStore";
 import { formatDeliveryLeadDays, formatPrice } from "@/lib/utils";
+import { formatFlowerQuantityRange, getFlowerQuantityRange } from "@/lib/flower-quantities";
 
 const ADDON_ICONS: Record<string, typeof RiGiftLine> = {
   BEBIDA: RiGobletLine,
@@ -83,7 +84,11 @@ export default function ProductDetail({
     [selectedAddons]
   );
   const total = product.price * quantity + addonTotal * quantity;
-  const flowerTotal = product.flowers.reduce((sum: number, item: any) => sum + Number(item.quantity || 1), 0);
+  const flowerTotals = product.flowers.reduce((totals: { min: number; max: number }, item: any) => {
+    const range = getFlowerQuantityRange(item);
+    return { min: totals.min + range.min, max: totals.max + range.max };
+  }, { min: 0, max: 0 });
+  const flowerTotal = flowerTotals.min === flowerTotals.max ? String(flowerTotals.max) : `${flowerTotals.min}-${flowerTotals.max}`;
 
   const toggleFavorite = () => {
     const current = readCookieArray("ff_favorite_products");
@@ -117,7 +122,9 @@ export default function ProductDetail({
         id: entry.flower.id,
         name: entry.flower.name,
         type: entry.flower.type,
-        quantity: entry.quantity || 1,
+        quantity: getFlowerQuantityRange(entry).max,
+        quantityMin: getFlowerQuantityRange(entry).min,
+        quantityMax: getFlowerQuantityRange(entry).max,
       })),
       addons: chosenAddons.map(addon => ({
         id: addon.id,
@@ -201,7 +208,7 @@ export default function ProductDetail({
                   {product.flowers.slice(0, 4).map((entry: any) => (
                     <div key={entry.id} className="text-center">
                       <span className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-primary-50 text-primary-500"><RiFlowerLine /></span>
-                      <p className="mt-2 text-xs font-medium leading-5 text-slate-600">{entry.quantity || 1} {entry.flower.name}</p>
+                      <p className="mt-2 text-xs font-medium leading-5 text-slate-600">{formatFlowerQuantityRange(entry)} {entry.flower.name}</p>
                     </div>
                   ))}
                   {product.flowers.length < 3 && (
@@ -235,7 +242,7 @@ export default function ProductDetail({
 
         <section className="mt-6 grid rounded-2xl border border-slate-200 bg-white shadow-sm md:grid-cols-3">
           {[
-            { Icon: RiFlowerLine, title: "Flores frescas", text: `${flowerTotal || "Flores"} seleccionadas cuidadosamente.` },
+            { Icon: RiFlowerLine, title: "Flores frescas", text: `${flowerTotal || "Flores"} aprox. seleccionadas cuidadosamente.` },
             { Icon: RiTruckLine, title: formatDeliveryLeadDays(product.deliveryLeadDays || 0), text: "Preparamos tu pedido con el tiempo necesario para entregarlo perfecto." },
             { Icon: RiGiftLine, title: "Presentación premium", text: "Cada arreglo se prepara con cuidado y materiales seleccionados." },
           ].map((benefit, index) => (

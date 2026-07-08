@@ -61,10 +61,10 @@ const STATUS_CONFIG: Record<string, {
     dot: "bg-amber-400",
   },
   PAID: {
-    label: "En producción",
-    shortLabel: "En producción",
-    color: "border-blue-100 bg-blue-50 text-blue-600",
-    dot: "bg-blue-500",
+    label: "Por preparar",
+    shortLabel: "Por preparar",
+    color: "border-amber-100 bg-amber-50 text-amber-600",
+    dot: "bg-amber-400",
   },
   PROCESSING: {
     label: "En producción",
@@ -73,10 +73,10 @@ const STATUS_CONFIG: Record<string, {
     dot: "bg-blue-500",
   },
   READY: {
-    label: "En producción",
-    shortLabel: "En producción",
-    color: "border-blue-100 bg-blue-50 text-blue-600",
-    dot: "bg-blue-500",
+    label: "Listo",
+    shortLabel: "Listo",
+    color: "border-emerald-100 bg-emerald-50 text-emerald-600",
+    dot: "bg-emerald-500",
   },
   OUT_FOR_DELIVERY: {
     label: "En ruta",
@@ -101,7 +101,7 @@ const STATUS_CONFIG: Record<string, {
 const STATUS_FILTERS = [
   { value: "PENDING", label: "Pendiente", dot: "bg-amber-400" },
   { value: "PAYMENT_INVALID", label: "Pago inválido", dot: "bg-red-500" },
-  { value: "PAID", label: "Pagado", dot: "bg-cyan-500" },
+  { value: "PAID", label: "Por preparar", dot: "bg-amber-400" },
   { value: "PRODUCTION", label: "En producción", dot: "bg-blue-500" },
   { value: "OUT_FOR_DELIVERY", label: "En ruta", dot: "bg-violet-600" },
   { value: "DELIVERED", label: "Entregado", dot: "bg-emerald-500" },
@@ -168,6 +168,33 @@ function getProductImage(order: any) {
 
 function isPaid(status: string) {
   return ["PAID", "PROCESSING", "READY", "OUT_FOR_DELIVERY", "DELIVERED"].includes(status);
+}
+
+function PaymentProofCard({
+  url,
+  className = "",
+  onOpen,
+}: {
+  url?: string | null;
+  className?: string;
+  onOpen: () => void;
+}) {
+  if (!url) {
+    return (
+      <div className={`rounded-2xl border border-dashed border-gray-200 p-4 text-sm text-gray-400 ${className}`}>
+        Aún no hay comprobante asociado a este pedido.
+      </div>
+    );
+  }
+
+  return (
+    <button type="button" onClick={onOpen}
+      className={`w-full rounded-2xl border border-dashed border-primary-200 bg-primary-50 p-3 text-left ${className}`}>
+      <p className="mb-2 text-sm font-semibold text-primary-700">Comprobante cargado</p>
+      <img src={url} alt="Comprobante" className="h-56 w-full rounded-xl object-cover" />
+      <p className="mt-2 text-xs text-primary-600">Toca para ampliarlo</p>
+    </button>
+  );
 }
 
 function whatsappUrl(order: any) {
@@ -724,6 +751,14 @@ export default function PedidosListClient({
                 )}
               </div>
 
+              {selectedOrder.paymentProofUrl && (
+                <PaymentProofCard
+                  url={selectedOrder.paymentProofUrl}
+                  className="lg:hidden"
+                  onOpen={() => setViewPhoto(selectedOrder.paymentProofUrl)}
+                />
+              )}
+
               {selectedOrder.adminNote && (
                 <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
                   <p className="mb-2 text-sm font-semibold text-amber-800">Observaciones del pedido</p>
@@ -763,18 +798,11 @@ export default function PedidosListClient({
                 </div>
               </div>
 
-              {selectedOrder.paymentProofUrl ? (
-                <button type="button" onClick={() => setViewPhoto(selectedOrder.paymentProofUrl)}
-                  className="w-full rounded-2xl border border-dashed border-primary-200 bg-primary-50 p-3 text-left">
-                  <p className="mb-2 text-sm font-semibold text-primary-700">Comprobante cargado</p>
-                  <img src={selectedOrder.paymentProofUrl} alt="Comprobante" className="h-56 w-full rounded-xl object-cover" />
-                  <p className="mt-2 text-xs text-primary-600">Toca para ampliarlo</p>
-                </button>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-gray-200 p-4 text-sm text-gray-400">
-                  Aún no hay comprobante asociado a este pedido.
-                </div>
-              )}
+              <PaymentProofCard
+                url={selectedOrder.paymentProofUrl}
+                className={selectedOrder.paymentProofUrl ? "hidden lg:block" : ""}
+                onOpen={() => selectedOrder.paymentProofUrl && setViewPhoto(selectedOrder.paymentProofUrl)}
+              />
 
               {selectedOrder.deliveryPhotoUrl && (
                 <button type="button" onClick={() => setViewPhoto(selectedOrder.deliveryPhotoUrl)}

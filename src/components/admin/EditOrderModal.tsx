@@ -16,6 +16,7 @@ import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import { DEFAULT_DELIVERY_FEE } from "@/lib/site-settings";
 import { toast } from "sonner";
 import { formatPrice, formatDeliveryLeadDays } from "@/lib/utils";
+import { formatFlowerQuantityRange, getFlowerQuantityRange } from "@/lib/flower-quantities";
 
 interface ProductImage { url: string; isMain: boolean }
 interface Addon { id: string; name: string; price: number; type: string; inStock: boolean }
@@ -26,7 +27,7 @@ interface Product {
   price: number;
   description: string;
   images: ProductImage[];
-  flowers?: { flower: Flower; quantity: number }[];
+  flowers?: { flower: Flower; quantity: number; quantityMin?: number | null; quantityMax?: number | null }[];
   occasion?: string;
   deliveryLeadDays?: number;
 }
@@ -42,7 +43,7 @@ type CartItem = {
       reduced: boolean;
       enlarged: boolean;
     };
-    baseFlowers: { id: string; name: string; baseQuantity: number; quantity: number }[];
+    baseFlowers: { id: string; name: string; baseQuantity: number; quantity: number; baseQuantityMin?: number; baseQuantityMax?: number; quantityMin?: number; quantityMax?: number }[];
     extraFlowers: { id: string; name: string; quantity: number }[];
   };
 };
@@ -57,7 +58,7 @@ type OrderItem = {
       reduced?: boolean;
       enlarged?: boolean;
     };
-    baseFlowers?: { id: string; name: string; baseQuantity: number; quantity: number }[];
+    baseFlowers?: { id: string; name: string; baseQuantity: number; quantity: number; baseQuantityMin?: number; baseQuantityMax?: number; quantityMin?: number; quantityMax?: number }[];
     extraFlowers?: { id: string; name: string; quantity: number }[];
   } | null;
   product: Product;
@@ -79,12 +80,19 @@ type OrderDetail = {
 };
 
 function buildBaseFlowers(product: Product) {
-  return (product.flowers || []).map(({ flower, quantity }) => ({
+  return (product.flowers || []).map(({ flower, quantity, quantityMin, quantityMax }) => {
+    const range = getFlowerQuantityRange({ quantity, quantityMin, quantityMax });
+    return {
     id: flower.id,
     name: flower.name,
-    baseQuantity: quantity || 1,
-    quantity: quantity || 1,
-  }));
+    baseQuantity: range.max,
+    baseQuantityMin: range.min,
+    baseQuantityMax: range.max,
+    quantity: range.max,
+    quantityMin: range.min,
+    quantityMax: range.max,
+  };
+  });
 }
 
 function deriveSizeModes(customization: OrderItem["customization"], baseFlowers: { baseQuantity: number; quantity: number }[]) {
@@ -676,7 +684,7 @@ export default function EditOrderModal({
                               <div key={flower.id} className="flex items-center justify-between gap-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
                                 <div className="min-w-0">
                                   <p className="truncate text-sm font-semibold text-gray-900">{flower.name}</p>
-                                  <p className="text-[11px] text-gray-400">Base: {flower.baseQuantity}</p>
+                                  <p className="text-[11px] text-gray-400">Base: {formatFlowerQuantityRange({ baseQuantity: flower.baseQuantity, baseQuantityMin: flower.baseQuantityMin, baseQuantityMax: flower.baseQuantityMax })}</p>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                   <button

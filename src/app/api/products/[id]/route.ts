@@ -2,6 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { productFlowerInclude } from "@/lib/product-selects";
 import { requireAdminUser } from "@/lib/route-auth";
+
+function normalizeFlowerRelation(item: any) {
+  const fallback = Math.max(1, Number(item.quantity) || 1);
+  const rawMin = Number(item.quantityMin ?? item.minQuantity ?? fallback);
+  const rawMax = Number(item.quantityMax ?? item.maxQuantity ?? fallback);
+  const quantityMin = Math.max(1, Number.isFinite(rawMin) ? Math.floor(rawMin) : fallback);
+  const quantityMax = Math.max(quantityMin, Number.isFinite(rawMax) ? Math.floor(rawMax) : quantityMin);
+  return {
+    flowerId: item.flowerId,
+    quantity: quantityMax,
+    quantityMin,
+    quantityMax,
+  };
+}
+
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   if (!(await requireAdminUser())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
@@ -18,7 +33,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     data: {
       ...data,
       images: { create: images.map((img: any, i: number) => ({ url: img.url, publicId: img.publicId || "", isMain: i === 0, order: i })) },
-      flowers: { create: flowerData.map((item: any) => ({ flowerId: item.flowerId, quantity: Math.max(1, Number(item.quantity) || 1) })) },
+      flowers: { create: flowerData.map(normalizeFlowerRelation) },
     },
     include: { images: true, category: true, flowers: productFlowerInclude },
   });

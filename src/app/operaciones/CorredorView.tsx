@@ -1,12 +1,15 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   RiRunLine, RiReceiptLine, RiLoader4Line, RiLogoutBoxLine, RiRefreshLine,
   RiCameraLine, RiCloseLine, RiCheckLine, RiArrowDownLine, RiDeleteBinLine,
   RiPencilLine, RiImageLine,
+  RiCalendarCheckLine, RiCalendarLine, RiFlowerLine, RiMapPin2Line,
 } from "react-icons/ri";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { getFlowerQuantityRange } from "@/lib/flower-quantities";
+import { formatScheduleDate, getEstimatedDeliveryDate, localDateKey, parseLocalDateKey } from "@/lib/order-schedule";
 
 const EXPENSE_CATS = ["Insumos", "Flores", "Transporte", "Empaque", "Otro"];
 const MAX_RECEIPT_PHOTO_DIMENSION = 1600;
@@ -33,6 +36,30 @@ type Expense = {
 type ReceiptPhoto = {
   file: File;
   preview: string;
+};
+
+type Order = {
+  id: string;
+  trackingToken: string;
+  customerName: string;
+  address: string;
+  status: string;
+  estimatedTime: string;
+  createdAt: string;
+  items: Array<{
+    id: string;
+    quantity: number;
+    product: {
+      name: string;
+      deliveryLeadDays?: number | null;
+      flowers: Array<{
+        quantity: number;
+        quantityMin?: number | null;
+        quantityMax?: number | null;
+        flower: { name: string; type?: string | null; color?: string | null };
+      }>;
+    };
+  }>;
 };
 
 function formatPrice(n: number) {
@@ -78,8 +105,16 @@ function createPhotoPreview(file: File) {
 }
 
 export default function CorredorView({ user, onLogout }: { user: { id: string; name: string; role: string }; onLogout: () => void }) {
+  const [activeTab, setActiveTab] = useState<"expenses" | "orders">("expenses");
   const [expenses,     setExpenses]     = useState<Expense[]>([]);
+  const [orders,       setOrders]       = useState<Order[]>([]);
   const [loading,      setLoading]      = useState(true);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [selectedOrderDate, setSelectedOrderDate] = useState(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return localDateKey(tomorrow);
+  });
   /* ── Create state ── */
   const [showCreate,   setShowCreate]   = useState(false);
   const [createForm,   setCreateForm]   = useState(emptyForm);
@@ -107,9 +142,47 @@ export default function CorredorView({ user, onLogout }: { user: { id: string; n
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  const loadOrders = async () => {
+    setOrdersLoading(true);
+    try {
+      const response = await fetch("/api/orders?status=PENDING_PAYMENT_CONFIRMATION,PAID,PROCESSING,READY");
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No fue posible cargar pedidos");
+      setOrders(Array.isArray(data) ? data : []);
+    } catch (error: any) {
+      toast.error(error.message || "No fue posible cargar pedidos");
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); void loadOrders(); }, []);
 
   const total = expenses.reduce((s, e) => s + e.amount, 0);
+  const futureOrders = useMemo(() => {
+    const todayKey = localDateKey(new Date());
+    return orders.filter(order => localDateKey(getEstimatedDeliveryDate(order)) > todayKey);
+  }, [orders]);
+  const orderDays = useMemo(() => {
+    const counts = new Map<string, number>();
+    futureOrders.forEach(order => {
+      const key = localDateKey(getEstimatedDeliveryDate(order));
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    return Array.from({ length: 30 }, (_, index) => {
+      const date = new Date(tomorrow);
+      date.setDate(tomorrow.getDate() + index);
+      const key = localDateKey(date);
+      return { key, date, count: counts.get(key) || 0 };
+    });
+  }, [futureOrders]);
+  const selectedOrders = useMemo(
+    () => futureOrders.filter(order => localDateKey(getEstimatedDeliveryDate(order)) === selectedOrderDate),
+    [futureOrders, selectedOrderDate]
+  );
 
   const addCreatePhotos = (files: FileList | File[]) => {
     const next = Array.from(files).map((file) => ({ file, preview: createPhotoPreview(file) }));
@@ -239,7 +312,7 @@ export default function CorredorView({ user, onLogout }: { user: { id: string; n
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <button onClick={load}
+            <button onClick={() => { load(); void loadOrders(); }}
               className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 rounded-xl text-gray-400 transition-colors">
               <RiRefreshLine size={18}/>
             </button>
@@ -250,14 +323,37 @@ export default function CorredorView({ user, onLogout }: { user: { id: string; n
           </div>
         </div>
         <div className="px-4 pb-3">
-          <button onClick={() => setShowCreate(true)}
-            className="w-full flex items-center justify-center gap-2 bg-green-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-green-600 active:scale-95 transition-all">
-            <RiReceiptLine size={16}/> Registrar gasto
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => setActiveTab("expenses")}
+              className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-all ${activeTab === "expenses" ? "bg-green-500 text-white" : "bg-gray-100 text-gray-600"}`}>
+              <RiReceiptLine size={16}/> Gastos
+            </button>
+            <button onClick={() => setActiveTab("orders")}
+              className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-all ${activeTab === "orders" ? "bg-green-500 text-white" : "bg-gray-100 text-gray-600"}`}>
+              <RiCalendarCheckLine size={16}/> Pedidos
+            </button>
+          </div>
+          {activeTab === "expenses" && (
+            <button onClick={() => setShowCreate(true)}
+              className="mt-2 w-full flex items-center justify-center gap-2 bg-green-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-green-600 active:scale-95 transition-all">
+              <RiReceiptLine size={16}/> Registrar gasto
+            </button>
+          )}
         </div>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+        {activeTab === "orders" ? (
+          <CorredorOrdersCalendar
+            loading={ordersLoading}
+            days={orderDays}
+            selectedDate={selectedOrderDate}
+            onSelectDate={setSelectedOrderDate}
+            orders={selectedOrders}
+            totalFuture={futureOrders.length}
+          />
+        ) : (
+          <>
         {/* Summary */}
         {expenses.length > 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center justify-between">
@@ -321,6 +417,8 @@ export default function CorredorView({ user, onLogout }: { user: { id: string; n
               </div>
             ))}
           </div>
+        )}
+          </>
         )}
       </div>
 
@@ -647,5 +745,110 @@ function ExpenseCreateModal({
         </div>
       </div>
     </div>
+  );
+}
+
+function CorredorOrdersCalendar({
+  loading,
+  days,
+  selectedDate,
+  onSelectDate,
+  orders,
+  totalFuture,
+}: {
+  loading: boolean;
+  days: Array<{ key: string; date: Date; count: number }>;
+  selectedDate: string;
+  onSelectDate: (date: string) => void;
+  orders: Order[];
+  totalFuture: number;
+}) {
+  if (loading) {
+    return <div className="flex justify-center py-20"><RiLoader4Line className="animate-spin text-green-500" size={32}/></div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-green-100 bg-white p-4 shadow-sm">
+        <p className="text-xs text-gray-400">Pedidos próximos</p>
+        <p className="text-2xl font-bold text-green-600">{totalFuture}</p>
+        <p className="mt-1 text-xs text-gray-400">De mañana a 30 días</p>
+      </div>
+
+      <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
+        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {days.map(day => {
+            const active = day.key === selectedDate;
+            return (
+              <button
+                key={day.key}
+                type="button"
+                onClick={() => onSelectDate(day.key)}
+                className={`min-w-[78px] rounded-2xl border px-2.5 py-2 text-center transition ${active ? "border-green-200 bg-green-50 text-green-700" : day.count ? "border-amber-100 bg-amber-50 text-amber-700" : "border-gray-100 bg-gray-50 text-gray-400"}`}
+              >
+                <span className="block text-[10px] font-semibold capitalize">{formatScheduleDate(day.date).split(",")[0]}</span>
+                <strong className="mt-0.5 block text-sm">{day.date.getDate()}</strong>
+                <span className="mt-0.5 block text-[9px]">{day.count} ped.</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Fecha seleccionada</p>
+            <h2 className="text-sm font-bold capitalize">{formatScheduleDate(parseLocalDateKey(selectedDate))}</h2>
+          </div>
+          <span className="rounded-full bg-green-50 px-3 py-1 text-[10px] font-bold text-green-600">{orders.length} pedidos</span>
+        </div>
+
+        {orders.length ? (
+          <div className="space-y-3">
+            {orders.map(order => <CorredorOrderCard key={order.id} order={order} />)}
+          </div>
+        ) : (
+          <div className="py-12 text-center">
+            <RiCalendarLine className="mx-auto text-gray-200" size={50} />
+            <p className="mt-3 text-gray-400 font-medium">Sin pedidos para este día</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CorredorOrderCard({ order }: { order: Order }) {
+  const productNames = order.items.map(item => `${item.quantity > 1 ? `x${item.quantity} ` : ""}${item.product?.name || "Producto"}`).join(", ");
+  const flowerLines = order.items.flatMap(item =>
+    (item.product?.flowers || []).map(entry => {
+      const range = getFlowerQuantityRange(entry);
+      return `${entry.flower.name} ${range.min === range.max ? range.max : `${range.min}-${range.max}`}`;
+    })
+  );
+
+  return (
+    <article className="rounded-2xl border border-gray-100 bg-gray-50 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-bold text-green-600">#{order.trackingToken}</p>
+          <h3 className="mt-0.5 truncate text-sm font-bold text-gray-900">{productNames}</h3>
+          <p className="mt-1 flex items-center gap-1 truncate text-[11px] text-gray-500"><RiMapPin2Line className="shrink-0" />{order.address}</p>
+        </div>
+        <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[9px] font-bold text-gray-500">{order.status}</span>
+      </div>
+
+      {flowerLines.length > 0 && (
+        <div className="mt-3 rounded-xl bg-white p-2">
+          <p className="mb-1 flex items-center gap-1 text-[10px] font-bold text-gray-500"><RiFlowerLine /> Flores a comprar</p>
+          <p className="text-[11px] leading-5 text-gray-600">{flowerLines.join(" · ")}</p>
+        </div>
+      )}
+
+      <p className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-gray-500">
+        <RiCalendarLine className="text-green-500" /> Entrega estimada: {formatScheduleDate(getEstimatedDeliveryDate(order))}
+      </p>
+    </article>
   );
 }
