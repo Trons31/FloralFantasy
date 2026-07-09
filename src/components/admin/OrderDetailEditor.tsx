@@ -66,8 +66,8 @@ const FLOW_STATUSES = [
 
 const flowLabel: Record<string, string> = {
   PENDING_PAYMENT_CONFIRMATION: "Pedido recibido",
-  PAID: "Pago confirmado",
-  PROCESSING: "Preparando flores",
+  PAID: "Por preparar",
+  PROCESSING: "En producción",
   READY: "Pedido listo",
   OUT_FOR_DELIVERY: "En camino",
   DELIVERED: "Entregado",

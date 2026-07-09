@@ -179,6 +179,8 @@ model Order {
   deliveryPhotoPublicId String?
   adminNote       String?
   manualAdjustment Float               @default(0)
+  preparationOrder Int?
+  isUrgent        Boolean              @default(false)
   items           OrderItem[]
   statusHistory   OrderStatusHistory[]
   notifications   Notification[]

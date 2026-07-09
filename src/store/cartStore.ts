@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { maxPreparationTime } from "@/lib/utils";
+import { formatCustomerDeliveryDate, getDeliveryDateLabel, getEffectiveDeliveryLeadDays, maxPreparationTime } from "@/lib/utils";
 
 export interface CartAddon {
   id: string; name: string; price: number; type: string;
@@ -41,7 +41,7 @@ interface CartStore {
   getTotalItems: () => number;
   getTotalPrice: () => number;
   getEstimatedTime: () => { value: number; unit: string; label: string };
-  getDeliveryLeadDays: () => { days: number; label: string; dateLabel: string };
+  getDeliveryLeadDays: (sameDayCutoffTime?: string) => { days: number; label: string; dateLabel: string };
 }
 
 const calcSubtotal = (item: Omit<CartItem, "subtotal">) =>
@@ -89,16 +89,10 @@ export const useCartStore = create<CartStore>()(
             preparationTimeUnit: i.preparationTimeUnit,
           }))
         ),
-      getDeliveryLeadDays: () => {
-        const days = get().items.reduce((max, item) => Math.max(max, item.deliveryLeadDays || 0), 0);
-        const label = days <= 0 ? "Entrega hoy" : days === 1 ? "Entrega en 1 día" : `Entrega en ${days} días`;
-        const date = new Date();
-        date.setDate(date.getDate() + days);
-        const dateLabel = new Intl.DateTimeFormat("es-CO", {
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-        }).format(date);
+      getDeliveryLeadDays: (sameDayCutoffTime = "16:00") => {
+        const days = get().items.reduce((max, item) => Math.max(max, getEffectiveDeliveryLeadDays(item.deliveryLeadDays || 0, sameDayCutoffTime)), 0);
+        const label = formatCustomerDeliveryDate(days);
+        const dateLabel = getDeliveryDateLabel(days);
         return { days, label, dateLabel };
       },
     }),

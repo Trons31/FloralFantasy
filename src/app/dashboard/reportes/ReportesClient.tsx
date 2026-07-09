@@ -95,7 +95,7 @@ const STATUS_LABELS: Record<string, string> = {
   PENDING: "Pendiente",
   PENDING_PAYMENT_CONFIRMATION: "Por confirmar",
   PAYMENT_INVALID: "Pago inválido",
-  PAID: "Pagado",
+  PAID: "Por preparar",
   PROCESSING: "En producción",
   READY: "Listo",
   OUT_FOR_DELIVERY: "En ruta",

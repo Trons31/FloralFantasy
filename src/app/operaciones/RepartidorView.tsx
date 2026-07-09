@@ -12,11 +12,22 @@ type Addon     = { id:string; addon:{ name:string } };
 type OrderItem = { id:string; quantity:number; addons:Addon[]; product:{ name:string; images:{url:string;isMain:boolean}[] } };
 type Order     = { id:string; trackingToken:string; customerName:string; address:string;
   customerPhone?:string; addressRef?:string; city?: { name: string } | null; estimatedTime:string; total:number; status:string;
+  preparationOrder?: number | null; isUrgent?: boolean; createdAt?: string;
   deliveryPhotoUrl?:string; items:OrderItem[] };
 
 const EXPENSE_CATS = ["Insumos","Flores","Transporte","Empaque","Otro"];
 const MAX_DELIVERY_PHOTO_DIMENSION = 1600;
 const DELIVERY_PHOTO_QUALITY = 0.82;
+
+function sortDeliveryOrders(list: Order[]) {
+  return [...list].sort((a, b) => {
+    if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
+    const aOrder = a.preparationOrder ?? Number.MAX_SAFE_INTEGER;
+    const bOrder = b.preparationOrder ?? Number.MAX_SAFE_INTEGER;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+  });
+}
 
 async function compressImageForUpload(file: File) {
   if (!file.type.startsWith("image/")) return file;
@@ -173,8 +184,8 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
     setEgresoFile(null); setEgresoPreview(null);
   };
 
-  const ready          = orders.filter(o => o.status === "READY");
-  const delivered      = orders.filter(o => ["OUT_FOR_DELIVERY","DELIVERED"].includes(o.status));
+  const ready          = sortDeliveryOrders(orders.filter(o => o.status === "READY"));
+  const delivered      = sortDeliveryOrders(orders.filter(o => ["OUT_FOR_DELIVERY","DELIVERED"].includes(o.status)));
   const activeOrders   = activeTab === "READY" ? ready : delivered;
   const activeConfig   = activeTab === "READY"
     ? { title:"Listos para recoger", count: ready.length, dot:"bg-green-500" }
@@ -521,7 +532,7 @@ function DeliveryCard({ order, updating, action, onAction, onDeliver }: {
   const telUrl = phoneDigits ? `tel:${phoneDigits}` : "";
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+    <div className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${order.isUrgent ? "border-red-300 ring-2 ring-red-100" : "border-gray-100"}`}>
       <div className="flex gap-4 p-4">
         <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-xl overflow-hidden bg-gray-50 flex-shrink-0">
           {mainImg
@@ -547,6 +558,8 @@ function DeliveryCard({ order, updating, action, onAction, onDeliver }: {
             <div className="shrink-0 text-right">
               <p className="text-[10px] uppercase tracking-[0.18em] text-gray-400 font-semibold">Guía</p>
               <p className="text-xs font-mono text-primary-600 font-bold mt-0.5">{order.trackingToken}</p>
+              {order.isUrgent && <p className="mt-1 rounded-full bg-red-600 px-2 py-1 text-[9px] font-bold text-white">Urgente</p>}
+              {order.preparationOrder && <p className="mt-1 rounded-full bg-blue-50 px-2 py-1 text-[9px] font-bold text-blue-600">Orden #{order.preparationOrder}</p>}
             </div>
           </div>
         </div>

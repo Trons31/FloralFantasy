@@ -39,6 +39,7 @@ function statusFilter(status?: string) {
     case "PENDING":
       return { in: ["PENDING", "PENDING_PAYMENT_CONFIRMATION"] };
     case "PRODUCTION":
+    case "PROCESSING":
       return "PROCESSING";
     case "PAID":
     case "PAYMENT_INVALID":
@@ -122,7 +123,11 @@ export default async function TodosPedidosPage({
             },
           },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: [
+          { isUrgent: "desc" },
+          { preparationOrder: { sort: "asc", nulls: "last" } },
+          { createdAt: "desc" },
+        ],
         skip: (page - 1) * perPage,
         take: perPage,
       }),

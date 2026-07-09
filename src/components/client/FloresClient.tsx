@@ -23,8 +23,9 @@ import {
   RiWhatsappLine,
 } from "react-icons/ri";
 import { GiDiamondRing, GiFlowerPot, GiRose, GiSunflower, GiTiara } from "react-icons/gi";
-import { formatPrice } from "@/lib/utils";
+import { formatCustomerDeliveryDate, formatPrice, getEffectiveDeliveryLeadDays, hasSameDayCutoffPassed } from "@/lib/utils";
 import { useCartStore } from "@/store/cartStore";
+import { DEFAULT_SAME_DAY_CUTOFF_TIME } from "@/lib/site-settings";
 
 type CatalogProduct = {
   id: string;
@@ -79,6 +80,7 @@ export default function FloresClient({
   const [search, setSearch] = useState(initialFilters.q || "");
   const [sortBy, setSortBy] = useState("recent");
   const [priceRange, setPriceRange] = useState("all");
+  const [sameDayCutoffTime, setSameDayCutoffTime] = useState(DEFAULT_SAME_DAY_CUTOFF_TIME);
   const [activeFilter, setActiveFilter] = useState<{ type: FilterKey; value: string }>(() => {
     if (initialFilters.categoria) return { type: "category", value: initialFilters.categoria };
     if (initialFilters.ocasion) return { type: "occasion", value: initialFilters.ocasion };
@@ -90,6 +92,15 @@ export default function FloresClient({
   const { addItem, toggleCart } = useCartStore();
 
   useEffect(() => setFavorites(readCookieArray("ff_favorite_products")), []);
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then(response => response.json())
+      .then(data => {
+        if (typeof data?.sameDayCutoffTime === "string") setSameDayCutoffTime(data.sameDayCutoffTime);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const term = search.trim();
@@ -275,7 +286,7 @@ export default function FloresClient({
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-5">
               {filtered.map((product, index) => (
                 <motion.div key={product.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index * 0.025, 0.25) }}>
-                  <ProductCard product={product} favorite={favorites.includes(product.id)} onFavorite={toggleFavorite} onAdd={handleAdd} />
+                  <ProductCard product={product} favorite={favorites.includes(product.id)} onFavorite={toggleFavorite} onAdd={handleAdd} sameDayCutoffTime={sameDayCutoffTime} />
                 </motion.div>
               ))}
             </div>
@@ -285,7 +296,7 @@ export default function FloresClient({
         <section className="mb-5 grid rounded-2xl border border-slate-200 bg-white sm:grid-cols-2 lg:grid-cols-4">
           {[
             { Icon: RiFlowerLine, title: "Flores frescas", text: "Seleccionadas cuidadosamente cada día." },
-            { Icon: RiTruckLine, title: "Entrega el mismo día", text: "Haz tu pedido antes de las 2:00 PM." },
+            { Icon: RiTruckLine, title: "Entrega el mismo día", text: `Haz tu pedido antes de las ${sameDayCutoffTime}.` },
             { Icon: RiGift2Line, title: "Presentación premium", text: "Cada arreglo se prepara con amor." },
             { Icon: RiShoppingBagLine, title: "Tarjeta personalizada", text: "Incluye tu mensaje sin costo adicional." },
           ].map(({ Icon, title, text }) => (
@@ -342,9 +353,11 @@ function CompactProductCard({ product, favorite, onFavorite }: { product: Catalo
   );
 }
 
-function ProductCard({ product, favorite, onFavorite, onAdd }: { product: CatalogProduct; favorite: boolean; onFavorite: (id: string) => void; onAdd: (product: CatalogProduct) => void }) {
+function ProductCard({ product, favorite, onFavorite, onAdd, sameDayCutoffTime }: { product: CatalogProduct; favorite: boolean; onFavorite: (id: string) => void; onAdd: (product: CatalogProduct) => void; sameDayCutoffTime: string }) {
   const image = getImage(product);
   const flower = product.flowers[0]?.flower;
+  const effectiveDeliveryLeadDays = getEffectiveDeliveryLeadDays(product.deliveryLeadDays || 0, sameDayCutoffTime);
+  const sameDayMovedToTomorrow = (product.deliveryLeadDays || 0) === 0 && hasSameDayCutoffPassed(sameDayCutoffTime);
   return (
     <article className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
       <Link href={`/flores/${product.id}`} className="relative block aspect-[1.25] overflow-hidden bg-slate-50">
@@ -357,7 +370,8 @@ function ProductCard({ product, favorite, onFavorite, onAdd }: { product: Catalo
         <p className="mt-1 text-base font-extrabold">{formatPrice(product.price)}</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           <span className="rounded-md bg-rose-50 px-2 py-1 text-[9px] text-primary-500">{flower?.name || product.category?.name}</span>
-          {!product.requiresSpecialOrder && product.deliveryLeadDays === 0 && <span className="rounded-md bg-emerald-50 px-2 py-1 text-[9px] text-emerald-600">Mismo día</span>}
+          {!product.requiresSpecialOrder && product.deliveryLeadDays === 0 && <span className="rounded-md bg-emerald-50 px-2 py-1 text-[9px] text-emerald-600">{formatCustomerDeliveryDate(effectiveDeliveryLeadDays)}</span>}
+          {sameDayMovedToTomorrow && <span className="rounded-md bg-amber-50 px-2 py-1 text-[9px] text-amber-700">Después de {sameDayCutoffTime}</span>}
         </div>
         <div className="mt-3 grid grid-cols-[1fr_38px] gap-2">
           <Link href={`/flores/${product.id}`} className="flex h-9 items-center justify-center rounded-lg border border-primary-300 text-[10px] font-bold text-primary-500 transition hover:bg-primary-500 hover:text-white">Ver producto</Link>

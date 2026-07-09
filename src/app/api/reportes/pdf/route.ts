@@ -43,7 +43,7 @@ function statusLabel(status: string) {
     PENDING: "Pendiente",
     PENDING_PAYMENT_CONFIRMATION: "Pendiente de confirmación",
     PAYMENT_INVALID: "Pago inválido",
-    PAID: "Pagado",
+    PAID: "Por preparar",
     PROCESSING: "En producción",
     READY: "Listo",
     OUT_FOR_DELIVERY: "En ruta",

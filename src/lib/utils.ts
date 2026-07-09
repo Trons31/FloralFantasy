@@ -33,6 +33,33 @@ export function getDeliveryDateLabel(days: number, baseDate = new Date()): strin
   }).format(date);
 }
 
+export function formatCustomerDeliveryDate(days: number, baseDate = new Date()): string {
+  if (!days || days <= 0) return "Mismo día";
+  return `Entrega el ${getDeliveryDateLabel(days, baseDate)}`;
+}
+
+export function hasSameDayCutoffPassed(cutoffTime: string, now = new Date(), timeZone = "America/Bogota") {
+  const [cutoffHour, cutoffMinute] = cutoffTime.split(":").map(Number);
+  if (!Number.isFinite(cutoffHour) || !Number.isFinite(cutoffMinute)) return false;
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    hour12: false,
+  }).formatToParts(now);
+  const hour = Number(parts.find(part => part.type === "hour")?.value || 0);
+  const minute = Number(parts.find(part => part.type === "minute")?.value || 0);
+
+  return hour * 60 + minute > cutoffHour * 60 + cutoffMinute;
+}
+
+export function getEffectiveDeliveryLeadDays(days: number, cutoffTime: string, now = new Date()) {
+  const baseDays = Math.max(0, Number(days) || 0);
+  return baseDays === 0 && hasSameDayCutoffPassed(cutoffTime, now) ? 1 : baseDays;
+}
+
 export function comparePreparationTime(
   aVal: number,
   aUnit: string,
@@ -77,8 +104,8 @@ export const STATUS_LABELS: Record<string, string> = {
   PENDING: "Pedido recibido",
   PENDING_PAYMENT_CONFIRMATION: "Pendiente de confirmación de pago",
   PAYMENT_INVALID: "Pago inválido",
-  PAID: "Pago confirmado",
-  PROCESSING: "Preparando flores",
+  PAID: "Por preparar",
+  PROCESSING: "En producción",
   READY: "Pedido listo",
   OUT_FOR_DELIVERY: "En camino",
   DELIVERED: "Entregado",

@@ -29,7 +29,8 @@ import {
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { useCartStore } from "@/store/cartStore";
-import { formatDeliveryLeadDays, formatPrice } from "@/lib/utils";
+import { formatCustomerDeliveryDate, formatPrice, getEffectiveDeliveryLeadDays, hasSameDayCutoffPassed } from "@/lib/utils";
+import { DEFAULT_SAME_DAY_CUTOFF_TIME } from "@/lib/site-settings";
 import { formatFlowerQuantityRange, getFlowerQuantityRange } from "@/lib/flower-quantities";
 
 const ADDON_ICONS: Record<string, typeof RiGiftLine> = {
@@ -69,6 +70,7 @@ export default function ProductDetail({
   const [imageIndex, setImageIndex] = useState(0);
   const [previewAddon, setPreviewAddon] = useState<any | null>(null);
   const [favorite, setFavorite] = useState(false);
+  const [sameDayCutoffTime, setSameDayCutoffTime] = useState(DEFAULT_SAME_DAY_CUTOFF_TIME);
   const { addItem, toggleCart } = useCartStore();
   const images = product.images || [];
   const mainImage = images[imageIndex]?.url || images[0]?.url || "";
@@ -78,6 +80,15 @@ export default function ProductDetail({
     writeCookieArray("ff_viewed_products", [product.id, ...viewed.filter(id => id !== product.id)].slice(0, 16));
     setFavorite(readCookieArray("ff_favorite_products").includes(product.id));
   }, [product.id]);
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then(response => response.json())
+      .then(data => {
+        if (typeof data?.sameDayCutoffTime === "string") setSameDayCutoffTime(data.sameDayCutoffTime);
+      })
+      .catch(() => {});
+  }, []);
 
   const addonTotal = useMemo(
     () => selectedAddons.reduce((sum, addon) => sum + Number(addon.price || 0), 0),
@@ -89,6 +100,8 @@ export default function ProductDetail({
     return { min: totals.min + range.min, max: totals.max + range.max };
   }, { min: 0, max: 0 });
   const flowerTotal = flowerTotals.min === flowerTotals.max ? String(flowerTotals.max) : `${flowerTotals.min}-${flowerTotals.max}`;
+  const effectiveDeliveryLeadDays = getEffectiveDeliveryLeadDays(product.deliveryLeadDays || 0, sameDayCutoffTime);
+  const sameDayMovedToTomorrow = (product.deliveryLeadDays || 0) === 0 && hasSameDayCutoffPassed(sameDayCutoffTime);
 
   const toggleFavorite = () => {
     const current = readCookieArray("ff_favorite_products");
@@ -197,9 +210,20 @@ export default function ProductDetail({
                 </span>
               ))}
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-600">
-                <RiTimeLine /> {formatDeliveryLeadDays(product.deliveryLeadDays || 0)}
+                <RiTimeLine /> {formatCustomerDeliveryDate(effectiveDeliveryLeadDays)}
               </span>
+              {sameDayMovedToTomorrow && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+                  <RiTruckLine /> Después de las {sameDayCutoffTime}: queda para {formatCustomerDeliveryDate(1).replace("Entrega el ", "")}
+                </span>
+              )}
             </div>
+
+            {sameDayMovedToTomorrow && (
+              <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
+                Estás pidiendo después de la hora límite configurada. Este pedido se entregará el día siguiente: <strong>{formatCustomerDeliveryDate(1)}</strong>.
+              </div>
+            )}
 
             {product.flowers.length > 0 && (
               <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -208,7 +232,7 @@ export default function ProductDetail({
                   {product.flowers.slice(0, 4).map((entry: any) => (
                     <div key={entry.id} className="text-center">
                       <span className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-primary-50 text-primary-500"><RiFlowerLine /></span>
-                      <p className="mt-2 text-xs font-medium leading-5 text-slate-600">{formatFlowerQuantityRange(entry)} {entry.flower.name}</p>
+                      <p className="mt-2 text-xs font-medium leading-5 text-slate-600">{formatFlowerQuantityRange(entry)} {entry.flower.name} aprox.</p>
                     </div>
                   ))}
                   {product.flowers.length < 3 && (
@@ -243,7 +267,7 @@ export default function ProductDetail({
         <section className="mt-6 grid rounded-2xl border border-slate-200 bg-white shadow-sm md:grid-cols-3">
           {[
             { Icon: RiFlowerLine, title: "Flores frescas", text: `${flowerTotal || "Flores"} aprox. seleccionadas cuidadosamente.` },
-            { Icon: RiTruckLine, title: formatDeliveryLeadDays(product.deliveryLeadDays || 0), text: "Preparamos tu pedido con el tiempo necesario para entregarlo perfecto." },
+            { Icon: RiTruckLine, title: formatCustomerDeliveryDate(effectiveDeliveryLeadDays), text: "Preparamos tu pedido con el tiempo necesario para entregarlo perfecto." },
             { Icon: RiGiftLine, title: "Presentación premium", text: "Cada arreglo se prepara con cuidado y materiales seleccionados." },
           ].map((benefit, index) => (
             <article key={benefit.title} className={`flex items-center gap-4 p-5 ${index ? "border-t border-slate-100 md:border-l md:border-t-0" : ""}`}>

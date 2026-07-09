@@ -65,6 +65,8 @@ type Order = {
   giftMessage?: string | null;
   estimatedTime: string;
   status: string;
+  preparationOrder?: number | null;
+  isUrgent?: boolean;
   adminNote?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -78,6 +80,16 @@ const tabConfig: Array<{ value: Tab; label: string; Icon: React.ElementType }> =
   { value: "READY", label: "Terminados", Icon: RiCheckboxCircleFill },
   { value: "FUTURE", label: "Futuros", Icon: RiCalendarCheckLine },
 ];
+
+function sortOperationalOrders(list: Order[]) {
+  return [...list].sort((a, b) => {
+    if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
+    const aOrder = a.preparationOrder ?? Number.MAX_SAFE_INTEGER;
+    const bOrder = b.preparationOrder ?? Number.MAX_SAFE_INTEGER;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
+}
 
 export default function PreparadorView({ user, onLogout }: { user: any; onLogout: () => void }) {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -136,9 +148,9 @@ export default function PreparadorView({ user, onLogout }: { user: any; onLogout
   };
 
   const grouped = useMemo(() => ({
-    PAID: orders.filter(order => order.status === "PAID"),
-    PROCESSING: orders.filter(order => order.status === "PROCESSING"),
-    READY: orders.filter(order => order.status === "READY"),
+    PAID: sortOperationalOrders(orders.filter(order => order.status === "PAID")),
+    PROCESSING: sortOperationalOrders(orders.filter(order => order.status === "PROCESSING")),
+    READY: sortOperationalOrders(orders.filter(order => order.status === "READY")),
     FUTURE: orders.filter(order => {
       const deliveryKey = localDateKey(getEstimatedDeliveryDate(order));
       const todayKey = localDateKey(new Date());
@@ -346,10 +358,14 @@ function OrderCard({ order, tab, updating, onAction }: {
   const processingStart = order.statusHistory?.find(entry => entry.status === "PROCESSING")?.createdAt || order.updatedAt;
 
   return (
-    <article className={`overflow-hidden rounded-3xl border bg-white shadow-[0_8px_30px_rgba(15,23,42,.06)] ${tab === "PROCESSING" ? "border-amber-200" : tab === "READY" ? "border-emerald-100" : "border-primary-100"}`}>
+    <article className={`overflow-hidden rounded-3xl border bg-white shadow-[0_8px_30px_rgba(15,23,42,.06)] ${order.isUrgent ? "border-red-300 ring-2 ring-red-100" : tab === "PROCESSING" ? "border-amber-200" : tab === "READY" ? "border-emerald-100" : "border-primary-100"}`}>
       <div className="p-4">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-xs font-bold text-primary-500">#{order.trackingToken}</span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs font-bold text-primary-500">#{order.trackingToken}</span>
+            {order.preparationOrder && <span className="rounded-full bg-blue-50 px-2 py-1 text-[9px] font-bold text-blue-600">Orden #{order.preparationOrder}</span>}
+            {order.isUrgent && <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-1 text-[9px] font-bold text-white"><RiAlarmWarningLine size={12} /> Urgente</span>}
+          </div>
           <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[10px] font-semibold ${tab === "PROCESSING" ? "bg-orange-50 text-orange-600" : tab === "READY" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
             <span className={`h-2 w-2 rounded-full ${tab === "READY" ? "bg-emerald-500" : "bg-amber-400"}`} />
             {tab === "PAID" ? "Por preparar" : tab === "PROCESSING" ? "En preparación" : "Terminado"}

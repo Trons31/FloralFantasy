@@ -58,8 +58,8 @@ export default async function DashboardPage() {
   const STATUS_LABEL: Record<string, string> = {
     PENDING_PAYMENT_CONFIRMATION: "Pendiente de confirmación",
     PAYMENT_INVALID: "Pago inválido",
-    PAID: "Pagado",
-    PROCESSING: "Procesando",
+    PAID: "Por preparar",
+    PROCESSING: "En producción",
     READY: "Listo",
     OUT_FOR_DELIVERY: "En camino",
     DELIVERED: "Entregado",
@@ -72,8 +72,8 @@ export default async function DashboardPage() {
   const stats = [
     { icon: RiAlertLine, label: "Pendiente de confirmación", value: String(statusMap.PENDING_PAYMENT_CONFIRMATION || 0), sub: "esperan comprobante", color: "bg-amber-50 text-amber-600" },
     { icon: RiBankCardLine, label: "Pago inválido", value: String(statusMap.PAYMENT_INVALID || 0), sub: "requieren corrección", color: "bg-red-50 text-red-600" },
-    { icon: RiCheckLine, label: "Pagado", value: String(statusMap.PAID || 0), sub: "listos para preparar", color: "bg-blue-50 text-blue-600" },
-    { icon: RiLoader4Line, label: "Procesando", value: String(statusMap.PROCESSING || 0), sub: "en producción", color: "bg-amber-50 text-amber-600" },
+    { icon: RiCheckLine, label: "Por preparar", value: String(statusMap.PAID || 0), sub: "pago validado", color: "bg-blue-50 text-blue-600" },
+    { icon: RiLoader4Line, label: "En producción", value: String(statusMap.PROCESSING || 0), sub: "preparación iniciada", color: "bg-amber-50 text-amber-600" },
     { icon: RiTruckLine, label: "Listo", value: String(statusMap.READY || 0), sub: "pendientes de salida", color: "bg-green-50 text-green-600" },
   ];
 

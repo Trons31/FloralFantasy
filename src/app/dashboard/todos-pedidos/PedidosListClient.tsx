@@ -10,6 +10,7 @@ import Pagination from "@/components/ui/Pagination";
 import { formatPrice } from "@/lib/utils";
 import {
   RiAddLine,
+  RiAlarmWarningLine,
   RiArrowDownSLine,
   RiArrowLeftSLine,
   RiArrowRightSLine,
@@ -28,6 +29,7 @@ import {
   RiRouteLine,
   RiSearchLine,
   RiShoppingBagLine,
+  RiSortAsc,
   RiTimeLine,
   RiWhatsappLine,
   RiWifiOffLine,
@@ -102,7 +104,7 @@ const STATUS_FILTERS = [
   { value: "PENDING", label: "Pendiente", dot: "bg-amber-400" },
   { value: "PAYMENT_INVALID", label: "Pago inválido", dot: "bg-red-500" },
   { value: "PAID", label: "Por preparar", dot: "bg-amber-400" },
-  { value: "PRODUCTION", label: "En producción", dot: "bg-blue-500" },
+  { value: "PROCESSING", label: "En producción", dot: "bg-blue-500" },
   { value: "OUT_FOR_DELIVERY", label: "En ruta", dot: "bg-violet-600" },
   { value: "DELIVERED", label: "Entregado", dot: "bg-emerald-500" },
   { value: "CANCELLED", label: "Cancelado", dot: "bg-slate-500" },
@@ -168,6 +170,14 @@ function getProductImage(order: any) {
 
 function isPaid(status: string) {
   return ["PAID", "PROCESSING", "READY", "OUT_FOR_DELIVERY", "DELIVERED"].includes(status);
+}
+
+function canValidatePayment(status: string) {
+  return ["PENDING", "PENDING_PAYMENT_CONFIRMATION", "PAYMENT_INVALID"].includes(status);
+}
+
+function canManageOperationalOrder(status: string) {
+  return ["PAID", "PROCESSING", "READY"].includes(status);
 }
 
 function PaymentProofCard({
@@ -293,8 +303,10 @@ export default function PedidosListClient({
   const [isNavigating, startNavigation] = useTransition();
   const [searchVal, setSearchVal] = useState(filters.q || "");
   const [updating, setUpdating] = useState<string | null>(null);
+  const [prioritySaving, setPrioritySaving] = useState(false);
   const [viewPhoto, setViewPhoto] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [priorityOrder, setPriorityOrder] = useState<any | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const daysTrackRef = useRef<HTMLDivElement>(null);
@@ -394,14 +406,51 @@ export default function PedidosListClient({
       });
       if (!response.ok) throw new Error("No fue posible actualizar");
       toast.success("Estado actualizado");
-      setSelectedOrder((previous: any) =>
-        previous?.id === orderId ? { ...previous, status: newStatus } : previous
-      );
+      if (newStatus === "PAID") {
+        setSelectedOrder(null);
+      } else {
+        setSelectedOrder((previous: any) =>
+          previous?.id === orderId ? { ...previous, status: newStatus } : previous
+        );
+      }
       router.refresh();
     } catch {
       toast.error("Error al actualizar");
     } finally {
       setUpdating(null);
+    }
+  };
+
+  const handlePrioritySave = async () => {
+    if (!priorityOrder) return;
+    setPrioritySaving(true);
+    try {
+      const response = await fetch(`/api/orders/${priorityOrder.id}/priority`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isUrgent: Boolean(priorityOrder.isUrgent),
+          preparationOrder: priorityOrder.preparationOrder ?? null,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No fue posible guardar la prioridad");
+      setPriorityOrder((previous: any) => previous ? {
+        ...previous,
+        isUrgent: data.isUrgent,
+        preparationOrder: data.preparationOrder,
+      } : previous);
+      setSelectedOrder((previous: any) => previous?.id === priorityOrder.id ? {
+        ...previous,
+        isUrgent: data.isUrgent,
+        preparationOrder: data.preparationOrder,
+      } : previous);
+      toast.success(data.isUrgent ? "Pedido marcado como urgente" : "Prioridad actualizada");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible guardar la prioridad");
+    } finally {
+      setPrioritySaving(false);
     }
   };
 
@@ -440,6 +489,21 @@ export default function PedidosListClient({
     { key: "delivered" as const, label: "Entregados hoy", value: dashboardStats.delivered, icon: RiCheckboxCircleLine, iconStyle: "bg-emerald-50 text-emerald-600" },
     { key: "cancelled" as const, label: "Cancelados", value: dashboardStats.cancelled, icon: RiCloseCircleLine, iconStyle: "bg-red-50 text-red-500" },
   ].map(stat => ({ ...stat, trend: getTrend(stat.value, previousStats[stat.key]) }));
+
+  const priorityReferenceOrders = orders
+    .filter(order =>
+      priorityOrder &&
+      order.id !== priorityOrder.id &&
+      canManageOperationalOrder(order.status) &&
+      (order.preparationOrder || order.isUrgent)
+    )
+    .sort((a, b) => {
+      if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
+      const orderA = a.preparationOrder ?? Number.MAX_SAFE_INTEGER;
+      const orderB = b.preparationOrder ?? Number.MAX_SAFE_INTEGER;
+      if (orderA !== orderB) return orderA - orderB;
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
 
   return (
     <div className="min-h-screen bg-[#f8f9fc] px-4 py-5 sm:px-6 lg:px-7">
@@ -654,6 +718,18 @@ export default function PedidosListClient({
                         <p className="mt-1 flex items-center gap-1.5 truncate text-[11px] text-slate-600">
                           <RiFlowerLine className="text-slate-400" size={13} /> {getProductName(order)}
                         </p>
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {order.isUrgent && (
+                            <span className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2 py-1 text-[9px] font-bold text-red-600">
+                              <RiAlarmWarningLine size={12} /> Urgente
+                            </span>
+                          )}
+                          {order.preparationOrder && (
+                            <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2 py-1 text-[9px] font-bold text-blue-600">
+                              <RiSortAsc size={12} /> Prep. #{order.preparationOrder}
+                            </span>
+                          )}
+                        </div>
                         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-400">
                           <span className="flex min-w-0 items-center gap-1">
                             <RiMapPin2Line size={13} />
@@ -686,10 +762,26 @@ export default function PedidosListClient({
                     </div>
 
                     <div className="col-span-3 grid w-full grid-cols-3 gap-1.5 border-t border-slate-100 pt-2 lg:col-span-1 lg:flex lg:w-auto lg:justify-end lg:border-0 lg:pt-0">
-                      <button type="button" onClick={() => setSelectedOrder(order)}
-                        className="inline-flex h-8 w-full items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-emerald-600 px-1.5 text-[9px] sm:gap-1.5 sm:px-2 sm:text-[10px] sm:w-auto font-semibold text-white shadow-sm transition hover:bg-emerald-700">
-                        <RiCheckboxCircleLine size={16} /> Validar pago
-                      </button>
+                      {canValidatePayment(order.status) && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedOrder(order)}
+                          className="inline-flex h-8 w-full items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-emerald-600 px-1.5 text-[9px] font-semibold text-white shadow-sm transition hover:bg-emerald-700 sm:w-auto sm:gap-1.5 sm:px-2 sm:text-[10px]"
+                        >
+                          <RiCheckboxCircleLine size={16} />
+                          Validar pago
+                        </button>
+                      )}
+                      {canManageOperationalOrder(order.status) && (
+                        <button
+                          type="button"
+                          onClick={() => setPriorityOrder(order)}
+                          className="inline-flex h-8 w-full items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-amber-500 px-1.5 text-[9px] font-semibold text-white shadow-sm transition hover:bg-amber-600 sm:w-auto sm:gap-1.5 sm:px-2 sm:text-[10px]"
+                        >
+                          <RiSortAsc size={16} />
+                          Orden/Urgencia
+                        </button>
+                      )}
                       <button type="button" onClick={() => router.push(`/dashboard/pedidos/${order.id}`)}
                         className="inline-flex h-8 w-full items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-1.5 text-[9px] sm:gap-1.5 sm:px-2 sm:text-[10px] sm:w-auto font-semibold text-slate-800 transition hover:bg-slate-50">
                         <RiEditLine size={15} /> Editar pedido
@@ -726,7 +818,7 @@ export default function PedidosListClient({
       <ResponsiveModal
         open={!!selectedOrder}
         onClose={() => setSelectedOrder(null)}
-        title="Detalle del pedido"
+        title="Validar pago"
         description={selectedOrder?.trackingToken || ""}
         panelClassName="md:max-w-4xl"
       >
@@ -814,7 +906,7 @@ export default function PedidosListClient({
 
             <div className="space-y-3">
               <div className="rounded-2xl border border-gray-100 bg-white p-4">
-                {["PENDING", "PENDING_PAYMENT_CONFIRMATION", "PAYMENT_INVALID"].includes(selectedOrder.status) ? (
+                {canValidatePayment(selectedOrder.status) ? (
                   <>
                     <p className="mb-2 text-sm font-semibold text-gray-900">Acciones de validación</p>
                     <div className="space-y-2">
@@ -846,6 +938,124 @@ export default function PedidosListClient({
                 className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white">
                 Editar pedido
               </button>
+            </div>
+          </div>
+        )}
+      </ResponsiveModal>
+
+      <ResponsiveModal
+        open={!!priorityOrder}
+        onClose={() => setPriorityOrder(null)}
+        title="Orden y urgencia"
+        description={priorityOrder?.trackingToken || ""}
+        panelClassName="md:max-w-3xl"
+      >
+        {priorityOrder && (
+          <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+            <div className="space-y-4">
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-xs font-bold text-primary-500">#{priorityOrder.trackingToken}</p>
+                <h3 className="mt-1 text-lg font-bold text-slate-950">{priorityOrder.customerName}</h3>
+                <p className="mt-1 text-sm text-slate-500">{getProductName(priorityOrder)}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold ${STATUS_CONFIG[priorityOrder.status]?.color || "border-slate-200 bg-slate-50 text-slate-600"}`}>
+                    <span className={`h-2 w-2 rounded-full ${STATUS_CONFIG[priorityOrder.status]?.dot || "bg-slate-500"}`} />
+                    {STATUS_CONFIG[priorityOrder.status]?.shortLabel || priorityOrder.status}
+                  </span>
+                  {priorityOrder.isUrgent && (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-600">
+                      <RiAlarmWarningLine size={14} /> Urgente
+                    </span>
+                  )}
+                  {priorityOrder.preparationOrder && (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-100 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-700">
+                      <RiSortAsc size={14} /> Orden #{priorityOrder.preparationOrder}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+                <label className="mb-3 block">
+                  <span className="mb-1 block text-xs font-semibold text-amber-900">Orden para el preparador</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={priorityOrder.preparationOrder ?? ""}
+                    onChange={event => setPriorityOrder((previous: any) => previous ? {
+                      ...previous,
+                      preparationOrder: event.target.value ? Number(event.target.value) : null,
+                    } : previous)}
+                    placeholder="Ej: 1"
+                    className="h-11 w-full rounded-xl border border-amber-200 bg-white px-3 text-sm outline-none focus:border-amber-400"
+                  />
+                </label>
+                <label className="mb-3 flex items-center gap-2 rounded-xl bg-white px-3 py-3 text-sm font-semibold text-red-600">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(priorityOrder.isUrgent)}
+                    onChange={event => setPriorityOrder((previous: any) => previous ? { ...previous, isUrgent: event.target.checked } : previous)}
+                    className="h-4 w-4 accent-red-500"
+                  />
+                  Marcar como entrega urgente
+                </label>
+                <button
+                  type="button"
+                  onClick={handlePrioritySave}
+                  disabled={prioritySaving}
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {prioritySaving ? <RiLoader4Line className="animate-spin" /> : <RiSortAsc />}
+                  {prioritySaving ? "Guardando..." : "Guardar orden/urgencia"}
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-100 bg-white p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-slate-950">Otros pedidos con orden</p>
+                  <p className="text-xs text-slate-500">Pedidos pagados que ya tienen orden o urgencia.</p>
+                </div>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                  {priorityReferenceOrders.length}
+                </span>
+              </div>
+
+              {priorityReferenceOrders.length ? (
+                <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+                  {priorityReferenceOrders.map(order => (
+                    <div key={order.id} className={`rounded-xl border p-3 ${
+                      order.isUrgent ? "border-red-100 bg-red-50" : "border-slate-100 bg-slate-50"
+                    }`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-slate-950">{order.customerName}</p>
+                          <p className="truncate text-xs text-slate-500">#{order.trackingToken} · {getProductName(order)}</p>
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          {order.preparationOrder ? (
+                            <span className="inline-flex items-center gap-1 rounded-lg bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700">
+                              <RiSortAsc size={13} /> #{order.preparationOrder}
+                            </span>
+                          ) : (
+                            <span className="rounded-lg bg-white px-2 py-1 text-xs font-semibold text-slate-500">Sin orden</span>
+                          )}
+                          {order.isUrgent && (
+                            <span className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-2 py-1 text-xs font-bold text-red-600">
+                              <RiAlarmWarningLine size={13} /> Urgente
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center text-sm text-slate-500">
+                  Todavía no hay otros pedidos pagados con orden o urgencia asignada en esta vista.
+                </div>
+              )}
             </div>
           </div>
         )}

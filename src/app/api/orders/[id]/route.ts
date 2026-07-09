@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { productFlowerInclude } from "@/lib/product-selects";
 import { requireAdminUser } from "@/lib/route-auth";
-import { formatDeliveryLeadDays, maxDeliveryLeadDays } from "@/lib/utils";
+import { formatCustomerDeliveryDate, getEffectiveDeliveryLeadDays, maxDeliveryLeadDays } from "@/lib/utils";
+import { DEFAULT_SAME_DAY_CUTOFF_TIME, normalizeSameDayCutoffTime } from "@/lib/site-settings";
 
 async function getOrderDetails(id: string) {
   return prisma.order.findUnique({
@@ -144,12 +145,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const normalizedDeliveryFee = Math.max(0, Number(deliveryFee ?? 0));
     const normalizedManualAdjustment = Number(manualAdjustment ?? 0);
     const total = subtotal + normalizedDeliveryFee + normalizedManualAdjustment;
+    const cutoffSetting = await prisma.appSetting.findUnique({ where: { key: "sameDayCutoffTime" } }).catch(() => null);
+    const sameDayCutoffTime = normalizeSameDayCutoffTime(cutoffSetting?.value ?? process.env.SAME_DAY_CUTOFF_TIME ?? DEFAULT_SAME_DAY_CUTOFF_TIME);
     const deliveryLead = maxDeliveryLeadDays(
       products.map((product) => ({
-        deliveryLeadDays: product.deliveryLeadDays,
+        deliveryLeadDays: getEffectiveDeliveryLeadDays(product.deliveryLeadDays, sameDayCutoffTime),
       }))
     );
-    const estimatedTime = deliveryLead.label || formatDeliveryLeadDays(0);
+    const estimatedTime = formatCustomerDeliveryDate(deliveryLead.days);
     const cleanAdminNote = typeof adminNote === "string" ? adminNote.trim() || null : null;
 
     const updated = await prisma.$transaction(async (tx) => {

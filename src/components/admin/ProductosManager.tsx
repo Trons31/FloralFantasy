@@ -59,6 +59,9 @@ type Occasion = { id: string; name: string; slug: string; subtitle?: string | nu
 type Flower = { id: string; name: string; type: string; color?: string | null };
 type SelectedFlower = { flowerId: string; quantity: number; quantityMin: number; quantityMax: number };
 
+const normalizeSearchText = (value: string) =>
+  value.toLocaleLowerCase("es").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
 // Slot de imagen: puede tener un File pendiente (nueva) o una URL ya subida (edición)
 type ImageSlot =
   | { kind: "pending"; file: File; previewUrl: string }   // aún no subida
@@ -84,6 +87,7 @@ export default function ProductosManager({
   const [imageSlots,      setImageSlots]      = useState<ImageSlot[]>([]);
   const [uploadingSlots,  setUploadingSlots]  = useState<Set<number>>(new Set());
   const [selectedFlowers, setSelectedFlowers] = useState<SelectedFlower[]>([]);
+  const [flowerSearch, setFlowerSearch] = useState("");
 
   const [showCatForm, setShowCatForm] = useState(false);
   const [newCatName,  setNewCatName]  = useState("");
@@ -118,6 +122,14 @@ export default function ProductosManager({
   }, [products, search, filter, medianPrice, sort]);
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PER_PAGE));
   const pageItems = filteredProducts.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  const filteredFlowers = useMemo(() => {
+    const query = normalizeSearchText(flowerSearch.trim());
+    if (!query) return flowers;
+
+    return flowers.filter(flower => (
+      normalizeSearchText(`${flower.name} ${flower.type} ${flower.color || ""}`).includes(query)
+    ));
+  }, [flowers, flowerSearch]);
 
   useEffect(() => {
     setPage((current) => Math.min(current, totalPages));
@@ -230,7 +242,7 @@ export default function ProductosManager({
   const openCreate = () => {
     setEditing(null);
     reset({ preparationTimeValue:0, preparationTimeUnit:"MINUTES", deliveryLeadDays:0, inStock:true, featured:false, requiresSpecialOrder:false });
-    setImageSlots([]); setSelectedFlowers([]); setShowForm(true);
+    setImageSlots([]); setSelectedFlowers([]); setFlowerSearch(""); setShowForm(true);
   };
 
   const openEdit = (p: Product) => {
@@ -245,13 +257,14 @@ export default function ProductosManager({
       const { min, max } = flowerRange(f);
       return { flowerId: f.flower.id, quantity: max, quantityMin: min, quantityMax: max };
     }));
+    setFlowerSearch("");
     setShowForm(true);
   };
 
   const closeForm = () => {
     // Liberar todos los object URLs pendientes
     imageSlots.forEach(s => { if (s.kind === "pending") URL.revokeObjectURL(s.previewUrl); });
-    setShowForm(false); setEditing(null); reset(); setImageSlots([]); setSelectedFlowers([]);
+    setShowForm(false); setEditing(null); reset(); setImageSlots([]); setSelectedFlowers([]); setFlowerSearch("");
   };
 
   const confirmDelete = async () => {
@@ -658,7 +671,7 @@ export default function ProductosManager({
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                   <RiFlowerLine size={15} className="text-primary-500" />
                   Flores que contiene
-                  <span className="text-gray-400 font-normal text-xs">(filtrables por tipo)</span>
+                  <span className="text-gray-400 font-normal text-xs">(busca por nombre, tipo o color)</span>
                 </label>
                 {flowers.length === 0 ? (
                   <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl p-3">
@@ -666,8 +679,33 @@ export default function ProductosManager({
                     No hay flores registradas. Ve a <strong>Gestión de Flores</strong> primero.
                   </div>
                 ) : (
-                  <div className="space-y-2 p-3 bg-gray-50 rounded-xl border border-gray-100 max-h-56 overflow-y-auto">
-                    {flowers.map(f => {
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 transition focus-within:border-primary-300 focus-within:ring-2 focus-within:ring-primary-50">
+                      <RiSearchLine size={15} className="shrink-0 text-gray-400" />
+                      <input
+                        type="search"
+                        value={flowerSearch}
+                        onChange={event => setFlowerSearch(event.target.value)}
+                        placeholder="Buscar flor por nombre..."
+                        className="min-w-0 flex-1 bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
+                      />
+                      {flowerSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setFlowerSearch("")}
+                          className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                          aria-label="Limpiar busqueda de flores"
+                        >
+                          <RiCloseLine size={14} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-2 p-3 bg-gray-50 rounded-xl border border-gray-100 max-h-56 overflow-y-auto">
+                      {filteredFlowers.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-gray-200 bg-white p-4 text-center text-xs text-gray-500">
+                          No encontramos flores con ese nombre.
+                        </div>
+                      ) : filteredFlowers.map(f => {
                       const selected = selectedFlowerQty(f.id) > 0;
                       const range = selectedFlowerRange(f.id);
                       return (
@@ -737,6 +775,7 @@ export default function ProductosManager({
                         </div>
                       );
                     })}
+                    </div>
                   </div>
                 )}
                 {selectedFlowers.length > 0 && (

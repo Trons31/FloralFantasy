@@ -3,8 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { productFlowerInclude } from "@/lib/product-selects";
 import { generateTrackingToken } from "@/lib/tokens";
 import { sendPushToAdmins } from "@/lib/webpush";
-import { STATUS_LABELS } from "@/lib/utils";
+import { formatCustomerDeliveryDate, getEffectiveDeliveryLeadDays, STATUS_LABELS } from "@/lib/utils";
 import { requireAdminUser, requireOrderManagementUser } from "@/lib/route-auth";
+import { DEFAULT_SAME_DAY_CUTOFF_TIME, normalizeSameDayCutoffTime } from "@/lib/site-settings";
 
 export async function POST(req: NextRequest) {
   try {
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
     const productIds = items.map((i: any) => i.productId);
     const existingProducts = await prisma.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true },
+      select: { id: true, deliveryLeadDays: true },
     });
     const foundIds = existingProducts.map((p) => p.id);
     const missingIds = productIds.filter((id: string) => !foundIds.includes(id));
@@ -66,6 +67,12 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    const cutoffSetting = await prisma.appSetting.findUnique({ where: { key: "sameDayCutoffTime" } }).catch(() => null);
+    const sameDayCutoffTime = normalizeSameDayCutoffTime(cutoffSetting?.value ?? process.env.SAME_DAY_CUTOFF_TIME ?? DEFAULT_SAME_DAY_CUTOFF_TIME);
+    const effectiveDeliveryLeadDays = existingProducts.reduce(
+      (max, product) => Math.max(max, getEffectiveDeliveryLeadDays(product.deliveryLeadDays || 0, sameDayCutoffTime)),
+      0
+    );
 
     const trackingToken = generateTrackingToken();
     const initialStatus = isAdminDraft ? "PENDING" : "PENDING_PAYMENT_CONFIRMATION";
@@ -82,7 +89,7 @@ export async function POST(req: NextRequest) {
         giftMessage: cleanGiftMessage || null,
         total,
         deliveryFee,
-        estimatedTime: estimatedTime || "1 dia",
+        estimatedTime: formatCustomerDeliveryDate(effectiveDeliveryLeadDays),
         adminNote: typeof adminNote === "string" ? adminNote.trim() || null : null,
         manualAdjustment: Number(manualAdjustment || 0),
         status: initialStatus,
@@ -184,7 +191,11 @@ export async function GET(req: NextRequest) {
     where: {
       status: statuses ? { in: statuses as any } : { notIn: ["DELIVERED", "CANCELLED"] },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: [
+      { isUrgent: "desc" },
+      { preparationOrder: { sort: "asc", nulls: "last" } },
+      { createdAt: "asc" },
+    ],
     include: {
       city: true,
       paymentMethod: true,

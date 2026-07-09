@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Header from "@/components/client/Header";
 import { useCartStore } from "@/store/cartStore";
-import { formatPrice } from "@/lib/utils";
+import { formatCustomerDeliveryDate, formatPrice, getEffectiveDeliveryLeadDays, hasSameDayCutoffPassed } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -28,8 +28,7 @@ import {
   RiWhatsappLine,
 } from "react-icons/ri";
 import { toast } from "sonner";
-import { DEFAULT_DELIVERY_FEE } from "@/lib/site-settings";
-import { formatDeliveryLeadDays } from "@/lib/utils";
+import { DEFAULT_DELIVERY_FEE, DEFAULT_SAME_DAY_CUTOFF_TIME } from "@/lib/site-settings";
 import { formatFlowerQuantityRange } from "@/lib/flower-quantities";
 
 const schema = z.object({
@@ -112,6 +111,7 @@ export default function CheckoutPageClient() {
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
   const [deliveryFee, setDeliveryFee] = useState(DEFAULT_DELIVERY_FEE);
+  const [sameDayCutoffTime, setSameDayCutoffTime] = useState(DEFAULT_SAME_DAY_CUTOFF_TIME);
   const [loadingLink, setLoadingLink] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -132,7 +132,9 @@ export default function CheckoutPageClient() {
 
   const subtotal = getTotalPrice();
   const total = subtotal + deliveryFee;
-  const cartDelivery = getDeliveryLeadDays();
+  const cartDelivery = getDeliveryLeadDays(sameDayCutoffTime);
+  const hasSameDayItems = (orderItems.length ? orderItems : items).some(item => (item.deliveryLeadDays || 0) === 0);
+  const sameDayMovedToTomorrow = hasSameDayItems && hasSameDayCutoffPassed(sameDayCutoffTime);
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormData>({ resolver: zodResolver(schema) });
 
@@ -146,6 +148,7 @@ export default function CheckoutPageClient() {
       .then((r) => r.json())
       .then((data) => {
         if (typeof data?.deliveryFee === "number") setDeliveryFee(data.deliveryFee);
+        if (typeof data?.sameDayCutoffTime === "string") setSameDayCutoffTime(data.sameDayCutoffTime);
       })
       .catch(() => {});
     fetch("/api/payment-methods")
@@ -180,7 +183,7 @@ export default function CheckoutPageClient() {
       .then((order) => {
         if (!order?.id) throw new Error("Pedido no encontrado");
         const orderDeliveryDays = Array.isArray(order.items)
-          ? order.items.reduce((max: number, item: any) => Math.max(max, item.product?.deliveryLeadDays || 0), 0)
+          ? order.items.reduce((max: number, item: any) => Math.max(max, getEffectiveDeliveryLeadDays(item.product?.deliveryLeadDays || 0, sameDayCutoffTime)), 0)
           : 0;
         setCreatedOrder(order);
         setOrderItems(Array.isArray(order.items) ? order.items.map((item: any) => ({
@@ -215,7 +218,7 @@ export default function CheckoutPageClient() {
       })
       .catch(() => {})
       .finally(() => setLoadingLink(false));
-  }, [checkoutToken]);
+  }, [checkoutToken, sameDayCutoffTime]);
 
   const onSubmit = async (data: FormData) => {
     if (!items.length) {
@@ -582,8 +585,14 @@ export default function CheckoutPageClient() {
                   <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-4 text-sm text-emerald-700">
                     <RiTimeLine size={15} />
                     <span className="font-semibold">Entrega</span>
-                    <span>· {formatDeliveryLeadDays(orderDeliveryLeadDays)}</span>
+                    <span>· {formatCustomerDeliveryDate(orderDeliveryLeadDays)}</span>
                   </div>
+                  {sameDayMovedToTomorrow && (
+                    <div className="mb-4 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-800">
+                      <span className="font-semibold">Pedido después de las {sameDayCutoffTime}</span>
+                      <span className="block">Los productos de entrega hoy quedan para {formatCustomerDeliveryDate(1).replace("Entrega el ", "")}.</span>
+                    </div>
+                  )}
                 <div className="border-t pt-4 space-y-2 text-sm">
                   <div className="flex justify-between text-gray-500">
                     <span className="flex items-center gap-1.5"><RiTruckLine size={14} /> Domicilio</span>
@@ -593,7 +602,7 @@ export default function CheckoutPageClient() {
                     <div className="flex justify-between text-gray-500">
                       <span>Entrega</span>
                       <span className="text-emerald-600 font-medium">
-                        {formatDeliveryLeadDays(orderDeliveryLeadDays)}
+                        {formatCustomerDeliveryDate(orderDeliveryLeadDays)}
                       </span>
                     </div>
                   )}
@@ -873,7 +882,7 @@ export default function CheckoutPageClient() {
                         <div className="min-w-0">
                           <p className="truncate text-[14px] font-bold text-slate-900">{item.name}</p>
                           <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                            <RiTimeLine size={12} /> {formatDeliveryLeadDays(item.deliveryLeadDays || 0)}
+                            <RiTimeLine size={12} /> {formatCustomerDeliveryDate(getEffectiveDeliveryLeadDays(item.deliveryLeadDays || 0, sameDayCutoffTime))}
                           </p>
                         </div>
                         <button
@@ -912,8 +921,14 @@ export default function CheckoutPageClient() {
                 <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2.5 text-[11px] text-emerald-700">
                   <RiTimeLine size={15} />
                   <span className="font-semibold">Entrega</span>
-                  <span>· {formatDeliveryLeadDays(cartDelivery.days)}</span>
+                  <span>· {formatCustomerDeliveryDate(cartDelivery.days)}</span>
                 </div>
+                {sameDayMovedToTomorrow && (
+                  <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-[11px] leading-5 text-amber-800">
+                    <span className="font-semibold">Pedido después de las {sameDayCutoffTime}</span>
+                    <span className="block">Tu pedido queda para {formatCustomerDeliveryDate(1).replace("Entrega el ", "")}.</span>
+                  </div>
+                )}
               <div className="mt-3 flex items-center gap-3 rounded-xl bg-primary-50/60 px-3 py-3">
                 <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white text-primary-500"><RiGiftLine size={14} /></span>
                 <div>
@@ -924,7 +939,7 @@ export default function CheckoutPageClient() {
 
               <div className="mt-3 space-y-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3">
                 {[
-                  ["Entrega hoy disponible", "Realiza tu pedido antes de las 2:00 PM"],
+                  ["Entrega hoy disponible", `Realiza tu pedido antes de las ${sameDayCutoffTime}`],
                   ["Pago 100% seguro", "Protegemos tu información"],
                   ["Garantía de satisfacción", "Te acompañamos durante todo el proceso"],
                 ].map(([title, description]) => (

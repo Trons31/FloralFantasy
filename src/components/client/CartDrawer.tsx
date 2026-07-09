@@ -12,29 +12,34 @@ import {
   RiShieldCheckLine,
   RiSubtractLine,
   RiTimeLine,
+  RiTruckLine,
 } from "react-icons/ri";
 import Link from "next/link";
 import { useCartStore } from "@/store/cartStore";
-import { formatPrice, formatDeliveryLeadDays } from "@/lib/utils";
-import { DEFAULT_DELIVERY_FEE } from "@/lib/site-settings";
+import { formatCustomerDeliveryDate, formatPrice, getEffectiveDeliveryLeadDays, hasSameDayCutoffPassed } from "@/lib/utils";
+import { DEFAULT_DELIVERY_FEE, DEFAULT_SAME_DAY_CUTOFF_TIME } from "@/lib/site-settings";
 
 export default function CartDrawer() {
   const { items, isOpen, toggleCart, removeItem, updateQuantity, getTotalPrice, getEstimatedTime, getDeliveryLeadDays } = useCartStore();
   const [deliveryFee, setDeliveryFee] = useState(DEFAULT_DELIVERY_FEE);
+  const [sameDayCutoffTime, setSameDayCutoffTime] = useState(DEFAULT_SAME_DAY_CUTOFF_TIME);
 
   const subtotal = getTotalPrice();
   const total = subtotal + deliveryFee;
   const est = getEstimatedTime();
-  const delivery = getDeliveryLeadDays();
+  const delivery = getDeliveryLeadDays(sameDayCutoffTime);
   const itemCount = items.reduce((count, item) => count + item.quantity, 0);
   const heroItem = items[0];
-  const deliveryStatusLabel = delivery.days > 0 ? `${delivery.label} disponible` : "Entrega hoy disponible";
+  const deliveryStatusLabel = delivery.days > 0 ? delivery.label : "Entrega hoy disponible";
+  const hasSameDayItems = items.some(item => (item.deliveryLeadDays || 0) === 0);
+  const sameDayMovedToTomorrow = hasSameDayItems && hasSameDayCutoffPassed(sameDayCutoffTime);
 
   useEffect(() => {
     fetch("/api/settings")
       .then(r => r.json())
       .then(data => {
         if (typeof data?.deliveryFee === "number") setDeliveryFee(data.deliveryFee);
+        if (typeof data?.sameDayCutoffTime === "string") setSameDayCutoffTime(data.sameDayCutoffTime);
       })
       .catch(() => {});
   }, []);
@@ -133,7 +138,7 @@ export default function CartDrawer() {
                             </h3>
                             <p className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
                               <RiTimeLine size={11} />
-                              {heroItem ? formatDeliveryLeadDays(heroItem.deliveryLeadDays || 0) : "Mismo día"}
+                              {heroItem ? formatCustomerDeliveryDate(getEffectiveDeliveryLeadDays(heroItem.deliveryLeadDays || 0, sameDayCutoffTime)) : "Mismo día"}
                             </p>
                           </div>
 
@@ -234,6 +239,13 @@ export default function CartDrawer() {
                       <div className="flex items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-700 sm:text-xs">
                         <RiTimeLine size={14} />
                         <span>{delivery.label} · <strong>{delivery.dateLabel}</strong></span>
+                      </div>
+                    )}
+
+                    {sameDayMovedToTomorrow && (
+                      <div className="rounded-2xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-800 sm:text-xs">
+                        <span className="inline-flex items-center gap-1 font-semibold"><RiTruckLine size={14} /> Después de las {sameDayCutoffTime}</span>
+                        <span className="block">Los productos de entrega hoy quedan para {formatCustomerDeliveryDate(1).replace("Entrega el ", "")}.</span>
                       </div>
                     )}
 

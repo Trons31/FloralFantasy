@@ -25,8 +25,8 @@ function formatDate(iso: string) {
 
 const COLS = [
   { id: "PENDING_PAYMENT_CONFIRMATION", label: "Pago pendiente", dot: "bg-amber-500", bg: "bg-amber-50/70 border-amber-200" },
-  { id: "PAID", label: "Pagado", dot: "bg-blue-500", bg: "bg-blue-50/70 border-blue-200" },
-  { id: "PROCESSING", label: "Procesando", dot: "bg-amber-500", bg: "bg-amber-50/70 border-amber-200" },
+  { id: "PAID", label: "Por preparar", dot: "bg-blue-500", bg: "bg-blue-50/70 border-blue-200" },
+  { id: "PROCESSING", label: "En producción", dot: "bg-amber-500", bg: "bg-amber-50/70 border-amber-200" },
   { id: "READY", label: "Listo", dot: "bg-green-500", bg: "bg-green-50/70 border-green-200" },
   { id: "OUT_FOR_DELIVERY", label: "En camino", dot: "bg-purple-500", bg: "bg-purple-50/70 border-purple-200" },
   { id: "DELIVERED", label: "Entregado", dot: "bg-emerald-500", bg: "bg-emerald-50/70 border-emerald-200" },

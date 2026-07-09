@@ -18,6 +18,7 @@ import {
   RiSaveLine,
   RiSettings3Line,
   RiShieldCheckLine,
+  RiTimeLine,
   RiTruckLine,
   RiUserLine,
 } from "react-icons/ri";
@@ -90,16 +91,20 @@ function providerStyle(provider: string) {
 export default function AjustesClient({
   initialMethods,
   initialDeliveryFee,
+  initialSameDayCutoffTime,
   initialLoginEmail,
 }: {
   initialMethods: PaymentMethod[];
   initialDeliveryFee: number;
+  initialSameDayCutoffTime: string;
   initialLoginEmail: string;
 }) {
   const router = useRouter();
   const [methods, setMethods] = useState(initialMethods);
   const [deliveryFee, setDeliveryFee] = useState(initialDeliveryFee);
   const [savedDeliveryFee, setSavedDeliveryFee] = useState(initialDeliveryFee);
+  const [sameDayCutoffTime, setSameDayCutoffTime] = useState(initialSameDayCutoffTime);
+  const [savedSameDayCutoffTime, setSavedSameDayCutoffTime] = useState(initialSameDayCutoffTime);
   const [savingDeliveryFee, setSavingDeliveryFee] = useState(false);
   const [savingCredentials, setSavingCredentials] = useState(false);
   const [savingMethod, setSavingMethod] = useState(false);
@@ -113,23 +118,26 @@ export default function AjustesClient({
 
   const activeMethods = methods.filter(method => method.isActive).length;
 
-  const saveDeliveryFee = async () => {
+  const saveDeliverySettings = async () => {
     setSavingDeliveryFee(true);
     try {
       const response = await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deliveryFee }),
+        body: JSON.stringify({ deliveryFee, sameDayCutoffTime }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "No se pudo guardar el domicilio");
+      if (!response.ok) throw new Error(data.error || "No se pudo guardar la configuración de entrega");
       const saved = Number(data.deliveryFee) || deliveryFee;
+      const savedCutoff = typeof data.sameDayCutoffTime === "string" ? data.sameDayCutoffTime : sameDayCutoffTime;
       setDeliveryFee(saved);
       setSavedDeliveryFee(saved);
-      toast.success("Costo de domicilio actualizado");
+      setSameDayCutoffTime(savedCutoff);
+      setSavedSameDayCutoffTime(savedCutoff);
+      toast.success("Configuración de entrega actualizada");
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo guardar el domicilio");
+      toast.error(error instanceof Error ? error.message : "No se pudo guardar la configuración de entrega");
     } finally {
       setSavingDeliveryFee(false);
     }
@@ -251,9 +259,9 @@ export default function AjustesClient({
       color: "bg-primary-50 text-primary-500",
     },
     {
-      label: "Costo de domicilio",
+      label: "Entrega",
       value: formatPrice(savedDeliveryFee),
-      detail: "COP",
+      detail: `Hoy hasta ${savedSameDayCutoffTime}`,
       Icon: RiTruckLine,
       color: "bg-emerald-50 text-emerald-600",
     },
@@ -350,30 +358,45 @@ export default function AjustesClient({
                 <RiTruckLine size={20} />
               </span>
               <div>
-                <h2 className="font-bold text-slate-950">Costo de domicilio</h2>
-                <p className="mt-1 text-xs text-slate-500">Este valor se mostrará en checkout, carrito y pedidos creados manualmente.</p>
+                <h2 className="font-bold text-slate-950">Configuración de entrega</h2>
+                <p className="mt-1 text-xs text-slate-500">Define el domicilio y la hora máxima para pedidos con entrega el mismo día.</p>
               </div>
             </div>
             <button
               type="button"
-              onClick={saveDeliveryFee}
+              onClick={saveDeliverySettings}
               disabled={savingDeliveryFee}
               className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 text-xs font-semibold text-white transition hover:bg-primary-600 disabled:opacity-60"
             >
               {savingDeliveryFee ? <RiLoader4Line className="animate-spin" /> : <RiSaveLine />}
-              {savingDeliveryFee ? "Guardando..." : "Guardar domicilio"}
+              {savingDeliveryFee ? "Guardando..." : "Guardar entrega"}
             </button>
           </div>
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-medium text-slate-600">Valor del domicilio (COP)</span>
-            <input
-              type="number"
-              min={0}
-              value={deliveryFee}
-              onChange={event => setDeliveryFee(Number(event.target.value) || 0)}
-              className="h-11 w-full rounded-xl border border-slate-200 px-4 text-sm text-slate-900 outline-none transition focus:border-primary-300 focus:ring-2 focus:ring-primary-50"
-            />
-          </label>
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-medium text-slate-600">Valor del domicilio (COP)</span>
+              <input
+                type="number"
+                min={0}
+                value={deliveryFee}
+                onChange={event => setDeliveryFee(Number(event.target.value) || 0)}
+                className="h-11 w-full rounded-xl border border-slate-200 px-4 text-sm text-slate-900 outline-none transition focus:border-primary-300 focus:ring-2 focus:ring-primary-50"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-medium text-slate-600">Hora límite para entrega hoy</span>
+              <span className="relative block">
+                <RiTimeLine className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="time"
+                  value={sameDayCutoffTime}
+                  onChange={event => setSameDayCutoffTime(event.target.value)}
+                  className="h-11 w-full rounded-xl border border-slate-200 pl-11 pr-4 text-sm text-slate-900 outline-none transition focus:border-primary-300 focus:ring-2 focus:ring-primary-50"
+                />
+              </span>
+              <p className="mt-1.5 text-[11px] leading-5 text-slate-500">Después de esta hora, los productos configurados para entrega hoy se programan para el día siguiente.</p>
+            </label>
+          </div>
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
