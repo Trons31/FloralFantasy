@@ -30,7 +30,7 @@ export default async function PedidosPage() {
   }));
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
+    <div>
       {/* KanbanBoard incluye el header y el modal internamente */}
       <KanbanBoard initialOrders={serialized} />
     </div>

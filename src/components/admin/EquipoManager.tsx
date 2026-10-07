@@ -282,15 +282,12 @@ export default function EquipoManager({
   ];
 
   return (
-    <div className="min-h-full bg-slate-50/70 p-3 sm:p-5 lg:p-7">
+    <div className="min-w-0">
       <div className="mx-auto max-w-[1500px] space-y-5">
         <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-start gap-3">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary-50 text-primary-500">
-              <RiTeamLine size={25} />
-            </span>
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Equipo</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Equipo</h1>
               <p className="mt-1 text-sm text-slate-500">
                 Gestiona preparadores, repartidores y corredores. Acceden con correo y contraseña en{" "}
                 <span className="font-semibold text-primary-500">/operaciones</span>
@@ -310,7 +307,7 @@ export default function EquipoManager({
             <button
               type="button"
               onClick={openCreate}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(236,18,91,.2)] transition hover:bg-primary-600"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-600"
             >
               <RiAddLine size={19} />
               Agregar miembro
@@ -318,7 +315,7 @@ export default function EquipoManager({
           </div>
         </header>
 
-        <section className="flex flex-col gap-4 rounded-2xl border border-primary-100 bg-gradient-to-r from-primary-50/90 to-rose-50/70 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <section className="flex flex-col gap-4 rounded-2xl border border-primary-100 bg-gradient-to-r from-primary-50/90 to-brand-50/70 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="flex min-w-0 items-center gap-4">
             <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-white text-primary-500 shadow-sm">
               <RiLink size={25} />
@@ -469,7 +466,28 @@ export default function EquipoManager({
         onClose={closeModal}
         title={editing ? "Editar miembro" : "Agregar miembro"}
         description={editing ? "Actualiza el nombre, correo, rol o asigna una nueva contraseña." : "Crea las credenciales para acceder a operaciones."}
-        panelClassName="sm:max-w-lg"
+        size="lg"
+        footer={(
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={closeModal}
+              disabled={saving}
+              className="h-11 rounded-xl border border-gray-200 bg-white px-5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={saveMember}
+              disabled={saving}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600 disabled:opacity-50"
+            >
+              {saving ? <RiLoader4Line className="animate-spin" /> : editing ? <RiCheckLine /> : <RiUserAddLine />}
+              {saving ? "Guardando..." : editing ? "Guardar cambios" : "Agregar miembro"}
+            </button>
+          </div>
+        )}
       >
         <div className="space-y-5">
           <label className="block">
@@ -562,25 +580,6 @@ export default function EquipoManager({
             </label>
           </div>
 
-          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={closeModal}
-              disabled={saving}
-              className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-600 disabled:opacity-50"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={saveMember}
-              disabled={saving}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white transition hover:bg-primary-600 disabled:opacity-60"
-            >
-              {saving ? <RiLoader4Line className="animate-spin" /> : editing ? <RiCheckLine /> : <RiUserAddLine />}
-              {saving ? "Guardando..." : editing ? "Guardar cambios" : "Agregar miembro"}
-            </button>
-          </div>
         </div>
       </ResponsiveModal>
 

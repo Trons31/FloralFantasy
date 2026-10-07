@@ -482,7 +482,7 @@ export default function PedidosListClient({
   };
 
   const stats = [
-    { key: "total" as const, label: "Total pedidos", value: dashboardStats.total, icon: RiShoppingBagLine, iconStyle: "bg-rose-50 text-primary-500" },
+    { key: "total" as const, label: "Total pedidos", value: dashboardStats.total, icon: RiShoppingBagLine, iconStyle: "bg-brand-50 text-primary-500" },
     { key: "pending" as const, label: "Pendientes", value: dashboardStats.pending, icon: RiFlashlightLine, iconStyle: "bg-orange-50 text-orange-500" },
     { key: "production" as const, label: "En producción", value: dashboardStats.production, icon: RiFlowerLine, iconStyle: "bg-blue-50 text-blue-600" },
     { key: "route" as const, label: "En ruta", value: dashboardStats.route, icon: RiRouteLine, iconStyle: "bg-violet-50 text-violet-600" },
@@ -506,15 +506,12 @@ export default function PedidosListClient({
     });
 
   return (
-    <div className="min-h-screen bg-[#f8f9fc] px-4 py-5 sm:px-6 lg:px-7">
+    <div className="min-w-0">
       <div className={`mx-auto max-w-[1500px] space-y-4 transition-opacity ${isNavigating ? "opacity-65" : "opacity-100"}`}>
         <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <div className="flex items-center gap-3">
-              <RiShoppingBagLine className="text-primary-500" size={27} />
-              <h1 className="text-[28px] font-bold tracking-tight text-[#11182c]">Pedidos</h1>
-            </div>
-            <p className="mt-1 text-sm text-slate-500">Gestiona y monitorea todos los pedidos de tu tienda</p>
+            <h1 className="text-2xl font-bold text-gray-900">Pedidos</h1>
+            <p className="mt-0.5 text-sm text-gray-500">Gestiona y monitorea todos los pedidos de tu tienda</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <button type="button" onClick={handleExport}
@@ -522,7 +519,7 @@ export default function PedidosListClient({
               <RiDownload2Line size={17} /> Exportar
             </button>
             <button type="button" onClick={() => setCreateOpen(true)}
-              className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 px-5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(232,24,90,0.22)] transition hover:-translate-y-0.5">
+              className="inline-flex h-11 items-center gap-2 rounded-xl bg-brand-500 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600">
               <RiAddLine size={18} /> Nuevo pedido
             </button>
           </div>
@@ -544,26 +541,25 @@ export default function PedidosListClient({
           </div>
         )}
 
-        <section className="grid grid-cols-2 gap-2.5 lg:grid-cols-3 2xl:grid-cols-6">
+        <section className="grid grid-cols-2 gap-4 lg:grid-cols-3 2xl:grid-cols-6">
           {stats.map(stat => (
-            <div key={stat.label}
-              className="flex min-h-[96px] items-center gap-2.5 rounded-2xl border border-slate-200/80 bg-white px-3 py-3 shadow-[0_7px_22px_rgba(15,23,42,0.04)] sm:gap-4 sm:px-4 sm:py-4">
-              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full sm:h-12 sm:w-12 ${stat.iconStyle}`}>
-                <stat.icon size={21} />
+            <div key={stat.label} className="min-w-0 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
+                <span className="min-w-0 truncate text-sm font-medium text-gray-500">{stat.label}</span>
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${stat.iconStyle}`}>
+                  <stat.icon size={18} />
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="truncate text-[9px] font-medium text-slate-500 sm:text-[11px]">{stat.label}</p>
-                <p className="mt-0.5 text-lg font-bold text-[#11182c] sm:text-xl">{stat.value}</p>
-                <p className={`mt-1 truncate text-[8px] sm:text-[10px] ${stat.trend.down ? "text-red-500" : "text-emerald-600"}`}>
-                  {stat.trend.down ? "↓" : "↑"} <span className="font-semibold">{stat.trend.value}</span>
-                  <span className="ml-1 text-slate-400">vs ayer</span>
-                </p>
-              </div>
+              <p className="text-xl font-bold tabular-nums text-gray-900 sm:text-2xl">{stat.value}</p>
+              <p className={`mt-1 truncate text-[11px] font-semibold ${stat.trend.down ? "text-red-500" : "text-emerald-600"}`}>
+                {stat.trend.down ? "↓" : "↑"} {stat.trend.value}
+                <span className="ml-1 font-normal text-gray-400">vs ayer</span>
+              </p>
             </div>
           ))}
         </section>
 
-        <section className="rounded-2xl border border-slate-200/80 bg-white px-3 py-3 shadow-[0_7px_22px_rgba(15,23,42,0.04)] sm:px-4">
+        <section className="rounded-2xl border border-gray-100 bg-white px-3 py-3 shadow-sm sm:px-4">
           <div className="mb-2 flex items-center justify-between gap-3 px-1">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Calendario de pedidos</p>
@@ -604,7 +600,7 @@ export default function PedidosListClient({
                   onClick={() => handleDayClick(day.date)}
                   className={`relative min-w-[56px] flex-none snap-center rounded-xl border px-1 py-1.5 text-center transition sm:min-w-[60px] ${
                     active
-                      ? "border-primary-500 bg-gradient-to-b from-primary-500 to-primary-600 text-white shadow-[0_8px_18px_rgba(232,24,90,0.22)]"
+                      ? "border-brand-500 bg-brand-500 text-white shadow-sm"
                       : "border-slate-200 bg-white text-slate-800 hover:border-primary-200 hover:bg-primary-50/30"
                   }`}>
                   <span className="block text-sm font-bold leading-none">{formatted.number}</span>
@@ -620,14 +616,14 @@ export default function PedidosListClient({
             })}
           </div>
         </section>
-        <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_7px_22px_rgba(15,23,42,0.04)]">
+        <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
           <div className="p-3">
             <form onSubmit={handleSearch} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px]">
               <div className="relative">
                 <RiSearchLine className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={19} />
                 <input value={searchVal} onChange={event => setSearchVal(event.target.value)}
                   placeholder="Buscar por nombre, teléfono, token o dirección..."
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-11 text-sm outline-none transition placeholder:text-slate-400 focus:border-primary-300 focus:ring-4 focus:ring-primary-50" />
+                  className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-12 pr-11 text-sm outline-none transition placeholder:text-gray-400 focus:border-brand-300 focus:bg-white focus:ring-4 focus:ring-brand-100" />
                 {searchVal && (
                   <button type="button" aria-label="Limpiar búsqueda"
                     onClick={() => {
@@ -642,7 +638,7 @@ export default function PedidosListClient({
 
 
               <button type="button" onClick={() => setFiltersOpen(open => !open)}
-                className={`inline-flex h-12 items-center justify-between rounded-xl border px-4 text-sm font-medium transition ${
+                className={`inline-flex h-11 items-center justify-between rounded-xl border px-4 text-sm font-medium transition ${
                   filtersOpen || filters.status
                     ? "border-primary-200 bg-primary-50 text-primary-600"
                     : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
@@ -687,121 +683,225 @@ export default function PedidosListClient({
               <p className="mt-1 text-sm text-slate-500">Selecciona otra fecha o cambia los filtros.</p>
             </div>
           ) : (
-            <div className="divide-y divide-slate-100 border-t border-slate-100">
-              {orders.map(order => {
-                const status = STATUS_CONFIG[order.status] || STATUS_CONFIG.PENDING;
-                const productImage = getProductImage(order);
-                const whatsapp = whatsappUrl(order);
-                return (
-                  <article key={order.id}
-                    className="grid grid-cols-3 gap-x-3 gap-y-2 px-3 py-2.5 transition hover:bg-slate-50/60 lg:grid-cols-[minmax(210px,1fr)_82px_72px_82px_minmax(240px,auto)] lg:items-center">
-                    <div className="col-span-3 flex min-w-0 gap-3 lg:col-span-1">
-                      <button type="button" disabled={!productImage}
-                        onClick={() => productImage && setViewPhoto(productImage)}
-                        className="group relative flex h-[72px] w-[72px] sm:h-[78px] sm:w-[78px] shrink-0 items-center justify-center overflow-hidden rounded-xl bg-rose-50 text-primary-300 disabled:cursor-default">
-                        {productImage ? (
-                          <>
-                            <img src={productImage} alt={getProductName(order)} className="h-full w-full object-cover" />
-                            <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-white opacity-0 transition group-hover:bg-black/30 group-hover:opacity-100">
-                              <RiZoomInLine size={22} />
-                            </span>
-                          </>
-                        ) : <RiFlowerLine size={30} />}
-                      </button>
-                      <div className="min-w-0 py-0.5">
-                        <p className="text-xs font-semibold text-primary-500">#{order.trackingToken}</p>
-                        <h3 className="mt-0.5 truncate text-sm font-bold text-[#11182c] sm:text-[15px]">{order.customerName}</h3>
-                        <div className="mt-0.5 flex items-center gap-2">
-                          <p className="text-xs text-slate-500">{order.customerPhone}</p>
-                          {whatsapp && <RiWhatsappLine className="text-emerald-500" size={14} />}
-                        </div>
-                        <p className="mt-1 flex items-center gap-1.5 truncate text-[11px] text-slate-600">
-                          <RiFlowerLine className="text-slate-400" size={13} /> {getProductName(order)}
-                        </p>
-                        <div className="mt-1 flex flex-wrap gap-1.5">
-                          {order.isUrgent && (
-                            <span className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2 py-1 text-[9px] font-bold text-red-600">
-                              <RiAlarmWarningLine size={12} /> Urgente
-                            </span>
-                          )}
-                          {order.preparationOrder && (
-                            <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2 py-1 text-[9px] font-bold text-blue-600">
-                              <RiSortAsc size={12} /> Prep. #{order.preparationOrder}
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-400">
-                          <span className="flex min-w-0 items-center gap-1">
-                            <RiMapPin2Line size={13} />
-                            <span className="max-w-[210px] truncate">{order.address}</span>
-                          </span>
-                          <span className="flex items-center gap-1"><RiTimeLine size={13} /> {formatDateTime(order.createdAt)}</span>
+            <>
+              {/* Movil: tarjetas */}
+              <ul className="divide-y divide-gray-100 border-t border-gray-100 md:hidden">
+                {orders.map(order => {
+                  const status = STATUS_CONFIG[order.status] || STATUS_CONFIG.PENDING;
+                  const productImage = getProductImage(order);
+                  const whatsapp = whatsappUrl(order);
+                  return (
+                    <li key={order.id} className="p-4">
+                      <div className="flex gap-3">
+                        <button type="button" disabled={!productImage}
+                          onClick={() => productImage && setViewPhoto(productImage)}
+                          aria-label="Ver foto del producto"
+                          className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-brand-50 text-brand-300 disabled:cursor-default">
+                          {productImage
+                            ? <img src={productImage} alt={getProductName(order)} className="h-full w-full object-cover" />
+                            : <RiFlowerLine size={24} />}
+                        </button>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-brand-600">#{order.trackingToken}</p>
+                              <p className="truncate font-black text-gray-900">{order.customerName}</p>
+                            </div>
+                            <strong className="shrink-0 tabular-nums text-gray-900">{formatPrice(order.total)}</strong>
+                          </div>
+                          <p className="mt-0.5 truncate text-xs text-gray-500">{getProductName(order)}</p>
                         </div>
                       </div>
-                    </div>
 
-                    <div>
-                      <p className="mb-1 text-[9px] text-slate-400">Estado</p>
-                      <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[9px] font-medium ${status.color}`}>
-                        <span className={`h-2 w-2 rounded-full ${status.dot}`} /> {status.shortLabel}
-                      </span>
-                    </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-bold ${status.color}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} /> {status.shortLabel}
+                        </span>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${isPaid(order.status) ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>
+                          {isPaid(order.status) ? "Pago validado" : "Pago pendiente"}
+                        </span>
+                        {order.isUrgent && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600">
+                            <RiAlarmWarningLine size={11} /> Urgente
+                          </span>
+                        )}
+                        {order.preparationOrder && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600">
+                            <RiSortAsc size={11} /> Prep. #{order.preparationOrder}
+                          </span>
+                        )}
+                      </div>
 
-                    <div>
-                      <p className="mb-1 text-[9px] text-slate-400">Pago</p>
-                      <span className={`inline-flex rounded-lg px-2 py-1.5 text-[9px] font-medium ${
-                        isPaid(order.status) ? "bg-emerald-50 text-emerald-600" : "border border-red-100 bg-red-50 text-red-500"
-                      }`}>
-                        {isPaid(order.status) ? "Validado ✓" : "Pendiente"}
-                      </span>
-                    </div>
+                      <p className="mt-2 flex items-center gap-1.5 text-xs text-gray-400">
+                        <RiMapPin2Line size={13} className="shrink-0" />
+                        <span className="truncate">{order.address}</span>
+                      </p>
 
-                    <div>
-                      <p className="mb-1 text-[9px] text-slate-400">Total</p>
-                      <p className="text-sm font-bold text-[#11182c]">{formatPrice(order.total)}</p>
-                    </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-gray-100 pt-3">
+                        {canValidatePayment(order.status) && (
+                          <button type="button" onClick={() => setSelectedOrder(order)}
+                            className="col-span-2 inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 text-xs font-semibold text-white transition hover:bg-emerald-700">
+                            <RiCheckboxCircleLine size={16} /> Validar pago
+                          </button>
+                        )}
+                        <button type="button" onClick={() => router.push(`/dashboard/pedidos/${order.id}`)}
+                          className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white text-xs font-semibold text-gray-700 transition hover:bg-gray-50">
+                          <RiEditLine size={15} /> Editar
+                        </button>
+                        {canManageOperationalOrder(order.status) ? (
+                          <button type="button" onClick={() => setPriorityOrder(order)}
+                            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 text-xs font-semibold text-amber-700 transition hover:bg-amber-100">
+                            <RiSortAsc size={15} /> Prioridad
+                          </button>
+                        ) : whatsapp ? (
+                          <a href={whatsapp} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-white text-xs font-semibold text-emerald-600 transition hover:bg-emerald-50">
+                            <RiWhatsappLine size={15} /> WhatsApp
+                          </a>
+                        ) : (
+                          <span />
+                        )}
+                        {canManageOperationalOrder(order.status) && whatsapp && (
+                          <a href={whatsapp} target="_blank" rel="noopener noreferrer"
+                            className="col-span-2 inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-white text-xs font-semibold text-emerald-600 transition hover:bg-emerald-50">
+                            <RiWhatsappLine size={15} /> WhatsApp
+                          </a>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
 
-                    <div className="col-span-3 grid w-full grid-cols-3 gap-1.5 border-t border-slate-100 pt-2 lg:col-span-1 lg:flex lg:w-auto lg:justify-end lg:border-0 lg:pt-0">
-                      {canValidatePayment(order.status) && (
-                        <button
-                          type="button"
-                          onClick={() => setSelectedOrder(order)}
-                          className="inline-flex h-8 w-full items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-emerald-600 px-1.5 text-[9px] font-semibold text-white shadow-sm transition hover:bg-emerald-700 sm:w-auto sm:gap-1.5 sm:px-2 sm:text-[10px]"
+              {/* Escritorio: tabla */}
+              <div className="hidden overflow-x-auto scrollbar-none md:block">
+                <table className="w-full min-w-[960px] border-collapse text-left">
+                  <thead className="bg-gray-50/80">
+                    <tr className="border-y border-gray-100 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                      <th className="px-3 py-2.5">Pedido</th>
+                      <th className="w-56 px-3 py-2.5">Entrega</th>
+                      <th className="w-36 whitespace-nowrap px-3 py-2.5">Estado</th>
+                      <th className="w-28 whitespace-nowrap px-3 py-2.5">Pago</th>
+                      <th className="w-28 whitespace-nowrap px-3 py-2.5 text-right">Total</th>
+                      <th className="w-40 px-3 py-2.5 text-right"><span className="sr-only">Acciones</span></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {orders.map(order => {
+                      const status = STATUS_CONFIG[order.status] || STATUS_CONFIG.PENDING;
+                      const productImage = getProductImage(order);
+                      const whatsapp = whatsappUrl(order);
+                      return (
+                        <tr
+                          key={order.id}
+                          tabIndex={0}
+                          aria-label={`Abrir pedido ${order.trackingToken}`}
+                          onClick={() => router.push(`/dashboard/pedidos/${order.id}`)}
+                          onKeyDown={event => {
+                            if (event.key !== "Enter") return;
+                            event.preventDefault();
+                            router.push(`/dashboard/pedidos/${order.id}`);
+                          }}
+                          className="group cursor-pointer bg-white text-xs text-gray-600 outline-none transition-colors hover:bg-brand-50/40 focus-visible:bg-brand-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-400"
                         >
-                          <RiCheckboxCircleLine size={16} />
-                          Validar pago
-                        </button>
-                      )}
-                      {canManageOperationalOrder(order.status) && (
-                        <button
-                          type="button"
-                          onClick={() => setPriorityOrder(order)}
-                          className="inline-flex h-8 w-full items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-amber-500 px-1.5 text-[9px] font-semibold text-white shadow-sm transition hover:bg-amber-600 sm:w-auto sm:gap-1.5 sm:px-2 sm:text-[10px]"
-                        >
-                          <RiSortAsc size={16} />
-                          Orden/Urgencia
-                        </button>
-                      )}
-                      <button type="button" onClick={() => router.push(`/dashboard/pedidos/${order.id}`)}
-                        className="inline-flex h-8 w-full items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-1.5 text-[9px] sm:gap-1.5 sm:px-2 sm:text-[10px] sm:w-auto font-semibold text-slate-800 transition hover:bg-slate-50">
-                        <RiEditLine size={15} /> Editar pedido
-                      </button>
-                      {whatsapp ? (
-                        <a href={whatsapp} target="_blank" rel="noopener noreferrer"
-                          className="inline-flex h-8 w-full items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-emerald-200 bg-white px-1.5 text-[9px] sm:gap-1.5 sm:px-2 sm:text-[10px] sm:w-auto font-semibold text-emerald-600 transition hover:bg-emerald-50">
-                          <RiWhatsappLine size={16} /> WhatsApp
-                        </a>
-                      ) : (
-                        <button type="button" disabled
-                          className="inline-flex h-8 w-full items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-slate-200 px-1.5 text-[9px] sm:gap-1.5 sm:px-2 sm:text-[10px] sm:w-auto font-semibold text-slate-300">
-                          <RiWhatsappLine size={16} /> WhatsApp
-                        </button>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+                          <td className="max-w-0 px-3 py-2.5">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <button type="button" disabled={!productImage}
+                                onClick={event => {
+                                  event.stopPropagation();
+                                  if (productImage) setViewPhoto(productImage);
+                                }}
+                                aria-label="Ver foto del producto"
+                                className="group/img relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-brand-50 text-brand-300 disabled:cursor-default">
+                                {productImage ? (
+                                  <>
+                                    <img src={productImage} alt={getProductName(order)} className="h-full w-full object-cover" />
+                                    <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-white opacity-0 transition group-hover/img:bg-black/30 group-hover/img:opacity-100">
+                                      <RiZoomInLine size={16} />
+                                    </span>
+                                  </>
+                                ) : <RiFlowerLine size={20} />}
+                              </button>
+                              <div className="min-w-0">
+                                <p className="flex min-w-0 items-center gap-1.5">
+                                  <span className="truncate font-bold text-gray-900">{order.customerName}</span>
+                                  <span className="shrink-0 font-semibold text-brand-600">#{order.trackingToken}</span>
+                                </p>
+                                <p className="mt-0.5 truncate text-[11px] text-gray-500">{getProductName(order)}</p>
+                                {(order.isUrgent || order.preparationOrder) && (
+                                  <div className="mt-1 flex gap-1">
+                                    {order.isUrgent && (
+                                      <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-600">
+                                        <RiAlarmWarningLine size={10} /> Urgente
+                                      </span>
+                                    )}
+                                    {order.preparationOrder && (
+                                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[9px] font-bold text-blue-600">
+                                        <RiSortAsc size={10} /> Prep. #{order.preparationOrder}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="max-w-0 px-3 py-2.5">
+                            <p className="truncate font-semibold text-gray-700">{order.address}</p>
+                            <p className="mt-0.5 flex items-center gap-1 text-[10px] text-gray-400">
+                              {order.customerPhone}
+                              <span aria-hidden="true">·</span>
+                              {formatDateTime(order.createdAt)}
+                            </p>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-bold ${status.color}`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} /> {status.shortLabel}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold ${isPaid(order.status) ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>
+                              {isPaid(order.status) ? "Validado" : "Pendiente"}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm font-bold tabular-nums text-gray-900">
+                            {formatPrice(order.total)}
+                          </td>
+                          <td className="px-3 py-2.5" onClick={event => event.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1">
+                              {canValidatePayment(order.status) && (
+                                <button type="button" onClick={() => setSelectedOrder(order)}
+                                  className="inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-lg bg-emerald-600 px-2.5 text-[11px] font-semibold text-white transition hover:bg-emerald-700">
+                                  <RiCheckboxCircleLine size={14} /> Validar
+                                </button>
+                              )}
+                              {canManageOperationalOrder(order.status) && (
+                                <button type="button" onClick={() => setPriorityOrder(order)}
+                                  title="Orden y urgencia" aria-label="Orden y urgencia"
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-amber-50 hover:text-amber-600">
+                                  <RiSortAsc size={15} />
+                                </button>
+                              )}
+                              {whatsapp && (
+                                <a href={whatsapp} target="_blank" rel="noopener noreferrer"
+                                  title="WhatsApp" aria-label="Escribir por WhatsApp"
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600">
+                                  <RiWhatsappLine size={15} />
+                                </a>
+                              )}
+                              <button type="button" onClick={() => router.push(`/dashboard/pedidos/${order.id}`)}
+                                title="Editar pedido" aria-label="Editar pedido"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-600">
+                                <RiEditLine size={15} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
 
           <Pagination
@@ -820,7 +920,7 @@ export default function PedidosListClient({
         onClose={() => setSelectedOrder(null)}
         title="Validar pago"
         description={selectedOrder?.trackingToken || ""}
-        panelClassName="md:max-w-4xl"
+        size="2xl"
       >
         {selectedOrder && (
           <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
@@ -859,9 +959,9 @@ export default function PedidosListClient({
               )}
 
               {selectedOrder.giftMessage && (
-                <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4">
-                  <p className="mb-2 text-sm font-semibold text-rose-800">Mensaje para la tarjeta</p>
-                  <p className="whitespace-pre-line text-sm text-rose-900">{selectedOrder.giftMessage}</p>
+                <div className="rounded-2xl border border-brand-100 bg-brand-50 p-4">
+                  <p className="mb-2 text-sm font-semibold text-brand-800">Mensaje para la tarjeta</p>
+                  <p className="whitespace-pre-line text-sm text-brand-900">{selectedOrder.giftMessage}</p>
                 </div>
               )}
 
@@ -876,7 +976,7 @@ export default function PedidosListClient({
                           <p className="text-xs text-gray-400">+ {item.addons.map((addon: any) => addon.addon?.name).filter(Boolean).join(", ")}</p>
                         )}
                         {item.customization?.bouquetSize && (
-                          <p className="mt-1 text-xs font-semibold text-rose-500">
+                          <p className="mt-1 text-xs font-semibold text-brand-500">
                             {getBouquetSummary(item.customization).label}
                             {getBouquetSummary(item.customization).detail !== "sin cambios"
                               ? ` · ${getBouquetSummary(item.customization).detail}`
@@ -948,7 +1048,7 @@ export default function PedidosListClient({
         onClose={() => setPriorityOrder(null)}
         title="Orden y urgencia"
         description={priorityOrder?.trackingToken || ""}
-        panelClassName="md:max-w-3xl"
+        size="xl"
       >
         {priorityOrder && (
           <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">

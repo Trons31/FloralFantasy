@@ -480,7 +480,7 @@ function Notes({ order, addons }: { order: Order; addons: Array<{ addon: { name:
 }
 
 function ElapsedTimer({ startedAt }: { startedAt: string }) {
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);

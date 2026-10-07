@@ -34,7 +34,7 @@ const COLOR_DOT_CLASSES: Record<string, string> = {
   Verde: "bg-emerald-500",
   Crema: "bg-amber-100 border border-amber-200",
   Champaña: "bg-yellow-100 border border-yellow-200",
-  Coral: "bg-rose-400",
+  Coral: "bg-brand-400",
   Salmón: "bg-orange-200",
   "Vino tinto": "bg-red-900",
   Bicolor: "bg-gradient-to-r from-primary-400 to-yellow-300",
@@ -359,15 +359,12 @@ export default function ProductosManager({
 
   return (
     <>
-      <div className="min-h-full bg-slate-50/70 p-3 sm:p-5 lg:p-7">
+      <div className="min-w-0">
         <div className="mx-auto max-w-[1500px] space-y-5">
           <header className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex items-start gap-3">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary-50 text-primary-500">
-                <RiShoppingBag3Line size={24} />
-              </span>
               <div>
-                <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Productos</h1>
+                <h1 className="text-2xl font-bold text-gray-900">Productos</h1>
                 <p className="mt-1 text-sm text-slate-500">Ramos, arreglos y composiciones florales.</p>
               </div>
             </div>
@@ -379,11 +376,11 @@ export default function ProductosManager({
               <button type="button" onClick={() => setShowFilters(current => !current)} className={`grid h-11 w-12 place-items-center rounded-xl border bg-white text-slate-600 shadow-sm transition ${showFilters ? "border-primary-300 text-primary-500" : "border-slate-200"}`} aria-label="Mostrar filtros">
                 <RiEqualizerLine size={18} />
               </button>
-              <button type="button" onClick={openCreate} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(236,18,91,.2)] transition hover:bg-primary-600">
+              <button type="button" onClick={openCreate} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-600">
                 <RiAddLine size={19} /> Nuevo producto
               </button>
             </div>
-            <button type="button" onClick={openCreate} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(236,18,91,.2)] transition hover:bg-primary-600 sm:hidden">
+            <button type="button" onClick={openCreate} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-600 sm:hidden">
               <RiAddLine size={19} /> Nuevo producto
             </button>
           </header>
@@ -503,9 +500,21 @@ export default function ProductosManager({
           onClose={closeForm}
           title={editing ? "Editar producto" : "Nuevo producto"}
           description={editing ? "Actualiza la información del producto y su composición." : "Registra el producto y define su composición."}
-          panelClassName="sm:max-w-3xl lg:max-w-4xl"
+          size="2xl"
+          footer={(
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button type="button" onClick={closeForm} disabled={saving}
+                className="h-11 rounded-xl border border-gray-200 bg-white px-5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50">
+                Cancelar
+              </button>
+              <button type="submit" form="product-form" disabled={saving}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600 disabled:opacity-50">
+                {saving ? <><RiLoader4Line className="animate-spin" /> Guardando...</> : (editing ? "Actualizar" : "Crear producto")}
+              </button>
+            </div>
+          )}
         >
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <form id="product-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
 
               {/* Images */}
               <div>
@@ -796,16 +805,6 @@ export default function ProductosManager({
                 ))}
               </div>
 
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={closeForm} disabled={saving}
-                  className="flex-1 border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50">
-                  Cancelar
-                </button>
-                <button type="submit" disabled={saving}
-                  className="flex-1 bg-primary-600 text-white py-3 rounded-xl text-sm font-medium hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
-                  {saving ? <><RiLoader4Line className="animate-spin" /> Guardando...</> : (editing ? "Actualizar" : "Crear producto")}
-                </button>
-              </div>
             </form>
         </ResponsiveModal>
       )}

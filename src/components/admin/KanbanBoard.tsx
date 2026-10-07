@@ -113,7 +113,7 @@ export default function KanbanBoard({ initialOrders }: { initialOrders: any[] })
     <>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Tablero de pedidos</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Tablero de pedidos</h1>
           <p className="text-gray-500 text-sm mt-0.5">
             Arrastra para cambiar estado - se notifica al cliente automaticamente
           </p>

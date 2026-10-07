@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminUser } from "@/lib/route-auth";
 import { sendPushToRoles } from "@/lib/webpush";
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   if (!(await requireAdminUser())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
@@ -17,7 +18,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       : Math.max(1, Math.floor(Number(rawOrder) || 1));
 
   const current = await prisma.order.findUnique({
-    where: { id: params.id },
+    where: { id },
     select: {
       id: true,
       trackingToken: true,
@@ -32,7 +33,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const order = await prisma.order.update({
-    where: { id: params.id },
+    where: { id },
     data: {
       ...(hasUrgent ? { isUrgent: body.isUrgent } : {}),
       preparationOrder,

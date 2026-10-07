@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { requireAdminUser } from "@/lib/route-auth";
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   if (!(await requireAdminUser())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
@@ -20,7 +21,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: "La contraseña debe tener al menos 6 caracteres" }, { status: 400 });
   }
 
-  const duplicateEmail = await prisma.user.findFirst({ where: { email: normalizedEmail, id: { not: params.id } } });
+  const duplicateEmail = await prisma.user.findFirst({ where: { email: normalizedEmail, id: { not: id } } });
   if (duplicateEmail) return NextResponse.json({ error: "Este correo ya está en uso" }, { status: 400 });
 
   const data: any = { name: name.trim(), email: normalizedEmail };
@@ -29,17 +30,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   data.pin = null;
 
   const user = await prisma.user.update({
-    where: { id: params.id },
+    where: { id },
     data,
     select: { id: true, name: true, email: true, role: true, createdAt: true },
   });
   return NextResponse.json(user);
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   if (!(await requireAdminUser())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
-  await prisma.user.delete({ where: { id: params.id } });
+  await prisma.user.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }

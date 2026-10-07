@@ -201,14 +201,14 @@ export default function AddonsManager({ initialAddons }: { initialAddons: Addon[
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f9fc] px-4 py-5 sm:px-6 lg:px-8">
+    <div className="min-w-0">
       <div className="mx-auto max-w-[1500px]">
         <header className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-[#11182c] sm:text-3xl">Productos adicionales</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Productos adicionales</h1>
             <p className="mt-1 text-sm text-slate-500">Bebidas, vinos, peluches, dulces y canastas</p>
           </div>
-          <button type="button" onClick={openCreate} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white shadow-[0_9px_22px_rgba(236,18,91,.22)] transition hover:bg-primary-600">
+          <button type="button" onClick={openCreate} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-600">
             <RiAddLine /> Nuevo adicional
           </button>
         </header>
@@ -243,14 +243,14 @@ export default function AddonsManager({ initialAddons }: { initialAddons: Addon[
 
         <section className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
           {[
-            { label: "Total adicionales", value: addons.length, detail: "Registrados", Icon: RiGiftLine, color: "bg-rose-50 text-primary-500" },
+            { label: "Total adicionales", value: addons.length, detail: "Registrados", Icon: RiGiftLine, color: "bg-brand-50 text-primary-500" },
             { label: "Activos", value: addons.filter(addon => addon.inStock).length, detail: "Disponibles", Icon: RiCheckLine, color: "bg-emerald-50 text-emerald-600" },
             { label: "Categorías", value: categoryCount, detail: "Organizadas", Icon: RiGridLine, color: "bg-violet-50 text-violet-600" },
             { label: "Más vendido", value: bestSeller?.name || "Sin datos", detail: `${bestSeller?.sales || 0} ventas`, Icon: RiFireLine, color: "bg-orange-50 text-orange-500" },
           ].map(card => (
             <article key={card.label} className="flex min-h-[115px] items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ${card.color}`}><card.Icon size={22} /></span>
-              <div className="min-w-0"><p className="truncate text-lg font-extrabold text-[#11182c]">{card.value}</p><p className="mt-1 text-xs font-semibold">{card.label}</p><p className="mt-1 text-[10px] text-slate-400">{card.detail}</p></div>
+              <div className="min-w-0"><p className="truncate text-lg font-extrabold text-gray-900">{card.value}</p><p className="mt-1 text-xs font-semibold">{card.label}</p><p className="mt-1 text-[10px] text-slate-400">{card.detail}</p></div>
             </article>
           ))}
         </section>
@@ -281,7 +281,7 @@ export default function AddonsManager({ initialAddons }: { initialAddons: Addon[
                     </button>
                   </div>
                   <div className="px-4 pb-3">
-                    <h2 className="truncate text-sm font-bold text-[#11182c]">{addon.name}</h2>
+                    <h2 className="truncate text-sm font-bold text-gray-900">{addon.name}</h2>
                     <p className="mt-1 text-sm font-bold text-primary-500">{formatPrice(addon.price)}</p>
                   </div>
                   <div className="grid grid-cols-3 border-t border-slate-100">
@@ -318,7 +318,15 @@ export default function AddonsManager({ initialAddons }: { initialAddons: Addon[
         onClose={closeEditor}
         title={editor === "new" ? "Nuevo adicional" : "Editar adicional"}
         description="Configura la información que verá el cliente al seleccionar este producto."
-        panelClassName="md:max-w-xl"
+        size="xl"
+        footer={(
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" onClick={closeEditor} disabled={saving} className="h-11 rounded-xl border border-gray-200 bg-white px-5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50">Cancelar</button>
+            <button type="button" onClick={saveAddon} disabled={saving} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600 disabled:opacity-50">
+              {saving ? <RiLoader4Line className="animate-spin" /> : <RiCheckLine />} {saving ? "Guardando..." : "Guardar adicional"}
+            </button>
+          </div>
+        )}
       >
         <div className="space-y-4">
           <div className="flex items-center gap-3">
@@ -341,19 +349,13 @@ export default function AddonsManager({ initialAddons }: { initialAddons: Addon[
             <span><strong className="block text-sm">Disponible</strong><small className="text-slate-400">Puede agregarse a nuevos pedidos</small></span>
             <button type="button" onClick={() => setForm({ ...form, inStock: !form.inStock })} className={`relative h-7 w-12 rounded-full transition ${form.inStock ? "bg-emerald-500" : "bg-slate-300"}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${form.inStock ? "left-6" : "left-1"}`} /></button>
           </label>
-          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
-            <button type="button" onClick={closeEditor} disabled={saving} className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-600">Cancelar</button>
-            <button type="button" onClick={saveAddon} disabled={saving} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white disabled:opacity-60">
-              {saving ? <RiLoader4Line className="animate-spin" /> : <RiCheckLine />} {saving ? "Guardando..." : "Guardar adicional"}
-            </button>
-          </div>
         </div>
       </ResponsiveModal>
 
-      <ResponsiveModal open={Boolean(viewer)} onClose={() => setViewer(null)} title={viewer?.name || "Adicional"} panelClassName="md:max-w-md">
+      <ResponsiveModal open={Boolean(viewer)} onClose={() => setViewer(null)} title={viewer?.name || "Adicional"} size="md">
         {viewer && (
           <div className="text-center">
-            <div className="mx-auto grid aspect-square max-w-xs place-items-center overflow-hidden rounded-3xl bg-slate-50">
+            <div className="mx-auto grid aspect-square max-w-xs place-items-center overflow-hidden rounded-2xl bg-slate-50">
               {viewer.imageUrl ? <img src={viewer.imageUrl} alt={viewer.name} className="h-full w-full object-contain" /> : (() => { const Icon = ICONS[viewer.type]; return <Icon size={90} className="text-slate-200" />; })()}
             </div>
             <h3 className="mt-5 text-xl font-bold">{viewer.name}</h3>

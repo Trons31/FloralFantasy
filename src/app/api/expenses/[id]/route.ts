@@ -4,7 +4,8 @@ import { deleteImage, uploadImage } from "@/lib/cloudinary";
 import { optimizeImageFileToDataUrl } from "@/lib/image-optimization";
 import { requireOrderManagementUser } from "@/lib/route-auth";
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const access = await requireOrderManagementUser(req);
   if (!access) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
@@ -57,7 +58,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const updated = await prisma.expense.update({
-    where: { id: params.id },
+    where: { id },
     data,
     select: {
       id: true,
@@ -75,7 +76,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json(updated);
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const access = await requireOrderManagementUser(_);
   if (!access) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
@@ -85,7 +87,7 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
   }
 
   const expense = await prisma.expense.findUnique({
-    where: { id: params.id },
+    where: { id },
     select: { receiptPhotoUrl: true, receiptPublicId: true },
   });
 
@@ -114,6 +116,6 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
     await deleteImage(publicId).catch(() => {});
   }
 
-  await prisma.expense.delete({ where: { id: params.id } });
+  await prisma.expense.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }

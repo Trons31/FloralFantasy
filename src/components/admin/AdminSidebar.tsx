@@ -2,267 +2,267 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut, useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { signOut } from "next-auth/react";
+import { useState } from "react";
 import type { IconType } from "react-icons";
 import {
-  RiBarChartLine,
-  RiCalendarEventLine,
-  RiCloseLine,
-  RiDashboardLine,
-  RiFlowerLine,
-  RiGiftLine,
-  RiLayoutGridLine,
-  RiLeafLine,
-  RiListCheck,
-  RiLogoutBoxLine,
-  RiMenuLine,
-  RiSettings4Line,
-  RiShieldLine,
-  RiTeamLine,
-  RiUser3Fill,
-  RiWalletLine,
-  RiCalculatorLine,
-} from "react-icons/ri";
+  FiBarChart2,
+  FiCalendar,
+  FiExternalLink,
+  FiGift,
+  FiGrid,
+  FiList,
+  FiLogOut,
+  FiMenu,
+  FiPackage,
+  FiSettings,
+  FiTrello,
+  FiUsers,
+  FiX,
+} from "react-icons/fi";
+import { PiFlowerTulip } from "react-icons/pi";
+import { VscGraph } from "react-icons/vsc";
+import { TbCash } from "react-icons/tb";
+import BrandLogo, { BRAND_NAME } from "@/components/ui/BrandLogo";
+import ConfirmModal from "@/components/ui/ConfirmModal";
+import { useBodyScrollLock } from "@/lib/scroll-lock";
 
-type NavItem = {
-  href: string;
-  icon: IconType;
-  label: string;
-  exact?: boolean;
-};
-
-type NavSection = {
-  label: string;
-  items: NavItem[];
-};
+type NavItem = { href: string; label: string; icon: IconType; exact?: boolean };
+type NavSection = { title: string; items: NavItem[] };
 
 const NAV_SECTIONS: NavSection[] = [
   {
-    label: "Dashboard",
+    title: "Principal",
     items: [
-      {
-        href: "/dashboard",
-        icon: RiDashboardLine,
-        label: "Dashboard",
-        exact: true,
-      },
+      { href: "/dashboard", label: "Inicio", icon: FiGrid, exact: true },
+      { href: "/dashboard/pedidos", label: "Tablero", icon: FiTrello },
+      { href: "/dashboard/todos-pedidos", label: "Pedidos", icon: FiList },
     ],
   },
   {
-    label: "Servicios",
+    title: "Catálogo",
     items: [
-      { href: "/dashboard/pedidos", icon: RiLayoutGridLine, label: "Tablero" },
-      { href: "/dashboard/todos-pedidos", icon: RiListCheck, label: "Pedidos" },
-      { href: "/dashboard/flores", icon: RiFlowerLine, label: "Flores" },
-      { href: "/dashboard/productos", icon: RiLeafLine, label: "Productos" },
-      { href: "/dashboard/ocasiones", icon: RiCalendarEventLine, label: "Ocasiones" },
-      { href: "/dashboard/addons", icon: RiGiftLine, label: "Adicionales" },
+      { href: "/dashboard/flores", label: "Flores", icon: PiFlowerTulip },
+      { href: "/dashboard/productos", label: "Productos", icon: FiPackage },
+      { href: "/dashboard/ocasiones", label: "Ocasiones", icon: FiCalendar },
+      { href: "/dashboard/addons", label: "Adicionales", icon: FiGift },
     ],
   },
   {
-    label: "Administración",
+    title: "Finanzas",
     items: [
-      { href: "/dashboard/contabilidad", icon: RiCalculatorLine, label: "Contabilidad" },
-      { href: "/dashboard/egresos", icon: RiWalletLine, label: "Egresos" },
-      { href: "/dashboard/reportes", icon: RiBarChartLine, label: "Reportes" },
-      { href: "/dashboard/equipo", icon: RiTeamLine, label: "Equipo" },
+      { href: "/dashboard/contabilidad", label: "Contabilidad", icon: VscGraph },
+      { href: "/dashboard/egresos", label: "Egresos", icon: TbCash },
+      { href: "/dashboard/reportes", label: "Reportes", icon: FiBarChart2 },
+    ],
+  },
+  {
+    title: "Cuenta",
+    items: [
+      { href: "/dashboard/equipo", label: "Equipo", icon: FiUsers },
+      { href: "/dashboard/ajustes", label: "Ajustes", icon: FiSettings },
     ],
   },
 ];
 
-const SIDEBAR_SURFACE =
-  "bg-[radial-gradient(circle_at_0%_0%,rgba(235,21,80,0.08),transparent_28%),linear-gradient(180deg,#0d1a2d_0%,#091426_100%)]";
+export type SidebarUser = {
+  name: string | null;
+  email: string | null;
+  role: string | null;
+};
 
-export default function AdminSidebar() {
-  const pathname = usePathname();
-  const { data: session } = useSession();
-  const [open, setOpen] = useState(false);
-  const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes((session?.user as any)?.role || "");
+function roleLabel(role: string | null) {
+  return role === "SUPER_ADMIN" ? "Super admin" : "Admin";
+}
 
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
+function isActive(pathname: string, item: NavItem) {
+  return item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`);
+}
 
-  useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
-
-  const isActive = (item: NavItem) =>
-    item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`);
-
-  const SidebarContent = () => (
-    <div className={`flex h-full flex-col overflow-hidden text-white ${SIDEBAR_SURFACE}`}>
-      <div className="px-5 pb-4 pt-5">
-        <div className="flex items-center gap-2.5">
-          <RiShieldLine className="shrink-0 text-primary-500" size={27} />
-          <div className="text-[13px] font-extrabold leading-none tracking-[0.02em]">
-            <span>SUPER </span>
-            <span className="text-primary-500">ADMIN</span>
+/**
+ * Contenido del sidebar. Vive a nivel de modulo a proposito: definido dentro
+ * del render de `AdminSidebar` (como estaba antes) React lo trataba como un
+ * componente nuevo en cada render y lo volvia a montar entero. Ese re-montaje
+ * era el parpadeo que se veia al abrir el menu en el celular.
+ */
+function SidebarBody({
+  pathname,
+  user,
+  onNavigate,
+  onLogout,
+}: {
+  pathname: string;
+  user: SidebarUser;
+  onNavigate: () => void;
+  onLogout: () => void;
+}) {
+  return (
+    <div className="relative flex h-full flex-col overflow-hidden bg-white text-gray-900">
+      {/* Cabecera: el negocio y, bajo un divisor, quien esta conectado. */}
+      <div className="relative px-2 pb-3 pt-2">
+        <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
+          <div className="flex items-center gap-2.5 p-3">
+            <BrandLogo size={36} />
+            <span className="line-clamp-2 min-w-0 flex-1 break-words text-sm font-black leading-snug text-gray-900">
+              {BRAND_NAME}
+            </span>
           </div>
-        </div>
-
-        <div className="mt-5 flex items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-primary-600 text-white shadow-[0_8px_22px_rgba(232,24,90,0.28)]">
-            <RiUser3Fill size={22} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-semibold leading-tight text-white">
-              {session?.user?.name || "Super Admin"}
-            </p>
-            <p className="mt-0.5 truncate text-[11px] leading-tight text-slate-400">
-              {session?.user?.email || ""}
-            </p>
+          <div className="border-t border-gray-100 p-1.5">
+            <div className="block px-1.5 py-1">
+              <span className="flex items-center gap-1.5">
+                <span className="min-w-0 flex-1 truncate text-xs font-semibold text-gray-700">
+                  {user.name || roleLabel(user.role)}
+                </span>
+                <span className="shrink-0 rounded-full bg-gray-100 px-1.5 py-px text-[10px] font-bold text-gray-500">
+                  {roleLabel(user.role)}
+                </span>
+              </span>
+              {user.email && <span className="mt-0.5 block truncate text-[11px] font-medium text-gray-400">{user.email}</span>}
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="mx-5 h-px bg-white/10" />
-
-      <nav className="sidebar-scroll flex-1 overflow-y-auto px-3 py-3">
-        <div className="space-y-4">
-          {NAV_SECTIONS.map((section) => (
-            <section key={section.label}>
-              {section.label !== "Dashboard" && (
-                <p className="mb-1.5 px-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  {section.label}
-                </p>
-              )}
-
-              <div className="space-y-0.5">
-                {section.items.map((item) => {
-                  const active = isActive(item);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      aria-current={active ? "page" : undefined}
-                      className={[
-                        "group flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-200",
-                        active
-                          ? "bg-gradient-to-r from-primary-500 to-[#f20f5e] text-white shadow-[0_8px_24px_rgba(232,24,90,0.24)]"
-                          : "text-slate-300 hover:bg-white/[0.055] hover:text-white",
-                      ].join(" ")}
-                    >
-                      <item.icon
-                        size={17}
-                        className={[
-                          "shrink-0 transition-colors",
-                          active ? "text-white" : "text-slate-400 group-hover:text-white",
-                        ].join(" ")}
-                      />
-                      <span className="truncate">{item.label}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-
-              {section.label !== "Dashboard" && (
-                <div className="mt-3 h-px bg-white/[0.07]" />
-              )}
-            </section>
-          ))}
-
-          {isAdmin && (
-            <section>
-              <p className="mb-1.5 px-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                Configuración
-              </p>
-              <Link
-                href="/dashboard/ajustes"
-                aria-current={pathname.startsWith("/dashboard/ajustes") ? "page" : undefined}
-                className={[
-                  "group flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-200",
-                  pathname.startsWith("/dashboard/ajustes")
-                    ? "bg-gradient-to-r from-primary-500 to-[#f20f5e] text-white shadow-[0_8px_24px_rgba(232,24,90,0.24)]"
-                    : "text-slate-300 hover:bg-white/[0.055] hover:text-white",
-                ].join(" ")}
-              >
-                <RiSettings4Line
-                  size={17}
-                  className={pathname.startsWith("/dashboard/ajustes") ? "text-white" : "text-slate-400 group-hover:text-white"}
-                />
-                <span>Ajustes</span>
-              </Link>
-            </section>
-          )}
-        </div>
+      <nav className="custom-scrollbar relative flex-1 overflow-y-auto px-2 pb-3">
+        {NAV_SECTIONS.map((section, index) => (
+          <div key={section.title} className={index === 0 ? "mt-1" : "mt-4 border-t border-gray-100 pt-4"}>
+            <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wide text-gray-400">{section.title}</p>
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const active = isActive(pathname, item);
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onNavigate}
+                    aria-current={active ? "page" : undefined}
+                    className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium leading-tight transition-colors ${
+                      active ? "bg-brand-500 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    }`}
+                  >
+                    {active && <span className="absolute -left-2 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-brand-300" />}
+                    <Icon
+                      className={`h-4 w-4 shrink-0 ${active ? "text-white" : "text-gray-400 group-hover:text-brand-500"}`}
+                    />
+                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
-      <div className="border-t border-white/[0.08] px-3 py-3">
-        <button
-          type="button"
-          onClick={() => signOut({ callbackUrl: "/auth/login" })}
-          className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-primary-400 transition-colors hover:bg-primary-500/10 hover:text-primary-300"
-        >
-          <RiLogoutBoxLine size={17} className="shrink-0" />
-          <span>Cerrar sesión</span>
-        </button>
+      <div className="relative px-2 pb-3">
+        <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-brand-600"
+          >
+            <FiExternalLink className="h-4 w-4 text-brand-500" />
+            <span className="min-w-0 flex-1">Ver tienda</span>
+          </a>
+          <div className="mx-4 h-px bg-gray-100" />
+          <button
+            type="button"
+            onClick={onLogout}
+            className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-gray-600 transition-colors hover:bg-red-50 hover:text-red-500"
+          >
+            <FiLogOut className="h-4 w-4 text-brand-500" />
+            <span className="min-w-0 flex-1">Cerrar sesión</span>
+          </button>
+        </div>
       </div>
     </div>
   );
+}
+
+export default function AdminSidebar({ user }: { user: SidebarUser }) {
+  const pathname = usePathname() ?? "";
+  const [open, setOpen] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  // Contador compartido con los modales: cerrar el menu no desbloquea el
+  // fondo de un modal que siga abierto, ni al reves.
+  useBodyScrollLock(open);
+
+  const close = () => setOpen(false);
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      // `redirect: false` + `location.replace`: con `callbackUrl` el router
+      // repinta el panel ya sin sesion antes de navegar (parpadeo), y el
+      // panel quedaria en el historial.
+      await signOut({ redirect: false });
+      window.location.replace("/auth/login");
+    } catch (error) {
+      console.error("No se pudo cerrar la sesión", error);
+      setLoggingOut(false);
+    }
+  };
+
+  const requestLogout = () => {
+    setOpen(false);
+    setConfirmLogout(true);
+  };
 
   return (
     <>
-      <header className={`fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-white/10 px-4 text-white shadow-lg lg:hidden ${SIDEBAR_SURFACE}`}>
-        <div className="flex items-center gap-2">
-          <RiShieldLine className="text-primary-500" size={24} />
-          <p className="text-xs font-extrabold">
-            SUPER <span className="text-primary-500">ADMIN</span>
-          </p>
+      {/* Barra superior en movil */}
+      <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between gap-3 border-b border-gray-100 bg-white px-4 text-gray-900 shadow-sm lg:hidden">
+        <div className="flex min-w-0 items-center gap-2">
+          <BrandLogo size={32} />
+          <span className="truncate text-sm font-bold text-gray-900">{BRAND_NAME}</span>
         </div>
         <button
           type="button"
-          onClick={() => setOpen(true)}
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-200 transition-colors hover:bg-white/10"
-          aria-label="Abrir menú"
+          onClick={() => setOpen((value) => !value)}
+          className="flex-shrink-0 rounded-xl p-2 text-gray-700 hover:bg-gray-100"
+          aria-label={open ? "Cerrar menú" : "Abrir menú"}
+          aria-expanded={open}
         >
-          <RiMenuLine size={21} />
+          {open ? <FiX className="h-5 w-5" /> : <FiMenu className="h-5 w-5" />}
         </button>
       </header>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            className="fixed inset-0 z-50 lg:hidden"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.button
-              type="button"
-              aria-label="Cerrar menú"
-              className="absolute inset-0 bg-slate-950/55"
-              onClick={() => setOpen(false)}
-            />
-            <motion.aside
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.12 }}
-              className="absolute inset-y-0 left-0 w-[min(82vw,16rem)] overflow-hidden shadow-2xl"
-            >
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
-                aria-label="Cerrar menú"
-              >
-                <RiCloseLine size={20} />
-              </button>
-              <SidebarContent />
-            </motion.aside>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Menu lateral en movil: siempre montado y se desliza con `transform`.
+          Montarlo y desmontarlo en cada apertura re-creaba todo el arbol y la
+          pantalla parpadeaba. `invisible` lo saca del orden de tabulacion
+          cuando esta cerrado. */}
+      <div className={`fixed inset-0 z-50 lg:hidden ${open ? "" : "pointer-events-none"}`} aria-hidden={!open}>
+        <div
+          className={`absolute inset-0 bg-black/45 transition-opacity duration-200 ${open ? "opacity-100" : "opacity-0"}`}
+          onClick={close}
+        />
+        <aside
+          className={`absolute inset-y-0 left-0 w-64 shadow-2xl transition-[transform,visibility] duration-200 ease-out ${
+            open ? "visible translate-x-0" : "invisible -translate-x-full"
+          }`}
+        >
+          <SidebarBody pathname={pathname} user={user} onNavigate={close} onLogout={requestLogout} />
+        </aside>
+      </div>
 
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 overflow-hidden border-r border-white/10 shadow-[8px_0_30px_rgba(15,23,42,0.08)] lg:block">
-        <SidebarContent />
+      {/* Sidebar de escritorio */}
+      <aside className="fixed left-0 top-0 hidden h-screen w-64 flex-col border-r border-gray-100 bg-white lg:flex">
+        <SidebarBody pathname={pathname} user={user} onNavigate={() => {}} onLogout={requestLogout} />
       </aside>
+
+      <ConfirmModal
+        open={confirmLogout}
+        onClose={() => setConfirmLogout(false)}
+        onConfirm={handleLogout}
+        loading={loggingOut}
+        title="Cerrar sesión"
+        message="¿Estás seguro de que quieres salir?"
+        confirmLabel="Salir"
+      />
     </>
   );
 }

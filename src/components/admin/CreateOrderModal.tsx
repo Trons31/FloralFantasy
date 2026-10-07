@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { RiCloseLine, RiSearchLine, RiAddLine, RiSubtractLine, RiShoppingBagLine, RiWhatsappLine, RiLoaderLine, RiCheckLine, RiLinkM, RiFileCopyLine } from "react-icons/ri";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
+import LoadingButton from "@/components/ui/LoadingButton";
 import { DEFAULT_DELIVERY_FEE } from "@/lib/site-settings";
 import { toast } from "sonner";
 import { formatPrice, formatDeliveryLeadDays } from "@/lib/utils";
@@ -407,12 +408,34 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
       onClose={onClose}
       title={success ? "Link de pago generado" : "Nuevo pedido"}
       description={success ? "Comparte este enlace con tu cliente por WhatsApp." : "Arma el pedido y genera el enlace de pago."}
-      panelClassName="md:max-w-4xl"
-      contentClassName="p-0 overflow-hidden"
+      size="2xl"
+      footer={
+        success ? (
+          <div className="flex justify-end">
+            <LoadingButton variant="secondary" onClick={onClose}>
+              Cerrar
+            </LoadingButton>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {error && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+            <LoadingButton
+              type="button"
+              onClick={handleSubmit}
+              loading={submitting}
+              disabled={cart.length === 0}
+              className="h-12 w-full"
+            >
+              {submitting ? "Generando link..." : "Generar link de pago"}
+              {!submitting && <RiLinkM size={18} />}
+            </LoadingButton>
+          </div>
+        )
+      }
     >
       {success ? (
         <div className="space-y-4">
-          <div className="rounded-3xl bg-green-50 border border-green-100 p-5">
+          <div className="rounded-2xl bg-green-50 border border-green-100 p-5">
             <div className="flex items-start gap-3">
               <div className="w-11 h-11 rounded-2xl bg-green-100 text-green-600 flex items-center justify-center flex-shrink-0">
                 <RiCheckLine size={22} />
@@ -427,7 +450,7 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
             </div>
           </div>
 
-            <div className="rounded-3xl border border-gray-200 bg-white p-4">
+            <div className="rounded-2xl border border-gray-200 bg-white p-4">
               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Link de pago</label>
               <div className="flex flex-col sm:flex-row gap-3">
                 <input value={generatedLink} readOnly className="flex-1 border border-gray-200 rounded-2xl px-4 py-3 text-sm bg-gray-50" />
@@ -442,25 +465,18 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
               </div>
             </div>
 
-          <div className="flex justify-end gap-3">
-            <button onClick={onClose} className="px-4 py-3 rounded-2xl border border-gray-200 text-gray-700 font-semibold">
-              Cerrar
-            </button>
-          </div>
         </div>
       ) : (
-        <div className="relative h-full min-h-0 flex flex-col overflow-hidden">
-          <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6 pb-32">
             <div className="grid lg:grid-cols-[1.1fr_.9fr] gap-6">
           <div className="space-y-4">
-            <div className="rounded-3xl bg-gray-50 border border-gray-100 p-4">
+            <div className="rounded-2xl bg-gray-50 border border-gray-100 p-4">
               <div className="relative">
                 <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Buscar productos..."
-                  className="w-full pl-9 pr-4 py-3 bg-white border border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+                  className="w-full pl-9 pr-4 py-3 bg-white border border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
                 />
               </div>
             </div>
@@ -468,7 +484,7 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
             <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
               {loadingProducts ? (
                 <div className="flex items-center justify-center py-12">
-                  <RiLoaderLine className="animate-spin text-rose-500" size={26} />
+                  <RiLoaderLine className="animate-spin text-brand-500" size={26} />
                 </div>
               ) : filtered.length === 0 ? (
                 <p className="text-center text-gray-400 text-sm py-10">Sin resultados</p>
@@ -482,37 +498,37 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                         {img ? (
                           <img src={img} alt={product.name} className="w-14 h-14 object-cover rounded-xl flex-shrink-0" />
                         ) : (
-                          <div className="w-14 h-14 bg-rose-50 rounded-xl flex-shrink-0 flex items-center justify-center">
-                            <RiShoppingBagLine className="text-rose-300" size={22} />
+                          <div className="w-14 h-14 bg-brand-50 rounded-xl flex-shrink-0 flex items-center justify-center">
+                            <RiShoppingBagLine className="text-brand-300" size={22} />
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-gray-900 text-sm leading-tight truncate">{product.name}</p>
-                          {product.occasion && <p className="text-[10px] text-rose-400 uppercase font-bold tracking-wide">{product.occasion}</p>}
-                          <p className="text-rose-600 font-bold text-sm mt-0.5">{formatPrice(product.price)}</p>
+                          {product.occasion && <p className="text-[10px] text-brand-400 uppercase font-bold tracking-wide">{product.occasion}</p>}
+                          <p className="text-brand-600 font-bold text-sm mt-0.5">{formatPrice(product.price)}</p>
                         </div>
                         {cartItem ? (
                           <div className="flex items-center gap-1.5 flex-shrink-0">
-                            <button onClick={() => updateQty(product.id, -1)} className="w-7 h-7 rounded-full bg-rose-100 flex items-center justify-center hover:bg-rose-200 transition-colors">
-                              <RiSubtractLine size={14} className="text-rose-600" />
+                            <button onClick={() => updateQty(product.id, -1)} className="w-7 h-7 rounded-full bg-brand-100 flex items-center justify-center hover:bg-brand-200 transition-colors">
+                              <RiSubtractLine size={14} className="text-brand-600" />
                             </button>
                             <span className="w-5 text-center text-sm font-bold text-gray-900">{cartItem.quantity}</span>
-                            <button onClick={() => updateQty(product.id, 1)} className="w-7 h-7 rounded-full bg-rose-500 flex items-center justify-center hover:bg-rose-600 transition-colors">
+                            <button onClick={() => updateQty(product.id, 1)} className="w-7 h-7 rounded-full bg-brand-500 flex items-center justify-center hover:bg-brand-600 transition-colors">
                               <RiAddLine size={14} className="text-white" />
                             </button>
                           </div>
                         ) : (
-                          <button onClick={() => addToCart(product)} className="flex-shrink-0 w-9 h-9 rounded-full bg-rose-500 flex items-center justify-center hover:bg-rose-600 transition-colors shadow-sm shadow-rose-200">
+                          <button onClick={() => addToCart(product)} className="flex-shrink-0 w-9 h-9 rounded-full bg-brand-500 flex items-center justify-center hover:bg-brand-600 transition-colors shadow-sm shadow-brand-100">
                             <RiAddLine size={18} className="text-white" />
                           </button>
                         )}
                       </div>
 
                       {cartItem && (
-                        <div className="rounded-2xl bg-rose-50/40 border border-rose-100 p-3 space-y-3">
+                        <div className="rounded-2xl bg-brand-50/40 border border-brand-100 p-3 space-y-3">
                           <div className="flex items-center justify-between gap-2">
-                            <p className="text-xs font-bold text-rose-700 uppercase tracking-wide">Personalizar ramo</p>
-                            <span className="text-[11px] text-rose-500 font-semibold">
+                            <p className="text-xs font-bold text-brand-700 uppercase tracking-wide">Personalizar ramo</p>
+                            <span className="text-[11px] text-brand-500 font-semibold">
                               {getBouquetSummary(cartItem.customization).label}
                             </span>
                           </div>
@@ -527,8 +543,8 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                                   (size === "REDUCED" && cartItem.customization.sizeModes.reduced) ||
                                   (size === "ENLARGED" && cartItem.customization.sizeModes.enlarged) ||
                                   (size === "STANDARD" && !cartItem.customization.sizeModes.reduced && !cartItem.customization.sizeModes.enlarged)
-                                    ? "bg-rose-500 text-white border-rose-500"
-                                    : "bg-white text-gray-600 border-gray-200 hover:border-rose-300"
+                                    ? "bg-brand-500 text-white border-brand-500"
+                                    : "bg-white text-gray-600 border-gray-200 hover:border-brand-300"
                                 }`}
                               >
                                 {size === "REDUCED" ? "Reducido" : size === "STANDARD" ? "Normal" : "Agrandado"}
@@ -536,17 +552,17 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                             ))}
                           </div>
 
-                          <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-3 py-2">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-rose-500">Detalle</p>
+                          <div className="rounded-2xl border border-brand-100 bg-brand-50/60 px-3 py-2">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-brand-500">Detalle</p>
                             {getBouquetSummary(cartItem.customization).chips.decreased.length > 0 ? (
-                              <div className="mt-2 rounded-xl border border-rose-100 bg-white/80 px-3 py-1.5">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-rose-500">Reducido</p>
+                              <div className="mt-2 rounded-xl border border-brand-100 bg-white/80 px-3 py-1.5">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-brand-500">Reducido</p>
                                 <p className="mt-1 text-[13px] font-semibold leading-snug text-gray-900">
                                   {`Quitaste ${formatNames(getBouquetSummary(cartItem.customization).chips.decreased)}`}
                                 </p>
                                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                                   {getBouquetSummary(cartItem.customization).chips.decreased.map((flower) => (
-                                    <span key={flower.id} className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-600">
+                                    <span key={flower.id} className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-600">
                                       - {flower.name} x{flower.baseQuantity - flower.quantity}
                                     </span>
                                   ))}
@@ -622,7 +638,7 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                                       <button
                                         type="button"
                                         onClick={() => updateBaseFlowerQty(product.id, flower.id, 1)}
-                                        className="w-7 h-7 rounded-full bg-rose-500 flex items-center justify-center hover:bg-rose-600 transition-colors disabled:opacity-40"
+                                        className="w-7 h-7 rounded-full bg-brand-500 flex items-center justify-center hover:bg-brand-600 transition-colors disabled:opacity-40"
                                       >
                                         <RiAddLine size={12} className="text-white" />
                                       </button>
@@ -650,8 +666,8 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                                       onClick={() => toggleExtraFlower(product.id, flower)}
                                       className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
                                         selected
-                                          ? "bg-rose-500 border-rose-500 text-white"
-                                          : "bg-white border-gray-200 text-gray-600 hover:border-rose-300"
+                                          ? "bg-brand-500 border-brand-500 text-white"
+                                          : "bg-white border-gray-200 text-gray-600 hover:border-brand-300"
                                       }`}
                                     >
                                       {flower.name}
@@ -683,7 +699,7 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                                     <button
                                       type="button"
                                       onClick={() => updateExtraFlowerQty(product.id, flower.id, 1)}
-                                      className="w-7 h-7 rounded-full bg-rose-500 flex items-center justify-center hover:bg-rose-600 transition-colors"
+                                      className="w-7 h-7 rounded-full bg-brand-500 flex items-center justify-center hover:bg-brand-600 transition-colors"
                                     >
                                       <RiAddLine size={12} className="text-white" />
                                     </button>
@@ -705,7 +721,7 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
             </div>
 
             {cart.length > 0 && addons.length > 0 && (
-              <div className="rounded-3xl border border-gray-100 bg-white p-4">
+              <div className="rounded-2xl border border-gray-100 bg-white p-4">
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Complementos</p>
                 <div className="space-y-3">
                   {cart.map((c) => (
@@ -720,8 +736,8 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                               onClick={() => toggleAddon(c.product.id, addon)}
                               className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
                                 selected
-                                  ? "bg-rose-500 border-rose-500 text-white"
-                                  : "bg-white border-gray-200 text-gray-600 hover:border-rose-300"
+                                  ? "bg-brand-500 border-brand-500 text-white"
+                                  : "bg-white border-gray-200 text-gray-600 hover:border-brand-300"
                               }`}
                             >
                               {addon.name} +{formatPrice(addon.price)}
@@ -737,20 +753,20 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
           </div>
 
           <div className="space-y-4">
-            <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm">
+            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
               <h3 className="font-semibold text-lg mb-4">Observaciones del pedido</h3>
               <textarea
                 value={adminNote}
                 onChange={(e) => setAdminNote(e.target.value)}
                 placeholder="Color de rosas, cambios, sustituciones o instrucciones especiales..."
-                className="w-full min-h-[120px] resize-y border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+                className="w-full min-h-[120px] resize-y border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
               />
               <p className="text-xs text-gray-400 mt-2">
                 Úsalo para dejar indicaciones como color de rosas, reemplazos o cualquier ajuste del pedido.
               </p>
             </div>
 
-            <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm">
+            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
               <h3 className="font-semibold text-lg mb-4">Ajuste manual</h3>
               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">
                 Ajuste al total
@@ -760,14 +776,14 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                 value={manualAdjustment}
                 onChange={(e) => setManualAdjustment(e.target.value)}
                 placeholder="0"
-                className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+                className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
               />
               <p className="text-xs text-gray-400 mt-2">
                 Usa un valor positivo para aumentar el total o negativo para reducirlo.
               </p>
             </div>
 
-            <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm">
+            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
               <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
                 <RiShoppingBagLine className="text-primary-500" /> Resumen
               </h3>
@@ -778,7 +794,7 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
                     <div className="flex-1">
                       <p className="font-medium text-sm">{item.product.name}</p>
                       <p className="text-xs text-gray-400">x{item.quantity}</p>
-                      <p className="text-[11px] text-rose-500 font-semibold mt-0.5">
+                      <p className="text-[11px] text-brand-500 font-semibold mt-0.5">
                         {getBouquetSummary(item.customization).label}
                         {getBouquetSummary(item.customization).detail !== "Sin cambios"
                           ? ` · ${getBouquetSummary(item.customization).detail}`
@@ -819,24 +835,9 @@ export default function CreateOrderModal({ open, onClose, onCreated }: Props) {
               <div className="mt-4 flex items-center gap-2 text-xs text-gray-400">
                 <RiCheckLine size={14} /> El cliente completará sus datos y subirá el comprobante en checkout
               </div>
-              {error && <div className="mt-3 rounded-2xl bg-red-50 border border-red-200 p-3 text-sm text-red-600">{error}</div>}
             </div>
           </div>
         </div>
-      </div>
-
-        <div className="absolute inset-x-0 bottom-0 z-20 bg-white border-t border-gray-100 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_24px_rgba(15,23,42,0.04)] sm:px-6 sm:pt-4">
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting || cart.length === 0}
-            className="w-full flex items-center justify-center gap-2 bg-primary-600 text-white py-4 rounded-full font-semibold hover:bg-primary-700 disabled:opacity-50 transition-all shadow-lg shadow-primary-600/20"
-          >
-            {submitting ? "Generando link..." : "Generar link de pago"}
-            {!submitting && <RiLinkM size={18} />}
-          </button>
-        </div>
-      </div>
       )}
     </ResponsiveModal>
   );

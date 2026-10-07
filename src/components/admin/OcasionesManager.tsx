@@ -381,7 +381,27 @@ export default function OcasionesManager({ occasions: initial }: { occasions: Oc
         onClose={closeForm}
         title={editing ? "Editar ocasión" : "Nueva ocasión"}
         description="Define el nombre, las imágenes y si requiere pedido con anterioridad."
-        panelClassName="md:max-w-4xl"
+        size="2xl"
+        footer={(
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={closeForm}
+              className="h-11 rounded-xl border border-gray-200 bg-white px-5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600 disabled:opacity-50"
+            >
+              {saving ? <RiLoader4Line className="animate-spin" size={16} /> : <RiShieldCheckLine size={16} />}
+              {saving ? "Guardando..." : "Guardar ocasión"}
+            </button>
+          </div>
+        )}
       >
         <div className="space-y-5">
           <div className="grid md:grid-cols-2 gap-4">
@@ -399,7 +419,7 @@ export default function OcasionesManager({ occasions: initial }: { occasions: Oc
                     }));
                   }}
                   placeholder="Ej: Amor, Cumpleaños, Bodas"
-                  className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+                  className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
                 />
               </div>
 
@@ -409,7 +429,7 @@ export default function OcasionesManager({ occasions: initial }: { occasions: Oc
                   value={form.slug}
                   onChange={(e) => setForm((prev) => ({ ...prev, slug: slugify(e.target.value) }))}
                   placeholder="amor"
-                  className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+                  className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
                 />
                 <p className="text-xs text-gray-400 mt-1">Se usará en el filtro público de la tienda.</p>
               </div>
@@ -420,7 +440,7 @@ export default function OcasionesManager({ occasions: initial }: { occasions: Oc
                   value={form.subtitle}
                   onChange={(e) => setForm((prev) => ({ ...prev, subtitle: e.target.value }))}
                   placeholder="Ej: & Romance"
-                  className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+                  className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
                 />
               </div>
 
@@ -431,7 +451,7 @@ export default function OcasionesManager({ occasions: initial }: { occasions: Oc
                     type="number"
                     value={form.sortOrder}
                     onChange={(e) => setForm((prev) => ({ ...prev, sortOrder: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
                   />
                 </div>
                 <div>
@@ -440,7 +460,7 @@ export default function OcasionesManager({ occasions: initial }: { occasions: Oc
                     type="number"
                     value={form.advanceOrderDays}
                     onChange={(e) => setForm((prev) => ({ ...prev, advanceOrderDays: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+                    className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
                   />
                 </div>
               </div>
@@ -496,7 +516,7 @@ export default function OcasionesManager({ occasions: initial }: { occasions: Oc
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-sm font-semibold text-gray-900">Imagen {idx + 1}</p>
                             {slot.isMain && (
-                              <span className="rounded-full bg-rose-100 text-rose-600 px-2 py-0.5 text-[11px] font-semibold">
+                              <span className="rounded-full bg-brand-100 text-brand-600 px-2 py-0.5 text-[11px] font-semibold">
                                 Principal
                               </span>
                             )}
@@ -517,7 +537,7 @@ export default function OcasionesManager({ occasions: initial }: { occasions: Oc
                               onClick={() => setMainImage(idx)}
                               className={`rounded-xl px-3 py-2 text-xs font-semibold border transition-colors ${
                                 slot.isMain
-                                  ? "border-rose-500 bg-rose-500 text-white"
+                                  ? "border-brand-500 bg-brand-500 text-white"
                                   : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
                               }`}
                             >
@@ -540,24 +560,6 @@ export default function OcasionesManager({ occasions: initial }: { occasions: Oc
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3 pt-2">
-            <button
-              type="button"
-              onClick={closeForm}
-              className="px-4 py-3 rounded-2xl border border-gray-200 text-gray-700 font-semibold"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-primary-600 text-white font-semibold hover:bg-primary-700 disabled:opacity-50"
-            >
-              {saving ? <RiLoader4Line className="animate-spin" size={16} /> : <RiShieldCheckLine size={16} />}
-              {saving ? "Guardando..." : "Guardar ocasión"}
-            </button>
-          </div>
         </div>
       </ResponsiveModal>
       <ConfirmDialog

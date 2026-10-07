@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdminUser } from "@/lib/route-auth";
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   if (!(await requireAdminUser())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
@@ -14,7 +15,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 
   return NextResponse.json(await prisma.flower.update({
-    where: { id: params.id },
+    where: { id },
     data: {
       name,
       type: String(body.type || "Flor").trim() || "Flor",
@@ -25,10 +26,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }));
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   if (!(await requireAdminUser())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
-  await prisma.flower.delete({ where: { id: params.id } });
+  await prisma.flower.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }

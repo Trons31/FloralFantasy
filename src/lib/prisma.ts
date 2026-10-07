@@ -7,7 +7,7 @@ function readEnvFileDatabaseUrl() {
 
   for (const filename of candidates) {
     try {
-      const envPath = path.join(process.cwd(), filename);
+      const envPath = path.join(/*turbopackIgnore: true*/ process.cwd(), filename);
       if (!fs.existsSync(envPath)) continue;
 
       const content = fs.readFileSync(envPath, "utf8");

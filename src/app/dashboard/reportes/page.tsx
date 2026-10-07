@@ -9,10 +9,11 @@ const PREPARED_STATUSES = ["PROCESSING", "READY"] as const;
 const REVENUE_STATUSES = ["PAID", "PROCESSING", "READY", "OUT_FOR_DELIVERY", "DELIVERED"] as const;
 
 export default async function ReportesPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams: { year?: string; month?: string; day?: string; mode?: string };
+  searchParams: Promise<{ year?: string; month?: string; day?: string; mode?: string }>;
 }) {
+  const searchParams = await searchParamsPromise;
   const now = new Date();
   const mode = searchParams.mode === "month" ? "month" : "day";
   const year = Number.parseInt(searchParams.year || String(now.getFullYear()), 10);

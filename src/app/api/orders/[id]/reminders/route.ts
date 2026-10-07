@@ -94,7 +94,8 @@ async function getReminderRecipients(recipient: string, adminId: string) {
   return [];
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const admin = await requireAdminUser();
   if (!admin?.id) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
@@ -118,7 +119,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   const order = await prisma.order.findUnique({
-    where: { id: params.id },
+    where: { id },
     select: {
       id: true,
       trackingToken: true,

@@ -7,6 +7,7 @@ import {
 } from "react-icons/ri";
 import { toast } from "sonner";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
+import Modal from "@/components/ui/Modal";
 
 type Addon     = { id:string; addon:{ name:string } };
 type OrderItem = { id:string; quantity:number; addons:Addon[]; product:{ name:string; images:{url:string;isMain:boolean}[] } };
@@ -319,7 +320,7 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
         onClose={() => { setPhotoOrder(null); setPhotoError(false); }}
         title="Confirmar entrega"
         description="La foto de evidencia es obligatoria para confirmar."
-        panelClassName="sm:max-w-md"
+        size="md"
       >
         {photoOrder && (
           <div className="space-y-4">
@@ -417,19 +418,7 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
 
       {/* ── Egreso / gasto modal ── */}
       {showEgreso && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 backdrop-blur-sm">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-sm shadow-2xl p-6 pb-8 overflow-y-auto max-h-[90vh]">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h2 className="font-bold text-lg flex items-center gap-2">
-                  <RiReceiptLine className="text-amber-500" size={20}/> Registrar gasto
-                </h2>
-                <p className="text-xs text-gray-400 mt-0.5">El gasto quedará en contabilidad con tu nombre</p>
-              </div>
-              <button onClick={closeEgreso} className="p-2 hover:bg-gray-100 rounded-full text-gray-400">
-                <RiCloseLine size={20}/>
-              </button>
-            </div>
+        <Modal open onClose={closeEgreso} title="Registrar gasto" description="El gasto quedará en contabilidad con tu nombre" size="sm">
 
             <div className="space-y-4">
               {/* Description */}
@@ -505,8 +494,7 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
                 </button>
               </div>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

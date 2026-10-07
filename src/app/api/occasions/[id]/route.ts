@@ -71,13 +71,13 @@ async function replaceImages(occasionId: string, nextImages: ReturnType<typeof n
   });
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   if (!(await requireAdminUser())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
   try {
-    const id = params.id;
     const body = await req.json();
     const name = String(body?.name || "").trim();
     const slug = String(body?.slug || "").trim() || slugify(name);
@@ -126,13 +126,14 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   if (!(await requireAdminUser())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
   const occasion = await prisma.occasion.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: { images: true },
   });
 
@@ -146,7 +147,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
       .map((img) => deleteImage(img.publicId!))
   );
 
-  await prisma.occasion.delete({ where: { id: params.id } });
+  await prisma.occasion.delete({ where: { id } });
 
   return NextResponse.json({ ok: true });
 }

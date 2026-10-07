@@ -21,12 +21,13 @@ async function getOrderDetails(id: string) {
   });
 }
 
-export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   if (!(await requireAdminUser())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const order = await getOrderDetails(params.id);
+  const order = await getOrderDetails(id);
   if (!order) {
     return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
   }
@@ -34,7 +35,8 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   return NextResponse.json(order);
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   if (!(await requireAdminUser())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
@@ -63,7 +65,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     const existingOrder = await prisma.order.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: { id: true, status: true },
     });
 
@@ -159,16 +161,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       await tx.orderItemAddOn.deleteMany({
         where: {
           orderItem: {
-            orderId: params.id,
+            orderId: id,
           },
         },
       });
       await tx.orderItem.deleteMany({
-        where: { orderId: params.id },
+        where: { orderId: id },
       });
 
       await tx.order.update({
-        where: { id: params.id },
+        where: { id },
         data: {
           customerName: customerName.trim(),
           customerPhone: customerPhone.trim(),
@@ -193,7 +195,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         },
       });
 
-      return getOrderDetails(params.id);
+      return getOrderDetails(id);
     });
 
     return NextResponse.json(updated);

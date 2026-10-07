@@ -76,18 +76,18 @@ function StatCard({
   style: string;
 }) {
   return (
-    <div className="flex min-h-[132px] flex-col items-start gap-2 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:min-h-[126px] sm:flex-row sm:items-center sm:gap-4 sm:p-5">
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full sm:h-14 sm:w-14 ${style}`}>
-        <Icon className="text-xl sm:text-2xl" />
+    <div className="min-w-0 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+      <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
+        <span className="min-w-0 break-words text-sm font-medium text-gray-500">{label}</span>
+        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${style}`}>
+          <Icon className="text-lg" />
+        </div>
       </div>
-      <div className="min-w-0">
-        <p className="text-xs font-medium text-slate-500">{label}</p>
-        <p className="mt-1 max-w-full text-base font-bold leading-tight text-[#11182c] sm:truncate sm:text-xl">{value}</p>
-        <p className="mt-1 line-clamp-1 text-[9px] text-slate-400 sm:text-[10px]">{hint}</p>
-        <p className={`mt-1.5 text-[10px] font-medium ${trend.down ? "text-rose-500" : "text-emerald-600"}`}>
-          {trend.down ? "↓" : "↑"} {trend.value}% <span className="hidden font-normal text-slate-400 sm:inline">vs período anterior</span>
-        </p>
-      </div>
+      <p className="break-words text-xl font-bold tabular-nums text-gray-900 sm:text-2xl">{value}</p>
+      <p className="mt-1 break-words text-xs text-gray-400">{hint}</p>
+      <p className={`mt-1 text-[11px] font-semibold ${trend.down ? "text-red-500" : "text-emerald-600"}`}>
+        {trend.down ? "↓" : "↑"} {trend.value}% <span className="font-normal text-gray-400">vs período anterior</span>
+      </p>
     </div>
   );
 }
@@ -317,7 +317,7 @@ export default function ContabilidadDashboard({ initialData }: { initialData: Ac
       hint: "Total del período",
       trend: percentChange(summary.expenses, previous?.expenses || 0),
       icon: RiArrowDownLine,
-      style: "bg-rose-50 text-primary-500",
+      style: "bg-brand-50 text-primary-500",
     },
     {
       label: "Ganancia",
@@ -338,13 +338,13 @@ export default function ContabilidadDashboard({ initialData }: { initialData: Ac
   ];
 
   return (
-    <div className="min-h-screen bg-[#f8f9fc] px-4 py-6 sm:px-6 lg:px-7">
+    <div className="min-w-0">
       <div className="mx-auto max-w-[1500px] space-y-4">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex items-center gap-3">
               <RiBarChartBoxLine className="text-primary-500" size={28} />
-              <h1 className="text-[28px] font-bold tracking-tight text-[#11182c]">Contabilidad</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Contabilidad</h1>
             </div>
             <p className="mt-1 text-sm text-slate-500">
               Revisa ingresos, egresos, ganancia, pedidos y movimientos del período seleccionado.
@@ -367,7 +367,7 @@ export default function ContabilidadDashboard({ initialData }: { initialData: Ac
                 type="button"
                 onClick={() => setMode(item)}
                 className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                  mode === item ? "bg-[#0d1830] text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
+                  mode === item ? "bg-brand-500 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
                 }`}
               >
                 {item === "day" ? "Por día" : "Por mes"}
@@ -400,11 +400,11 @@ export default function ContabilidadDashboard({ initialData }: { initialData: Ac
 
         {mode === "day" && <DayStrip days={data.days} selectedDay={day} onSelectDay={setDay} />}
 
-        <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
+        <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {stats.map(stat => <StatCard key={stat.label} {...stat} />)}
         </section>
 
-        <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+        <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
           <div className="border-b border-slate-100 p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
@@ -420,7 +420,7 @@ export default function ContabilidadDashboard({ initialData }: { initialData: Ac
                       type="button"
                       onClick={() => setMovementType(value)}
                       className={`rounded-lg px-4 py-2 text-xs font-semibold transition ${
-                        movementType === value ? "bg-[#0d1830] text-white" : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+                        movementType === value ? "bg-brand-500 text-white" : "bg-slate-50 text-slate-600 hover:bg-slate-100"
                       }`}
                     >
                       {label}
@@ -460,53 +460,107 @@ export default function ContabilidadDashboard({ initialData }: { initialData: Ac
           </div>
 
           {pageItems.length === 0 ? (
-            <div className="py-16 text-center text-sm text-slate-400">No hay movimientos para mostrar.</div>
+            <div className="py-16 text-center text-sm text-gray-400">No hay movimientos para mostrar.</div>
           ) : (
-            <div className="px-3 lg:divide-y lg:divide-slate-100 lg:px-4">
-              {pageItems.map(item => {
-                const date = new Date(item.date);
-                const isOrder = item.type === "order";
-                return (
-                  <article key={`${item.type}-${item.id}`} className="my-3 grid grid-cols-[44px_minmax(0,1fr)] gap-x-3 gap-y-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm lg:my-0 lg:grid-cols-[58px_48px_minmax(260px,1fr)_120px_145px] lg:items-center lg:gap-3 lg:rounded-none lg:border-0 lg:bg-transparent lg:px-0 lg:py-3 lg:shadow-none">
-                    <div className="col-start-1 row-start-1 text-center lg:col-auto lg:row-auto">
-                      <p className="text-lg font-bold leading-none text-slate-900">{date.getDate()}</p>
-                      <p className="mt-1 text-[9px] font-semibold uppercase text-slate-500">{format(date, "MMM", { locale: es })}</p>
-                    </div>
-                    <div className={`col-start-1 row-start-2 flex h-10 w-10 items-center justify-center rounded-full lg:col-auto lg:row-auto ${isOrder ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-primary-500"}`}>
-                      {isOrder ? <RiShoppingBagLine size={18} /> : <RiBankCardLine size={18} />}
-                    </div>
-                    <div className="col-start-2 row-span-2 min-w-0 lg:col-auto lg:row-auto">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-bold text-slate-900">{isOrder ? "Pedido" : "Egreso"}</p>
-                        {isOrder && <span className="text-xs font-semibold text-primary-500">#{item.token}</span>}
-                      </div>
-                      <p className="text-sm font-semibold text-slate-800">{item.title}</p>
-                      <p className="truncate text-xs text-slate-500">{item.subtitle}</p>
-                      <p className="truncate text-[10px] text-slate-400">{item.detail}</p>
-                    </div>
-                    <div className="col-start-2 lg:col-auto">
-                      <span className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[10px] font-semibold ${
-                        isOrder ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-primary-500"
-                      }`}>
-                        <i className={`h-2 w-2 rounded-full ${isOrder ? "bg-emerald-500" : "bg-primary-500"}`} />
-                        {isOrder ? STATUS_LABELS[item.status] || item.status : "Gasto"}
-                      </span>
-                    </div>
-                    <div className="col-span-2 mt-1 flex items-center justify-between gap-3 border-t border-slate-100 pt-3 lg:col-auto lg:mt-0 lg:flex-col lg:items-end lg:border-0 lg:pt-0">
-                      <strong className={isOrder ? "text-emerald-600" : "text-primary-500"}>
-                        {isOrder ? "+" : "-"}{formatPrice(item.amount)}
-                      </strong>
+            <>
+              {/* Movil: tarjetas */}
+              <ul className="divide-y divide-gray-100 md:hidden">
+                {pageItems.map(item => {
+                  const date = new Date(item.date);
+                  const isOrder = item.type === "order";
+                  return (
+                    <li key={`${item.type}-${item.id}`}>
                       <Link
                         href={isOrder ? `/dashboard/pedidos/${item.id}` : "/dashboard/egresos"}
-                        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-semibold text-slate-700 hover:bg-slate-50"
+                        className="block p-4 transition-colors hover:bg-brand-50/40"
                       >
-                        <RiEyeLine size={14} /> Ver {isOrder ? "pedido" : "egreso"}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="flex flex-wrap items-center gap-2 font-black text-gray-900">
+                              {isOrder ? "Pedido" : "Egreso"}
+                              {isOrder && <span className="text-xs font-semibold text-brand-600">#{item.token}</span>}
+                            </p>
+                            <p className="mt-0.5 break-words text-sm font-semibold text-gray-700">{item.title}</p>
+                          </div>
+                          <strong className={`shrink-0 tabular-nums ${isOrder ? "text-emerald-600" : "text-brand-600"}`}>
+                            {isOrder ? "+" : "-"}{formatPrice(item.amount)}
+                          </strong>
+                        </div>
+                        {item.subtitle && <p className="mt-1 truncate text-xs text-gray-500">{item.subtitle}</p>}
+                        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 text-xs text-gray-400">
+                          <span className="capitalize">{format(date, "d MMM yyyy", { locale: es })}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${isOrder ? "bg-emerald-50 text-emerald-700" : "bg-brand-50 text-brand-700"}`}>
+                            {isOrder ? STATUS_LABELS[item.status] || item.status : "Gasto"}
+                          </span>
+                        </div>
                       </Link>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {/* Escritorio: tabla */}
+              <div className="hidden overflow-x-auto scrollbar-none md:block">
+                <table className="w-full min-w-[760px] border-collapse text-left">
+                  <thead className="bg-gray-50/80">
+                    <tr className="border-b border-gray-100 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                      <th className="w-28 whitespace-nowrap px-3 py-2.5">Fecha</th>
+                      <th className="w-24 whitespace-nowrap px-3 py-2.5">Tipo</th>
+                      <th className="px-3 py-2.5">Detalle</th>
+                      <th className="w-40 whitespace-nowrap px-3 py-2.5">Estado</th>
+                      <th className="w-32 whitespace-nowrap px-3 py-2.5 text-right">Monto</th>
+                      <th className="w-12 px-3 py-2.5"><span className="sr-only">Acciones</span></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {pageItems.map(item => {
+                      const date = new Date(item.date);
+                      const isOrder = item.type === "order";
+                      return (
+                        <tr key={`${item.type}-${item.id}`} className="group bg-white text-xs text-gray-600 transition-colors hover:bg-brand-50/40">
+                          <td className="whitespace-nowrap px-3 py-2.5 font-semibold capitalize text-gray-700">
+                            {format(date, "d MMM yyyy", { locale: es })}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className="inline-flex items-center gap-1.5 font-bold text-gray-900">
+                              <span className={`flex h-6 w-6 items-center justify-center rounded-lg ${isOrder ? "bg-emerald-50 text-emerald-600" : "bg-brand-50 text-brand-600"}`}>
+                                {isOrder ? <RiShoppingBagLine size={13} /> : <RiBankCardLine size={13} />}
+                              </span>
+                              {isOrder ? "Pedido" : "Egreso"}
+                            </span>
+                          </td>
+                          <td className="max-w-0 px-3 py-2.5">
+                            <p className="truncate font-bold text-gray-900">
+                              {item.title}
+                              {isOrder && <span className="ml-1.5 font-semibold text-brand-600">#{item.token}</span>}
+                            </p>
+                            <p className="mt-0.5 truncate text-[10px] text-gray-400">{[item.subtitle, item.detail].filter(Boolean).join(" · ")}</p>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${isOrder ? "bg-emerald-50 text-emerald-700" : "bg-brand-50 text-brand-700"}`}>
+                              {isOrder ? STATUS_LABELS[item.status] || item.status : "Gasto"}
+                            </span>
+                          </td>
+                          <td className={`whitespace-nowrap px-3 py-2.5 text-right text-sm font-bold tabular-nums ${isOrder ? "text-emerald-600" : "text-brand-600"}`}>
+                            {isOrder ? "+" : "-"}{formatPrice(item.amount)}
+                          </td>
+                          <td className="px-3 py-2.5 text-center">
+                            <Link
+                              href={isOrder ? `/dashboard/pedidos/${item.id}` : "/dashboard/egresos"}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-600"
+                              aria-label={`Ver ${isOrder ? "pedido" : "egreso"}`}
+                              title={`Ver ${isOrder ? "pedido" : "egreso"}`}
+                            >
+                              <RiEyeLine size={15} />
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
 
           <Pagination

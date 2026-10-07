@@ -378,7 +378,7 @@ export default function OrderDetailEditor({ initialOrder }: { initialOrder: any 
     : order.status === "PENDING" ? "PENDING_PAYMENT_CONFIRMATION" : null;
 
   return (
-    <div className="min-h-screen bg-[#f7f9fc] px-4 py-5 sm:px-6 lg:px-8">
+    <div className="min-w-0">
       <div className="mx-auto max-w-[1500px]">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <Link href="/dashboard/todos-pedidos" className="inline-flex items-center gap-2 text-xs font-medium text-slate-600 hover:text-primary-500">
@@ -401,7 +401,7 @@ export default function OrderDetailEditor({ initialOrder }: { initialOrder: any 
         <header className="mb-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
             <div>
-              <h1 className="text-2xl font-extrabold text-slate-950 sm:text-3xl">#{order.trackingToken}</h1>
+              <h1 className="text-2xl font-bold text-gray-900">#{order.trackingToken}</h1>
               <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3 text-xs text-slate-600">
                 <span className="flex items-center gap-2"><RiUser3Line className="text-primary-500" />{customer.name}<strong>{customer.phone}</strong></span>
                 <span className="flex items-center gap-2"><RiMapPin2Line className="text-primary-500" />{customer.address}</span>
@@ -756,7 +756,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className={`rounded-2xl border p-5 shadow-sm ${tone === "rose" ? "border-primary-100 bg-rose-50/60" : "border-slate-200 bg-white"}`}>
+    <section className={`rounded-2xl border p-5 shadow-sm ${tone === "rose" ? "border-primary-100 bg-brand-50/60" : "border-slate-200 bg-white"}`}>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-sm font-bold"><Icon className="text-primary-500" size={19} />{title}</h2>
         {action}

@@ -17,7 +17,8 @@ function normalizeFlowerRelation(item: any) {
   };
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   if (!(await requireAdminUser())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
@@ -26,10 +27,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const flowerData = Array.isArray(flowerRelations) && flowerRelations.length > 0
     ? flowerRelations
     : (Array.isArray(flowerIds) ? flowerIds.map((flowerId: string) => ({ flowerId, quantity: 1 })) : []);
-  await prisma.productImage.deleteMany({ where: { productId: params.id } });
-  await prisma.productFlower.deleteMany({ where: { productId: params.id } });
+  await prisma.productImage.deleteMany({ where: { productId: id } });
+  await prisma.productFlower.deleteMany({ where: { productId: id } });
   const product = await prisma.product.update({
-    where: { id: params.id },
+    where: { id },
     data: {
       ...data,
       images: { create: images.map((img: any, i: number) => ({ url: img.url, publicId: img.publicId || "", isMain: i === 0, order: i })) },
@@ -39,10 +40,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   });
   return NextResponse.json(product);
 }
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   if (!(await requireAdminUser())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
-  await prisma.product.delete({ where: { id: params.id } });
+  await prisma.product.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }

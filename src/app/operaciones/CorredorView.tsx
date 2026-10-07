@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { getFlowerQuantityRange } from "@/lib/flower-quantities";
 import { formatScheduleDate, getEstimatedDeliveryDate, localDateKey, parseLocalDateKey } from "@/lib/order-schedule";
+import Modal from "@/components/ui/Modal";
 
 const EXPENSE_CATS = ["Insumos", "Flores", "Transporte", "Empaque", "Otro"];
 const MAX_RECEIPT_PHOTO_DIMENSION = 1600;
@@ -501,16 +502,7 @@ function ExpenseModal({
   photoOptional?: boolean;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 backdrop-blur-sm">
-      <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-sm shadow-2xl p-6 pb-8 overflow-y-auto max-h-[90vh]">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="font-bold text-lg flex items-center gap-2">
-            <RiReceiptLine className="text-green-500" size={20}/> {title}
-          </h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400">
-            <RiCloseLine size={20}/>
-          </button>
-        </div>
+    <Modal open onClose={onClose} title={title} size="sm">
 
         <div className="space-y-4">
           {/* Description */}
@@ -586,8 +578,7 @@ function ExpenseModal({
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -621,16 +612,7 @@ function ExpenseCreateModal({
   accentColor: string;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 backdrop-blur-sm">
-      <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md shadow-2xl p-6 pb-8 overflow-y-auto max-h-[90vh]">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="font-bold text-lg flex items-center gap-2">
-            <RiReceiptLine className="text-green-500" size={20}/> {title}
-          </h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400">
-            <RiCloseLine size={20}/>
-          </button>
-        </div>
+    <Modal open onClose={onClose} title={title} size="md">
 
         <div className="space-y-4">
           <div>
@@ -743,8 +725,7 @@ function ExpenseCreateModal({
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

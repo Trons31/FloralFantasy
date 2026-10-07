@@ -23,7 +23,8 @@ const OPS_STATUS_RULES: Record<string, string[]> = {
   CORREDOR: [],
 };
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const access = await requireOrderManagementUser(req);
   if (!access) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
@@ -42,7 +43,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const existing = await prisma.order.findUnique({
-    where: { id: params.id },
+    where: { id },
     select: { id: true, status: true, customerEmail: true, customerName: true, trackingToken: true },
   });
   if (!existing) {
@@ -56,7 +57,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       : STATUS_LABELS[status] || status);
 
   const order = await prisma.order.update({
-    where: { id: params.id },
+    where: { id },
     data: { status },
   });
 

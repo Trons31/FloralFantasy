@@ -155,7 +155,7 @@ export default function PushNotificationsPrompt() {
   if (!supported || !visible) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[70] w-[min(92vw,380px)] rounded-3xl border border-pink-100 bg-white/95 shadow-2xl backdrop-blur-xl">
+    <div className="fixed bottom-4 right-4 z-[70] w-[min(92vw,380px)] rounded-2xl border border-pink-100 bg-white/95 shadow-2xl backdrop-blur-xl">
       <div className="flex items-start gap-3 p-4">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-pink-50 text-pink-600">
           <RiNotification3Line className="text-xl" />

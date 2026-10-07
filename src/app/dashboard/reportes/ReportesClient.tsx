@@ -204,7 +204,7 @@ function DayCarousel({
             }}
             className={`min-w-[58px] flex-none rounded-xl border px-1 py-2 text-center transition sm:min-w-[64px] ${
               active
-                ? "border-primary-500 bg-primary-500 text-white shadow-[0_8px_18px_rgba(236,18,91,.2)]"
+                ? "border-primary-500 bg-primary-500 text-white shadow-sm"
                 : "border-slate-200 bg-white text-slate-600 hover:border-primary-200"
             }`}
           >
@@ -321,7 +321,7 @@ export default function ReportesClient({
       value: formatPrice(summary.expenses),
       detail: `${expenses.length} movimientos`,
       Icon: RiWallet3Line,
-      color: "bg-rose-50 text-primary-500",
+      color: "bg-brand-50 text-primary-500",
     },
     {
       label: "Balance",
@@ -340,15 +340,12 @@ export default function ReportesClient({
   ];
 
   return (
-    <div className="min-h-full bg-slate-50/70 p-3 sm:p-5 lg:p-7">
+    <div className="min-w-0">
       <div className="mx-auto max-w-[1500px] space-y-5">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-3">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary-50 text-primary-500">
-              <RiBarChartBoxLine size={23} />
-            </span>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Reportes</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Reportes</h1>
               <p className="mt-1 text-sm text-slate-500">Ingresos, egresos y actividad operativa del negocio.</p>
             </div>
           </div>
@@ -356,7 +353,7 @@ export default function ReportesClient({
             type="button"
             onClick={exportPdf}
             disabled={exporting}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(236,18,91,.2)] transition hover:bg-primary-600 disabled:opacity-60"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-600 disabled:opacity-60"
           >
             {exporting ? <RiLoader4Line className="animate-spin" /> : <RiDownloadLine />}
             {exporting ? "Generando..." : "Exportar PDF"}
@@ -372,7 +369,7 @@ export default function ReportesClient({
                 onClick={() => navigate({ mode })}
                 className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${
                   selection.mode === mode
-                    ? "bg-[#0d1830] text-white shadow-sm"
+                    ? "bg-brand-500 text-white shadow-sm"
                     : "text-slate-600 hover:bg-slate-50"
                 }`}
               >

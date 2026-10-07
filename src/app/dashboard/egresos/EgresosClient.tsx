@@ -74,7 +74,7 @@ type Props = {
 const CATEGORIES = ["Flores", "Transporte", "Decoracion", "Empaque", "Personal", "Servicios", "Marketing", "Otro"];
 
 const categoryStyles: Record<string, { icon: typeof RiReceiptLine; circle: string; badge: string }> = {
-  Flores: { icon: RiFlowerLine, circle: "bg-rose-50 text-primary-500", badge: "bg-rose-50 text-primary-600" },
+  Flores: { icon: RiFlowerLine, circle: "bg-brand-50 text-primary-500", badge: "bg-brand-50 text-primary-600" },
   Transporte: { icon: RiTruckLine, circle: "bg-emerald-50 text-emerald-600", badge: "bg-emerald-50 text-emerald-700" },
   Decoracion: { icon: RiFlowerLine, circle: "bg-fuchsia-50 text-fuchsia-600", badge: "bg-fuchsia-50 text-fuchsia-700" },
   Empaque: { icon: RiBox3Line, circle: "bg-amber-50 text-amber-500", badge: "bg-amber-50 text-amber-700" },
@@ -175,7 +175,7 @@ function DayCarousel({
             }}
             className={`min-w-[58px] flex-none rounded-xl border px-1 py-2 text-center transition sm:min-w-[64px] ${
               active
-                ? "border-primary-500 bg-primary-500 text-white shadow-[0_8px_18px_rgba(236,18,91,.2)]"
+                ? "border-primary-500 bg-primary-500 text-white shadow-sm"
                 : "border-slate-200 bg-white text-slate-600 hover:border-primary-200"
             }`}
           >
@@ -338,16 +338,13 @@ export default function EgresosClient({
   };
 
   return (
-    <div className="min-h-full bg-slate-50/70 p-3 sm:p-5 lg:p-7">
+    <div className="min-w-0">
       <div className="mx-auto max-w-[1500px] space-y-4">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex items-center gap-3">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary-50 text-primary-500">
-                <RiArrowDownLine size={22} />
-              </span>
               <div>
-                <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Egresos</h1>
+                <h1 className="text-2xl font-bold text-gray-900">Egresos</h1>
                 <p className="mt-1 text-sm text-slate-500">Gestiona y controla todos los gastos del negocio.</p>
               </div>
             </div>
@@ -355,14 +352,14 @@ export default function EgresosClient({
           <button
             type="button"
             onClick={openCreate}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(236,18,91,.2)] transition hover:bg-primary-600"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-600"
           >
             <RiAddLine size={18} />
             Registrar egreso
           </button>
         </header>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+        <section className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm sm:p-4">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -396,7 +393,7 @@ export default function EgresosClient({
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+        <section className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-3 px-1">
             <div>
               <h2 className="text-sm font-bold text-slate-950">Dias del mes</h2>
@@ -416,7 +413,7 @@ export default function EgresosClient({
           <DayCarousel days={days} selectedDay={selection.day} onSelectDay={day => navigate({ day, page: 1 })} />
         </section>
 
-        <section className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
+        <section className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           {[
             {
               label: "Total hoy",
@@ -439,23 +436,21 @@ export default function EgresosClient({
           ].map((card, index) => {
             const Icon = card.icon;
             return (
-              <article key={card.label} className={`rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5 ${index === 2 ? "col-span-2 sm:col-span-1" : ""}`}>
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary-50 text-primary-500 sm:h-12 sm:w-12">
-                    <Icon className="text-xl sm:text-2xl" />
+              <article key={card.label} className={`min-w-0 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm ${index === 2 ? "col-span-2 sm:col-span-1" : ""}`}>
+                <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
+                  <span className="min-w-0 break-words text-sm font-medium text-gray-500">{card.label}</span>
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                    <Icon className="text-lg" />
                   </span>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-slate-500">{card.label}</p>
-                    <strong className="mt-1 block text-base font-bold leading-tight text-slate-950 sm:truncate sm:text-2xl">{card.value}</strong>
-                    <p className="mt-1 text-xs font-medium text-primary-500">{card.detail}</p>
-                  </div>
                 </div>
+                <p className="break-words text-xl font-bold tabular-nums text-gray-900 sm:text-2xl">{card.value}</p>
+                <p className="mt-1 text-xs text-gray-400">{card.detail}</p>
               </article>
             );
           })}
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+        <section className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
           <form
             onSubmit={event => {
               event.preventDefault();
@@ -487,90 +482,149 @@ export default function EgresosClient({
           </form>
         </section>
 
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-4 sm:px-5">
-            <h2 className="text-sm font-bold text-slate-950 sm:text-base">Egresos del {selection.dayLabel}</h2>
+            <h2 className="font-bold text-gray-900">Egresos del {selection.dayLabel}</h2>
             <p className="text-xs font-medium text-slate-500">
               Total del dia: <strong className="ml-1 text-primary-500">{formatPrice(summary.total)}</strong>
             </p>
           </div>
 
           {expenses.length ? (
-            <div className="divide-y divide-slate-100 px-4 sm:px-5">
-              {expenses.map(expense => {
-                const style = categoryStyles[expense.category] || categoryStyles.Otro;
-                const Icon = style.icon;
-                const photos = getExpensePhotoUrls(expense);
-                return (
-                  <article
-                    key={expense.id}
-                    className="grid grid-cols-2 gap-3 py-4 md:grid-cols-[minmax(260px,1.5fr)_minmax(150px,.75fr)_minmax(120px,.55fr)_auto] md:items-center md:gap-4"
-                  >
-                    <div className="col-span-2 flex min-w-0 items-start gap-3 md:col-auto">
-                      <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ${style.circle}`}>
-                        <Icon className="text-xl sm:text-2xl" />
-                      </span>
-                      <div className="min-w-0">
-                        <h3 className="truncate text-sm font-bold text-slate-950 sm:text-base">{expense.description}</h3>
-                        <p className="mt-0.5 truncate text-xs font-medium text-slate-500">
-                          {expense.registeredBy || "Super Admin"}
-                        </p>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${style.badge}`}>
-                            {expense.category || "Otro"}
-                          </span>
-                          <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 sm:text-xs">
-                            <RiCalendarLine />
-                            {format(new Date(expense.date), "d MMM yyyy, h:mm a", { locale: es })}
-                          </span>
+            <>
+              {/* Movil: tarjetas */}
+              <ul className="divide-y divide-gray-100 md:hidden">
+                {expenses.map(expense => {
+                  const style = categoryStyles[expense.category] || categoryStyles.Otro;
+                  const photos = getExpensePhotoUrls(expense);
+                  return (
+                    <li key={expense.id} className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="break-words font-black text-gray-900">{expense.description}</p>
+                          <p className="mt-0.5 truncate text-xs text-gray-500">{expense.registeredBy || "Super Admin"}</p>
+                        </div>
+                        <strong className="shrink-0 tabular-nums text-red-600">-{formatPrice(expense.amount)}</strong>
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-400">
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${style.badge}`}>{expense.category || "Otro"}</span>
+                        <span className="inline-flex items-center gap-1">
+                          <RiCalendarLine />
+                          {format(new Date(expense.date), "d MMM yyyy, h:mm a", { locale: es })}
+                        </span>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-2 border-t border-gray-100 pt-3">
+                        {photos.length ? (
+                          <button
+                            type="button"
+                            onClick={() => setViewPhotos(photos)}
+                            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-gray-200 px-3 text-xs font-semibold text-gray-700 transition hover:border-brand-200 hover:text-brand-600"
+                          >
+                            <RiZoomInLine size={14} /> Comprobante
+                          </button>
+                        ) : (
+                          <span className="text-xs text-gray-400">Sin comprobante</span>
+                        )}
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => openEdit(expense)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-600"
+                            aria-label={`Editar ${expense.description}`}
+                          >
+                            <RiEditLine size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteExpense(expense)}
+                            disabled={deleting === expense.id}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                            aria-label={`Eliminar ${expense.description}`}
+                          >
+                            {deleting === expense.id ? <RiLoader4Line className="animate-spin" /> : <RiDeleteBinLine size={16} />}
+                          </button>
                         </div>
                       </div>
-                    </div>
+                    </li>
+                  );
+                })}
+              </ul>
 
-                    <div className="min-w-0 rounded-xl bg-slate-50 p-3 md:rounded-none md:bg-transparent md:p-0">
-                      <p className="mb-1.5 text-[10px] font-medium text-slate-500">Comprobante</p>
-                      {photos.length ? (
-                        <button
-                          type="button"
-                          onClick={() => setViewPhotos(photos)}
-                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:border-primary-200 hover:text-primary-500"
-                        >
-                          <RiZoomInLine size={15} />
-                          Ver comprobante
-                        </button>
-                      ) : (
-                        <span className="text-xs text-slate-400">Sin comprobante</span>
-                      )}
-                    </div>
-
-                    <div className="rounded-xl bg-slate-50 p-3 md:rounded-none md:bg-transparent md:p-0">
-                      <p className="mb-1 text-[10px] font-medium text-slate-500">Monto</p>
-                      <strong className="text-base font-bold text-primary-500">-{formatPrice(expense.amount)}</strong>
-                    </div>
-
-                    <div className="col-span-2 flex items-center justify-end gap-2 border-t border-slate-100 pt-3 md:col-auto md:border-0 md:pt-0">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(expense)}
-                        className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 text-slate-600 transition hover:border-primary-200 hover:text-primary-500"
-                        aria-label={`Editar ${expense.description}`}
-                      >
-                        <RiEditLine size={17} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteExpense(expense)}
-                        disabled={deleting === expense.id}
-                        className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 text-red-500 transition hover:border-red-200 hover:bg-red-50 disabled:opacity-50"
-                        aria-label={`Eliminar ${expense.description}`}
-                      >
-                        {deleting === expense.id ? <RiLoader4Line className="animate-spin" /> : <RiDeleteBinLine size={17} />}
-                      </button>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+              {/* Escritorio: tabla */}
+              <div className="hidden overflow-x-auto scrollbar-none md:block">
+                <table className="w-full min-w-[760px] border-collapse text-left">
+                  <thead className="bg-gray-50/80">
+                    <tr className="border-b border-gray-100 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                      <th className="px-3 py-2.5">Egreso</th>
+                      <th className="w-32 whitespace-nowrap px-3 py-2.5">Categoría</th>
+                      <th className="w-44 whitespace-nowrap px-3 py-2.5">Fecha</th>
+                      <th className="w-36 whitespace-nowrap px-3 py-2.5">Comprobante</th>
+                      <th className="w-32 whitespace-nowrap px-3 py-2.5 text-right">Monto</th>
+                      <th className="w-24 px-3 py-2.5"><span className="sr-only">Acciones</span></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {expenses.map(expense => {
+                      const style = categoryStyles[expense.category] || categoryStyles.Otro;
+                      const photos = getExpensePhotoUrls(expense);
+                      return (
+                        <tr key={expense.id} className="bg-white text-xs text-gray-600 transition-colors hover:bg-brand-50/40">
+                          <td className="max-w-0 px-3 py-2.5">
+                            <p className="truncate font-bold text-gray-900">{expense.description}</p>
+                            <p className="mt-0.5 truncate text-[10px] text-gray-400">{expense.registeredBy || "Super Admin"}</p>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold ${style.badge}`}>{expense.category || "Otro"}</span>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5 font-semibold text-gray-700">
+                            {format(new Date(expense.date), "d MMM yyyy, h:mm a", { locale: es })}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            {photos.length ? (
+                              <button
+                                type="button"
+                                onClick={() => setViewPhotos(photos)}
+                                className="inline-flex items-center gap-1.5 font-semibold text-brand-600 hover:underline"
+                              >
+                                <RiZoomInLine size={14} /> Ver comprobante
+                              </button>
+                            ) : (
+                              <span className="text-gray-400">Sin comprobante</span>
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm font-bold tabular-nums text-red-600">
+                            -{formatPrice(expense.amount)}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <div className="flex justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => openEdit(expense)}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-600"
+                                aria-label={`Editar ${expense.description}`}
+                                title="Editar"
+                              >
+                                <RiEditLine size={15} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deleteExpense(expense)}
+                                disabled={deleting === expense.id}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                                aria-label={`Eliminar ${expense.description}`}
+                                title="Eliminar"
+                              >
+                                {deleting === expense.id ? <RiLoader4Line className="animate-spin" /> : <RiDeleteBinLine size={15} />}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : (
             <div className="grid min-h-52 place-items-center px-5 py-10 text-center">
               <div>
@@ -599,9 +653,28 @@ export default function EgresosClient({
         onClose={closeForm}
         title={editingExpense ? "Editar egreso" : "Registrar egreso"}
         description={editingExpense ? "Actualiza los datos del movimiento." : `Nuevo egreso para el ${selection.dayLabel}.`}
-        panelClassName="sm:max-w-xl"
+        size="xl"
+        footer={(
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={closeForm}
+              className="h-11 rounded-xl border border-gray-200 bg-white px-5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit" form="expense-form"
+              disabled={saving}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600 disabled:opacity-50"
+            >
+              {saving && <RiLoader4Line className="animate-spin" />}
+              {editingExpense ? "Guardar cambios" : "Registrar egreso"}
+            </button>
+          </div>
+        )}
       >
-        <form onSubmit={saveExpense} className="space-y-4">
+        <form id="expense-form" onSubmit={saveExpense} className="space-y-4">
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-slate-700">Descripción</span>
             <input
@@ -635,23 +708,6 @@ export default function EgresosClient({
                 {CATEGORIES.map(category => <option key={category}>{category}</option>)}
               </select>
             </label>
-          </div>
-          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={closeForm}
-              className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-600"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white disabled:opacity-60"
-            >
-              {saving && <RiLoader4Line className="animate-spin" />}
-              {editingExpense ? "Guardar cambios" : "Registrar egreso"}
-            </button>
           </div>
         </form>
       </ResponsiveModal>

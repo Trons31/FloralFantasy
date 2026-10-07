@@ -53,10 +53,11 @@ function statusFilter(status?: string) {
 }
 
 export default async function TodosPedidosPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams: SearchParams;
+  searchParams: Promise<SearchParams>;
 }) {
+  const searchParams = await searchParamsPromise;
   const page = Math.max(1, parseInt(searchParams.page || "1"));
   const perPage = 10;
   const anchorDate = parseLocalDate(searchParams.anchor || searchParams.date);

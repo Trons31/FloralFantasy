@@ -13,17 +13,18 @@ import { es } from "date-fns/locale";
 export const dynamic = "force-dynamic";
 
 export default async function EgresosPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams: {
+  searchParams: Promise<{
     year?: string;
     month?: string;
     day?: string;
     page?: string;
     q?: string;
     category?: string;
-  };
+  }>;
 }) {
+  const searchParams = await searchParamsPromise;
   const now = new Date();
   const year = Number.parseInt(searchParams.year || String(now.getFullYear()), 10);
   const month = Number.parseInt(searchParams.month || String(now.getMonth() + 1), 10);

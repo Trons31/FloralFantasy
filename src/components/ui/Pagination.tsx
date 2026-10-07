@@ -1,6 +1,6 @@
 "use client";
 
-import { RiArrowLeftSLine, RiArrowRightSLine } from "react-icons/ri";
+import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 
 type PaginationProps = {
   page: number;
@@ -11,106 +11,90 @@ type PaginationProps = {
   onPageChange: (page: number) => void;
   onPerPageChange?: (perPage: number) => void;
   perPageOptions?: number[];
+  /** Atenua los controles mientras llega la siguiente pagina. */
+  pending?: boolean;
   className?: string;
 };
 
-function pageItems(page: number, totalPages: number): Array<number | "ellipsis"> {
-  if (totalPages <= 5) return Array.from({ length: totalPages }, (_, index) => index + 1);
-  if (page <= 3) return [1, 2, 3, 4, "ellipsis", totalPages];
-  if (page >= totalPages - 2) return [1, "ellipsis", totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-  return [1, "ellipsis", page - 1, page, page + 1, "ellipsis", totalPages];
-}
+const navButton =
+  "inline-flex h-10 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-600 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:text-slate-300 disabled:opacity-70 sm:px-3 lg:flex-none";
 
+/**
+ * Paginacion de tablas del panel. Mismo diseño que `ServerPagination` de
+ * CliqCut: "Mostrando X a Y de Z", Anterior / Pagina N de M / Siguiente y
+ * selector "N por pagina". Va dentro del card de la tabla, al final.
+ */
 export default function Pagination({
   page,
   totalPages,
   totalItems,
   perPage,
-  itemLabel = "elementos",
+  itemLabel = "registros",
   onPageChange,
   onPerPageChange,
-  perPageOptions = [8, 10, 12, 16],
+  perPageOptions = [5, 10, 20, 50],
+  pending = false,
   className = "",
 }: PaginationProps) {
-  const safePages = Math.max(1, totalPages);
-  const safePage = Math.min(Math.max(1, page), safePages);
-  const first = totalItems ? (safePage - 1) * perPage + 1 : 0;
-  const last = Math.min(safePage * perPage, totalItems);
-  const items = pageItems(safePage, safePages);
+  const safeTotalPages = Math.max(1, totalPages);
+  const safePage = Math.min(Math.max(1, page), safeTotalPages);
+  const firstItem = totalItems === 0 ? 0 : (safePage - 1) * perPage + 1;
+  const lastItem = Math.min(safePage * perPage, totalItems);
+  const options = Array.from(new Set([...perPageOptions, perPage])).sort((a, b) => a - b);
 
   return (
-    <footer className={`border-t border-slate-100 bg-white px-3 py-4 sm:px-5 ${className}`}>
-      <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
-        <p className="text-center text-[11px] text-slate-500 sm:text-left">
-          Mostrando <strong className="font-semibold text-slate-700">{first}-{last}</strong> de{" "}
-          <strong className="font-semibold text-slate-700">{totalItems}</strong> {itemLabel}
-        </p>
+    <div className={`flex flex-col gap-3 border-t border-gray-100 bg-white px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between ${className}`}>
+      <p className="text-center text-xs font-semibold text-slate-500 lg:text-left">
+        {totalItems === 0
+          ? `Mostrando 0 de 0 ${itemLabel}`
+          : `Mostrando ${firstItem} a ${lastItem} de ${totalItems} ${itemLabel}`}
+      </p>
 
-        <div className="flex max-w-full items-center justify-center gap-1.5">
+      <div className={`flex flex-col gap-2 transition-opacity lg:flex-row lg:items-center ${pending ? "opacity-50" : ""}`}>
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            disabled={safePage <= 1}
             onClick={() => onPageChange(safePage - 1)}
+            disabled={safePage <= 1 || pending}
+            className={navButton}
             aria-label="Página anterior"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-primary-200 hover:text-primary-500 disabled:pointer-events-none disabled:opacity-30"
           >
-            <RiArrowLeftSLine size={18} />
+            <FiChevronLeft className="h-4 w-4" />
+            Anterior
           </button>
 
-          <div className="hidden items-center gap-1 sm:flex">
-            {items.map((item, index) =>
-              item === "ellipsis" ? (
-                <span key={`ellipsis-${index}`} className="grid h-9 min-w-5 place-items-center text-xs text-slate-400">...</span>
-              ) : (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => onPageChange(item)}
-                  aria-current={item === safePage ? "page" : undefined}
-                  className={`grid h-9 min-w-9 place-items-center rounded-lg px-2 text-xs font-semibold transition ${
-                    item === safePage
-                      ? "bg-primary-500 text-white shadow-[0_5px_14px_rgba(236,18,91,.2)]"
-                      : "border border-slate-200 bg-white text-slate-600 hover:border-primary-200 hover:text-primary-500"
-                  }`}
-                >
-                  {item}
-                </button>
-              )
-            )}
-          </div>
-
-          <span className="flex h-9 min-w-[72px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 sm:hidden">
-            {safePage} de {safePages}
+          <span className="flex h-10 shrink-0 items-center justify-center px-1 text-xs font-bold tabular-nums text-slate-700">
+            Página {safePage} de {safeTotalPages}
           </span>
 
           <button
             type="button"
-            disabled={safePage >= safePages}
             onClick={() => onPageChange(safePage + 1)}
+            disabled={safePage >= safeTotalPages || pending}
+            className={navButton}
             aria-label="Página siguiente"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-primary-200 hover:text-primary-500 disabled:pointer-events-none disabled:opacity-30"
           >
-            <RiArrowRightSLine size={18} />
+            Siguiente
+            <FiChevronRight className="h-4 w-4" />
           </button>
         </div>
 
-        <label className="flex items-center gap-2 text-[11px] text-slate-500">
-          <span>Mostrar</span>
-          {onPerPageChange ? (
+        {onPerPageChange && (
+          <label className="relative w-full lg:w-auto">
+            <span className="sr-only">Cantidad de {itemLabel} por página</span>
             <select
               value={perPage}
-              onChange={event => onPerPageChange(Number(event.target.value))}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none focus:border-primary-300"
+              onChange={(event) => onPerPageChange(Number(event.target.value))}
+              disabled={pending}
+              className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white pl-3 pr-8 text-xs font-semibold text-slate-700 outline-none transition focus:border-brand-300 focus:ring-2 focus:ring-brand-100 disabled:opacity-50 lg:w-auto"
             >
-              {Array.from(new Set([...perPageOptions, perPage])).sort((a, b) => a - b).map(option => (
-                <option key={option} value={option}>{option}</option>
+              {options.map((option) => (
+                <option key={option} value={option}>{option} por página</option>
               ))}
             </select>
-          ) : (
-            <span className="grid h-9 min-w-12 place-items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700">{perPage}</span>
-          )}
-        </label>
+          </label>
+        )}
       </div>
-    </footer>
+    </div>
   );
 }

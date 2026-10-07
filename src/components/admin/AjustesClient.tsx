@@ -275,15 +275,12 @@ export default function AjustesClient({
   ];
 
   return (
-    <div className="min-h-full bg-slate-50/70 p-3 sm:p-5 lg:p-7">
+    <div className="min-w-0">
       <div className="mx-auto max-w-[1500px] space-y-5">
         <header>
           <div className="flex items-start gap-3">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary-50 text-primary-500">
-              <RiSettings3Line size={23} />
-            </span>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Ajustes</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Ajustes</h1>
               <p className="mt-1 text-sm text-slate-500">Métodos de pago y configuración activa del checkout.</p>
             </div>
           </div>
@@ -329,7 +326,7 @@ export default function AjustesClient({
             <Field label="Confirmar contraseña" icon={<RiLockLine />} value={confirmPassword} onChange={setConfirmPassword} type="password" placeholder="Repite la nueva contraseña" />
           </div>
 
-          <div className="mt-5 flex flex-col gap-4 rounded-xl bg-gradient-to-r from-primary-50 to-rose-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-5 flex flex-col gap-4 rounded-xl bg-gradient-to-r from-primary-50 to-brand-50 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary-400 text-white">
                 <RiLockLine />
@@ -514,7 +511,16 @@ export default function AjustesClient({
         onClose={() => !savingMethod && setMethodModal(null)}
         title={methodModal?.id ? "Editar método de pago" : "Agregar método de pago"}
         description="Configura la información que verá el cliente al realizar una transferencia."
-        panelClassName="sm:max-w-2xl"
+        size="xl"
+        footer={methodModal ? (
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setMethodModal(null)} disabled={savingMethod} className="h-11 rounded-xl border border-gray-200 bg-white px-5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50">Cancelar</button>
+            <button type="button" onClick={savePaymentMethod} disabled={savingMethod} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600 disabled:opacity-50">
+              {savingMethod ? <RiLoader4Line className="animate-spin" /> : <RiSaveLine />}
+              {savingMethod ? "Guardando..." : "Guardar método"}
+            </button>
+          </div>
+        ) : undefined}
       >
         {methodModal && (
           <div className="space-y-4">
@@ -561,13 +567,6 @@ export default function AjustesClient({
               </label>
             </div>
 
-            <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-              <button type="button" onClick={() => setMethodModal(null)} disabled={savingMethod} className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-600">Cancelar</button>
-              <button type="button" onClick={savePaymentMethod} disabled={savingMethod} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white disabled:opacity-60">
-                {savingMethod ? <RiLoader4Line className="animate-spin" /> : <RiSaveLine />}
-                {savingMethod ? "Guardando..." : "Guardar método"}
-              </button>
-            </div>
           </div>
         )}
       </ResponsiveModal>

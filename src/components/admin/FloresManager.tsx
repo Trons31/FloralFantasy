@@ -57,7 +57,7 @@ const COLOR_DOT_CLASSES: Record<string, string> = {
   Verde: "bg-emerald-500",
   Crema: "bg-amber-100 border border-amber-200",
   Champaña: "bg-yellow-100 border border-yellow-200",
-  Coral: "bg-rose-400",
+  Coral: "bg-brand-400",
   Salmón: "bg-orange-200",
   "Vino tinto": "bg-red-900",
   Bicolor: "bg-gradient-to-r from-primary-400 to-yellow-300",
@@ -304,15 +304,12 @@ export default function FloresManager({ flowers: initial }: { flowers: Flower[] 
   };
 
   return (
-    <div className="min-h-full bg-slate-50/70 p-3 sm:p-5 lg:p-7">
+    <div className="min-w-0">
       <div className="mx-auto max-w-[1500px] space-y-5">
         <header className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex items-start gap-3">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary-50 text-primary-500">
-              <RiFlowerLine size={25} />
-            </span>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Gestión de Flores</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Gestión de Flores</h1>
               <p className="mt-1 text-sm text-slate-500">Administra las flores disponibles y sus colores para tus arreglos.</p>
             </div>
           </div>
@@ -324,12 +321,12 @@ export default function FloresManager({ flowers: initial }: { flowers: Flower[] 
             <button type="button" onClick={() => setShowFilters(current => !current)} className={`grid h-11 w-12 place-items-center rounded-xl border bg-white text-slate-600 shadow-sm transition ${showFilters ? "border-primary-300 text-primary-500" : "border-slate-200"}`} aria-label="Mostrar filtros">
               <RiEqualizerLine size={18} />
             </button>
-            <button type="button" onClick={openCreate} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(236,18,91,.2)] transition hover:bg-primary-600">
+            <button type="button" onClick={openCreate} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-600">
               <RiAddLine size={19} />
               Registrar flor
             </button>
           </div>
-          <button type="button" onClick={openCreate} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(236,18,91,.2)] transition hover:bg-primary-600 sm:hidden">
+          <button type="button" onClick={openCreate} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-600 sm:hidden">
             <RiAddLine size={19} />
             Registrar flor
           </button>
@@ -434,7 +431,22 @@ export default function FloresManager({ flowers: initial }: { flowers: Flower[] 
         />
       </div>
 
-      <ResponsiveModal open={showForm} onClose={closeForm} title={editing ? "Editar flor" : "Registrar flor"} description="Completa la información que se usará al crear arreglos." panelClassName="sm:max-w-lg">
+      <ResponsiveModal
+        open={showForm}
+        onClose={closeForm}
+        title={editing ? "Editar flor" : "Registrar flor"}
+        description="Completa la información que se usará al crear arreglos."
+        size="lg"
+        footer={(
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" onClick={closeForm} disabled={saving} className="h-11 rounded-xl border border-gray-200 bg-white px-5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50">Cancelar</button>
+            <button type="button" onClick={saveFlower} disabled={saving} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600 disabled:opacity-50">
+              {saving ? <RiLoader4Line className="animate-spin" /> : <RiCheckLine />}
+              {saving ? "Guardando..." : editing ? "Guardar cambios" : "Registrar flor"}
+            </button>
+          </div>
+        )}
+      >
         <div className="space-y-4">
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-slate-700">Imagen</span>
@@ -468,13 +480,6 @@ export default function FloresManager({ flowers: initial }: { flowers: Flower[] 
             <span className="mb-1.5 block text-xs font-semibold text-slate-700">Descripción</span>
             <textarea value={form.description} onChange={event => setForm(current => ({ ...current, description: event.target.value }))} rows={3} placeholder="Descripción opcional..." className="w-full resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-primary-300" />
           </label>
-          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-            <button type="button" onClick={closeForm} disabled={saving} className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-600">Cancelar</button>
-            <button type="button" onClick={saveFlower} disabled={saving} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-500 px-5 text-sm font-semibold text-white disabled:opacity-60">
-              {saving ? <RiLoader4Line className="animate-spin" /> : <RiCheckLine />}
-              {saving ? "Guardando..." : editing ? "Guardar cambios" : "Registrar flor"}
-            </button>
-          </div>
         </div>
       </ResponsiveModal>
 

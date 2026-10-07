@@ -1,4 +1,4 @@
-import { Montserrat_Alternates, Be_Vietnam_Pro, Poppins, Lobster_Two, Cinzel } from 'next/font/google';
+import { Montserrat_Alternates, Be_Vietnam_Pro, Poppins, Lobster_Two, Cinzel, Inter } from 'next/font/google';
 
 
 export const titleFont = Montserrat_Alternates({
@@ -28,3 +28,8 @@ export const cinzel = Cinzel({
     subsets: ['latin'],
     weight: ['600', '900'],
 })
+
+// Fuente del panel administrativo y del login (igual que CliqCut).
+export const fontInter = Inter({
+    subsets: ['latin'],
+});

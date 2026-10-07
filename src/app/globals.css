@@ -58,8 +58,18 @@ body {
     radial-gradient(circle at 80% 20%, rgba(216,154,24,0.06) 0%, transparent 50%);
 }
 
-/* Dashboard sidebar active item */
-.nav-active { background: linear-gradient(135deg, #fff0f5, #ffe0ec); color: #c40d47; font-weight: 600; }
+/* ── Panel (diseño CliqCut) ─────────────────────────────────────────── */
+.custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 8px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background-color: #c4c4c4; border-radius: 8px; border: 2px solid #f1f1f1; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #888; }
+
+/* Tablas que se desplazan en horizontal sin barra visible. */
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+/* Las notificaciones deben verse por encima de los modales (z-9999). */
+[data-sonner-toaster] { z-index: 20000 !important; }
 
 /* Kanban */
 .kanban-card { transition: all 0.2s ease; cursor: grab; }
@@ -69,9 +79,13 @@ body {
 @keyframes shimmer   { 0%   { background-position:-200% 0 }          100% { background-position:200% 0 } }
 .animate-fade-up { animation: fadeUp 0.6s ease-out forwards; }
 
-/* iOS: prevent zoom on input focus — inputs must be >= 16px font-size */
-input, select, textarea {
-  font-size: 16px !important;
+/* iOS: evita el zoom al enfocar un input (Safari hace zoom si < 16px).
+   Solo en pantallas tactiles pequeñas: en escritorio los inputs del panel
+   usan `text-sm` como en CliqCut. */
+@media (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
 }
 /* iOS: prevent rubber band scroll on fixed elements */
 body { -webkit-overflow-scrolling: touch; }

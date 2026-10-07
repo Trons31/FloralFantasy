@@ -13,6 +13,7 @@ import {
   RiSaveLine,
 } from "react-icons/ri";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
+import LoadingButton from "@/components/ui/LoadingButton";
 import { DEFAULT_DELIVERY_FEE } from "@/lib/site-settings";
 import { toast } from "sonner";
 import { formatPrice, formatDeliveryLeadDays } from "@/lib/utils";
@@ -481,7 +482,25 @@ export default function EditOrderModal({
       onClose={onClose}
       title="Editar pedido"
       description="Ajusta los datos del cliente, la dirección y los productos del pedido."
-      panelClassName="md:max-w-5xl"
+      size="3xl"
+      footer={
+        order ? (
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-center text-xs text-gray-400 sm:text-left">
+              El pedido se actualizará conservando su estado actual.
+            </p>
+            <div className="flex gap-2">
+              <LoadingButton variant="secondary" onClick={onClose} disabled={saving} className="flex-1 sm:flex-none">
+                Cancelar
+              </LoadingButton>
+              <LoadingButton onClick={handleSave} loading={saving} className="flex-1 sm:flex-none">
+                {!saving && <RiSaveLine size={16} />}
+                {saving ? "Guardando..." : "Guardar cambios"}
+              </LoadingButton>
+            </div>
+          </div>
+        ) : undefined
+      }
     >
       {loading ? (
         <div className="flex justify-center py-20">
@@ -492,7 +511,7 @@ export default function EditOrderModal({
       ) : order ? (
         <div className="grid gap-6 lg:grid-cols-[1.1fr_.9fr]">
           <div className="space-y-4">
-            <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
               <h3 className="mb-4 text-lg font-semibold text-gray-900">Información del cliente</h3>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="sm:col-span-2">
@@ -538,13 +557,13 @@ export default function EditOrderModal({
               </div>
             </div>
 
-            <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <h3 className="text-lg font-semibold text-gray-900">Productos</h3>
                 <span className="text-xs text-gray-400">{cart.length} producto{cart.length !== 1 ? "s" : ""}</span>
               </div>
 
-              <div className="rounded-3xl bg-gray-50 border border-gray-100 p-4 mb-4">
+              <div className="rounded-2xl bg-gray-50 border border-gray-100 p-4 mb-4">
                 <div className="relative">
                   <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                   <input
@@ -627,14 +646,14 @@ export default function EditOrderModal({
                           <div className="rounded-2xl border border-primary-100 bg-primary-50/60 px-3 py-2">
                             <p className="text-[10px] font-black uppercase tracking-widest text-primary-500">Detalle</p>
                             {getBouquetSummary(cartItem.customization).chips.decreased.length > 0 ? (
-                              <div className="mt-2 rounded-xl border border-rose-100 bg-white/80 px-3 py-1.5">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-rose-500">Reducido</p>
+                              <div className="mt-2 rounded-xl border border-brand-100 bg-white/80 px-3 py-1.5">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-brand-500">Reducido</p>
                                 <p className="mt-1 text-[13px] font-semibold leading-snug text-gray-900">
                                   {`Quitaste ${formatNames(getBouquetSummary(cartItem.customization).chips.decreased)}`}
                                 </p>
                                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                                   {getBouquetSummary(cartItem.customization).chips.decreased.map((flower) => (
-                                    <span key={flower.id} className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-600">
+                                    <span key={flower.id} className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-600">
                                       - {flower.name} x{flower.baseQuantity - flower.quantity}
                                     </span>
                                   ))}
@@ -772,7 +791,7 @@ export default function EditOrderModal({
           </div>
 
           <div className="space-y-4">
-            <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
               <h3 className="mb-4 text-lg font-semibold text-gray-900">Resumen</h3>
               <div className="space-y-3">
                 {cart.map((item) => (
@@ -823,7 +842,7 @@ export default function EditOrderModal({
               </div>
             </div>
 
-            <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
               <label className="mb-2 block text-sm font-semibold text-gray-900">Observaciones</label>
               <textarea
                 value={adminNote}
@@ -835,20 +854,6 @@ export default function EditOrderModal({
 
             {error && <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
-            <div className="sticky bottom-0 rounded-3xl border border-gray-100 bg-white p-4 shadow-sm">
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary-600 px-4 py-3.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
-              >
-                {saving ? <RiLoaderLine className="animate-spin" size={16} /> : <RiSaveLine size={16} />}
-                {saving ? "Guardando..." : "Guardar cambios"}
-              </button>
-              <p className="mt-2 text-center text-xs text-gray-400">
-                El pedido se actualizará conservando su estado actual.
-              </p>
-            </div>
           </div>
         </div>
       ) : null}

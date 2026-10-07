@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { RiDownloadLine, RiCloseLine, RiArrowLeftLine, RiArrowRightLine } from "react-icons/ri";
+import { useBodyScrollLock } from "@/lib/scroll-lock";
 
 export default function PhotoViewer({
   url,
@@ -20,15 +21,14 @@ export default function PhotoViewer({
   }, [url, urls]);
   const [index, setIndex] = useState(Math.min(Math.max(startIndex, 0), Math.max(0, imageUrls.length - 1)));
 
-  // Lock body scroll and close on Escape
+  // Bloqueo compartido: el visor se abre a veces sobre un modal, y escribir
+  // `overflow` a mano desbloqueaba el fondo del modal al cerrarlo.
+  useBodyScrollLock(true);
+
   useEffect(() => {
-    document.body.style.overflow = "hidden";
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
-    return () => {
-      document.body.style.overflow = "";
-      window.removeEventListener("keydown", handler);
-    };
+    return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
   const currentUrl = imageUrls[index] || imageUrls[0];

@@ -14,7 +14,8 @@ function parseBoolean(value: FormDataEntryValue | null) {
   return value === "true" || value === "1" || value === "on";
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   if (!(await requireAdmin())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
@@ -31,7 +32,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const isActive = parseBoolean(formData.get("isActive"));
     const sortOrder = Number(formData.get("sortOrder") || 0);
 
-    const current = await prisma.paymentMethod.findUnique({ where: { id: params.id } });
+    const current = await prisma.paymentMethod.findUnique({ where: { id } });
     if (!current) {
       return NextResponse.json({ error: "Método no encontrado" }, { status: 404 });
     }
@@ -54,7 +55,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     const updated = await prisma.paymentMethod.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         title: title || current.title,
         provider: provider || null,
@@ -76,19 +77,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   if (!(await requireAdmin())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
   try {
-    const current = await prisma.paymentMethod.findUnique({ where: { id: params.id } });
+    const current = await prisma.paymentMethod.findUnique({ where: { id } });
     if (!current) {
       return NextResponse.json({ error: "Método no encontrado" }, { status: 404 });
     }
 
     await prisma.order.updateMany({
-      where: { paymentMethodId: params.id },
+      where: { paymentMethodId: id },
       data: { paymentMethodId: null },
     });
 
@@ -96,7 +98,7 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
       await deleteImage(current.imagePublicId).catch(console.error);
     }
 
-    await prisma.paymentMethod.delete({ where: { id: params.id } });
+    await prisma.paymentMethod.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch (error: any) {
     console.error("Payment method delete error:", error);

@@ -9,7 +9,8 @@ function isValidImage(file: File) {
   return file.type.startsWith("image/");
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     const order = await prisma.order.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: {
         id: true,
         trackingToken: true,
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     const updated = await prisma.order.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         customerName: name || undefined,
         customerPhone: phone || undefined,

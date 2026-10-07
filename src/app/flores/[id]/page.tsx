@@ -19,9 +19,10 @@ function parseCookieArray(value?: string) {
   }
 }
 
-export default async function ProductPage({ params }: { params: { id: string } }) {
+export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const product = await prisma.product.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       images: { orderBy: { order: "asc" } },
       category: true,
@@ -30,7 +31,7 @@ export default async function ProductPage({ params }: { params: { id: string } }
   }).catch(() => null);
   if (!product) notFound();
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const viewedIds = parseCookieArray(cookieStore.get("ff_viewed_products")?.value);
   const searchTerms = parseCookieArray(cookieStore.get("ff_catalog_searches")?.value)
     .map(term => term.trim().toLocaleLowerCase("es"))
@@ -53,6 +54,9 @@ export default async function ProductPage({ params }: { params: { id: string } }
   const viewedRank = new Map(viewedIds.map((id, index) => [id, viewedIds.length - index]));
   const scored = candidates.map(candidate => {
     const searchable = `${candidate.name} ${candidate.description} ${candidate.category.name} ${candidate.flowers.map(item => `${item.flower.name} ${item.flower.type}`).join(" ")}`.toLocaleLowerCase("es");
+    // Componente de servidor: se ejecuta una vez por peticion, el desempate
+    // aleatorio de las recomendaciones es intencional.
+    // eslint-disable-next-line react-hooks/purity
     let score = Math.random();
     if (candidate.categoryId === product.categoryId) score += 6;
     if (candidate.occasion && candidate.occasion === product.occasion) score += 4;
