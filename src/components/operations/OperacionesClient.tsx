@@ -3,11 +3,26 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { RiEyeLine, RiEyeOffLine, RiFlowerLine, RiLockLine, RiMailLine, RiLoader4Line } from "react-icons/ri";
+import { RiLoader4Line } from "react-icons/ri";
+import { LuBell, LuClipboardList, LuEye, LuEyeOff, LuLock, LuMail, LuTruck } from "react-icons/lu";
+import { PiFlowerTulip } from "react-icons/pi";
+import Image from "next/image";
+import BrandLogo, { BRAND_NAME, LOGO_FULL_SRC } from "@/components/ui/BrandLogo";
+import LoadingButton from "@/components/ui/LoadingButton";
+import { fontInter } from "@/config/fonts";
 import PreparadorView from "@/app/operaciones/PreparadorView";
 import RepartidorView from "@/app/operaciones/RepartidorView";
 import CorredorView from "@/app/operaciones/CorredorView";
 import PushNotificationsPrompt from "@/components/admin/PushNotificationsPrompt";
+
+const inputClass =
+  "h-12 w-full rounded-2xl border border-gray-200 bg-gray-50 px-11 text-sm font-medium text-gray-900 transition placeholder:text-gray-400 focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-100 lg:h-11 lg:rounded-xl";
+
+const features = [
+  { icon: LuClipboardList, title: "Pedidos", text: "Tu cola del día" },
+  { icon: LuTruck, title: "Entregas", text: "Rutas y estados" },
+  { icon: LuBell, title: "Alertas", text: "En tiempo real" },
+];
 
 type OperationsUser = {
   id: string;
@@ -96,153 +111,158 @@ export default function OperacionesClient({ initialUser = null }: OperacionesPag
 
   if (loadingSession) {
     return (
-      <div className="grid min-h-screen place-items-center bg-gradient-to-br from-primary-50 to-rose-50">
-        <RiLoader4Line className="animate-spin text-primary-500" size={34} />
+      <div className="grid min-h-[100svh] place-items-center bg-gray-950">
+        <RiLoader4Line className="animate-spin text-brand-400" size={34} />
       </div>
     );
   }
 
   if (user?.role === "PREPARADOR") {
     return (
-      <>
+      <div className={fontInter.className}>
         <PreparadorView user={user} onLogout={handleLogout} />
         <PushNotificationsPrompt />
-      </>
+      </div>
     );
   }
 
   if (user?.role === "REPARTIDOR") {
     return (
-      <>
+      <div className={fontInter.className}>
         <RepartidorView user={user} onLogout={handleLogout} />
         <PushNotificationsPrompt />
-      </>
+      </div>
     );
   }
 
   if (user?.role === "CORREDOR") {
     return (
-      <>
+      <div className={fontInter.className}>
         <CorredorView user={user} onLogout={handleLogout} />
         <PushNotificationsPrompt />
-      </>
+      </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#0f172a] text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(244,114,182,0.24),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(249,115,22,0.16),transparent_28%),linear-gradient(135deg,#0f172a_0%,#111827_38%,#1f2937_100%)]" />
-      <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(255,255,255,0.16)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.16)_1px,transparent_1px)] [background-size:56px_56px]" />
+    <main className={`${fontInter.className} relative min-h-[100svh] overflow-hidden bg-gray-950 text-white lg:h-[100svh] lg:min-h-0`}>
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-brand-950/40 to-gray-950" />
+      <div
+        className="absolute inset-0 opacity-10"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(247, 45, 114, 0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(247, 45, 114, 0.3) 1px, transparent 1px)",
+          backgroundSize: "60px 60px",
+        }}
+      />
+      <PiFlowerTulip className="absolute right-8 top-20 h-24 w-24 rotate-12 text-brand-400/10 md:right-20 md:top-28 md:h-32 md:w-32" />
+      <PiFlowerTulip className="absolute bottom-20 left-8 h-16 w-16 -rotate-12 text-brand-400/10 md:left-20" />
 
-      <div className="relative mx-auto flex min-h-screen max-w-6xl items-center px-4 py-8">
-        <div className="grid w-full gap-6 lg:grid-cols-[1.05fr_.95fr]">
-          <section className="hidden flex-col justify-center lg:flex">
-            <div className="mb-5 inline-flex items-center gap-2 self-start rounded-full border border-white/15 bg-white/8 px-3.5 py-1.5 text-xs text-white/85 backdrop-blur">
-              <RiFlowerLine size={16} className="text-rose-300" />
-              Acceso seguro para operaciones
-            </div>
-            <h1 className="max-w-2xl text-4xl font-semibold leading-[0.95] tracking-tight xl:text-6xl">
-              Entra con tu correo y contraseña
-              <span className="block text-rose-300">y mantén la sesión activa</span>
+      <div className="relative z-10 mx-auto grid min-h-[100svh] w-full max-w-6xl items-center gap-10 px-4 py-8 lg:h-full lg:min-h-0 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8 lg:px-6 lg:py-5">
+        <section className="hidden lg:block">
+          <div className="mb-10 inline-flex items-center gap-2.5">
+            <BrandLogo size={32} variant="dark" />
+            <span className="text-xl font-black tracking-tight">{BRAND_NAME}</span>
+          </div>
+
+          <div className="max-w-xl">
+            <h1 className="text-5xl font-black leading-[0.98] tracking-tight">
+              Tu turno de operaciones, en{" "}
+              <span className="bg-gradient-to-r from-brand-300 to-pink-200 bg-clip-text text-transparent">un solo lugar</span>
             </h1>
-            <p className="mt-4 max-w-xl text-sm leading-6 text-white/72 sm:text-base sm:leading-7">
-              Cuando ingreses, el sistema te pedirá permiso para notificaciones y así podrás recibir pedidos nuevos, cambios de estado y avisos de entrega.
+            <p className="mt-4 max-w-lg text-base leading-7 text-gray-300">
+              Al entrar te pediremos permiso para notificaciones y así recibirás pedidos nuevos, cambios de estado y avisos de entrega.
             </p>
-            <div className="mt-6 flex flex-wrap gap-2 text-xs text-white/72">
-              <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 backdrop-blur">Sesión persistente</span>
-              <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 backdrop-blur">Alertas en tiempo real</span>
-              <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 backdrop-blur">Flujo operativo</span>
+
+            <div className="mt-7 grid max-w-lg grid-cols-3 gap-3">
+              {features.map(({ icon: Icon, title, text }) => (
+                <div key={title} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
+                  <Icon className="mb-2 h-5 w-5 text-brand-300" />
+                  <p className="text-sm font-semibold">{title}</p>
+                  <p className="mt-1 text-xs text-gray-400">{text}</p>
+                </div>
+              ))}
             </div>
-          </section>
+          </div>
+        </section>
 
-          <section className="flex items-center justify-center lg:justify-end">
-            <form
-              onSubmit={handleSubmit}
-              className="w-full max-w-md rounded-[2rem] border border-white/10 bg-white p-6 text-slate-900 shadow-[0_30px_80px_rgba(0,0,0,0.35)]"
-            >
-              <div className="mb-5 flex items-start justify-between gap-4">
-                <div>
-                  <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-orange-500 text-white shadow-lg shadow-rose-500/20">
-                    <RiFlowerLine size={22} />
-                  </div>
-                  <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Iniciar sesión</h2>
-                  <p className="mt-1.5 max-w-sm text-sm leading-5 text-slate-500">
-                    Usa tu correo y contraseña de equipo para entrar.
-                  </p>
-                </div>
-                <div className="hidden rounded-2xl bg-rose-50 p-2.5 text-rose-500 sm:block">
-                  <RiLockLine size={18} />
+        <section className="mx-auto w-full max-w-md">
+          <div className="mb-7 text-center lg:hidden">
+            <Image src={LOGO_FULL_SRC} alt={BRAND_NAME} width={168} height={191} priority className="mx-auto h-auto w-[168px]" />
+            <p className="mt-2 text-sm text-gray-400">Acceso del equipo de operaciones</p>
+          </div>
+
+          <div className="rounded-[28px] border border-white/10 bg-white p-6 text-gray-950 shadow-lg shadow-brand-950/20 md:p-8 md:shadow-2xl md:shadow-brand-950/30 lg:p-6">
+            <div className="mb-6 lg:mb-4">
+              <h2 className="text-2xl font-black tracking-tight lg:text-xl">Iniciar sesión</h2>
+              <p className="mt-1 text-sm leading-6 text-gray-500 lg:leading-5">
+                Usa el correo y la contraseña de tu cuenta de equipo.
+              </p>
+            </div>
+
+            {error && (
+              <div role="alert" className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="ops-email" className="mb-1.5 block text-sm font-bold text-gray-700">Correo</label>
+                <div className="relative">
+                  <LuMail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <input
+                    id="ops-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="tu@correo.com"
+                    autoComplete="email"
+                    required
+                    className={inputClass}
+                  />
                 </div>
               </div>
 
-              <div className="space-y-3.5">
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-slate-700">Correo</span>
-                  <div className="relative">
-                    <RiMailLine className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="tu@correo.com"
-                      autoComplete="email"
-                      required
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-11 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-rose-400 focus:bg-white focus:ring-4 focus:ring-rose-100"
-                    />
-                  </div>
-                </label>
-
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-slate-700">Contraseña</span>
-                  <div className="relative">
-                    <RiLockLine className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      autoComplete="current-password"
-                      required
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-11 py-3 pr-12 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-rose-400 focus:bg-white focus:ring-4 focus:ring-rose-100"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((current) => !current)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
-                    >
-                      {showPassword ? <RiEyeOffLine size={18} /> : <RiEyeLine size={18} />}
-                    </button>
-                  </div>
-                </label>
-
-                {error && (
-                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                    {error}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-rose-500 to-orange-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-500/20 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {loading ? (
-                    <>
-                      <RiLoader4Line className="animate-spin" />
-                      Entrando...
-                    </>
-                  ) : (
-                    <>
-                      <RiLockLine size={18} />
-                      Iniciar sesión
-                    </>
-                  )}
-                </button>
+              <div>
+                <label htmlFor="ops-password" className="mb-1.5 block text-sm font-bold text-gray-700">Contraseña</label>
+                <div className="relative">
+                  <LuLock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <input
+                    id="ops-password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Tu contraseña"
+                    autoComplete="current-password"
+                    required
+                    className={`${inputClass} pr-12`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((current) => !current)}
+                    className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-xl text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
+                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  >
+                    {showPassword ? <LuEyeOff className="h-4 w-4" /> : <LuEye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
+
+              <LoadingButton type="submit" loading={loading} className="h-12 w-full rounded-2xl lg:h-11 lg:rounded-xl">
+                {loading ? "Entrando..." : "Entrar"}
+              </LoadingButton>
             </form>
-          </section>
-        </div>
+
+            <p className="mt-7 text-center text-xs leading-5 text-gray-400 lg:mt-5">
+              ¿Eres administrador?{" "}
+              <a href="/auth/login" className="font-bold text-brand-600 hover:underline">
+                Entra al panel
+              </a>
+            </p>
+          </div>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }

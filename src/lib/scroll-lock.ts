@@ -36,6 +36,9 @@ function applyLock() {
     const current = parseFloat(window.getComputedStyle(body).paddingRight) || 0
     body.style.paddingRight = `${current + scrollbarWidth}px`
   }
+  // Los elementos `fixed` (cabecera de la tienda) no heredan el padding del
+  // body: con esta variable pueden dejar el mismo hueco y no saltar.
+  document.documentElement.style.setProperty('--scroll-lock-gap', `${Math.max(0, scrollbarWidth)}px`)
   body.style.overflow = 'hidden'
 }
 
@@ -43,6 +46,7 @@ function releaseLock() {
   const body = document.body
   body.style.overflow = previousOverflow
   body.style.paddingRight = previousPaddingRight
+  document.documentElement.style.removeProperty('--scroll-lock-gap')
 }
 
 /** Suma una capa al bloqueo. Devuelve la funcion que la quita. */

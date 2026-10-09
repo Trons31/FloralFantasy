@@ -20,7 +20,7 @@ import {
   RiSearchLine,
   RiShoppingBagLine,
 } from "react-icons/ri";
-import { formatPrice, STATUS_LABELS } from "@/lib/utils";
+import { formatPrice, formatTime, STATUS_LABELS } from "@/lib/utils";
 import Pagination from "@/components/ui/Pagination";
 import type {
   AccountingMode,
@@ -285,7 +285,7 @@ export default function ContabilidadDashboard({ initialData }: { initialData: Ac
       ["Tipo", "Fecha", "Descripción", "Detalle", "Monto"],
       ...movements.map(item => [
         item.type === "order" ? "Pedido" : "Gasto",
-        format(new Date(item.date), "yyyy-MM-dd HH:mm"),
+        `${format(new Date(item.date), "yyyy-MM-dd")} ${formatTime(item.date)}`,
         item.title,
         item.subtitle,
         item.type === "order" ? item.amount : -item.amount,

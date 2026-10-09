@@ -22,16 +22,16 @@ import {
   RiShoppingBagLine,
   RiShoppingBasketLine,
   RiSubtractLine,
-  RiTimeLine,
   RiTruckLine,
   RiZoomInLine,
 } from "react-icons/ri";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { useCartStore } from "@/store/cartStore";
-import { formatCustomerDeliveryDate, formatPrice, getEffectiveDeliveryLeadDays, hasSameDayCutoffPassed } from "@/lib/utils";
+import { formatDeliveryDay, formatPrice, getEffectiveDeliveryLeadDays } from "@/lib/utils";
 import { DEFAULT_SAME_DAY_CUTOFF_TIME } from "@/lib/site-settings";
 import { formatFlowerQuantityRange, getFlowerQuantityRange } from "@/lib/flower-quantities";
+import ProductCard from "@/components/client/ProductCard";
 
 const ADDON_ICONS: Record<string, typeof RiGiftLine> = {
   BEBIDA: RiGobletLine,
@@ -71,7 +71,7 @@ export default function ProductDetail({
   const [previewAddon, setPreviewAddon] = useState<any | null>(null);
   const [favorite, setFavorite] = useState(false);
   const [sameDayCutoffTime, setSameDayCutoffTime] = useState(DEFAULT_SAME_DAY_CUTOFF_TIME);
-  const { addItem, toggleCart } = useCartStore();
+  const { addItem, openCart } = useCartStore();
   const images = product.images || [];
   const mainImage = images[imageIndex]?.url || images[0]?.url || "";
 
@@ -101,7 +101,6 @@ export default function ProductDetail({
   }, { min: 0, max: 0 });
   const flowerTotal = flowerTotals.min === flowerTotals.max ? String(flowerTotals.max) : `${flowerTotals.min}-${flowerTotals.max}`;
   const effectiveDeliveryLeadDays = getEffectiveDeliveryLeadDays(product.deliveryLeadDays || 0, sameDayCutoffTime);
-  const sameDayMovedToTomorrow = (product.deliveryLeadDays || 0) === 0 && hasSameDayCutoffPassed(sameDayCutoffTime);
 
   const toggleFavorite = () => {
     const current = readCookieArray("ff_favorite_products");
@@ -146,17 +145,16 @@ export default function ProductDetail({
         type: addon.type,
       })),
     });
-    toast.success(`${item.name} agregado al carrito`);
   };
 
   const handleAdd = () => {
     addProductToCart(product, quantity, selectedAddons);
-    toggleCart();
+    openCart();
   };
 
   const quickAdd = (item: any) => {
     addProductToCart(item);
-    toggleCart();
+    openCart();
   };
 
   return (
@@ -210,20 +208,9 @@ export default function ProductDetail({
                 </span>
               ))}
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-600">
-                <RiTimeLine /> {formatCustomerDeliveryDate(effectiveDeliveryLeadDays)}
+                <RiTruckLine /> Entrega {formatDeliveryDay(effectiveDeliveryLeadDays)}
               </span>
-              {sameDayMovedToTomorrow && (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
-                  <RiTruckLine /> Después de las {sameDayCutoffTime}: queda para {formatCustomerDeliveryDate(1).replace("Entrega el ", "")}
-                </span>
-              )}
             </div>
-
-            {sameDayMovedToTomorrow && (
-              <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
-                Estás pidiendo después de la hora límite configurada. Este pedido se entregará el día siguiente: <strong>{formatCustomerDeliveryDate(1)}</strong>.
-              </div>
-            )}
 
             {product.flowers.length > 0 && (
               <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -267,7 +254,7 @@ export default function ProductDetail({
         <section className="mt-6 grid rounded-2xl border border-slate-200 bg-white shadow-sm md:grid-cols-3">
           {[
             { Icon: RiFlowerLine, title: "Flores frescas", text: `${flowerTotal || "Flores"} aprox. seleccionadas cuidadosamente.` },
-            { Icon: RiTruckLine, title: formatCustomerDeliveryDate(effectiveDeliveryLeadDays), text: "Preparamos tu pedido con el tiempo necesario para entregarlo perfecto." },
+            { Icon: RiTruckLine, title: `Entrega ${formatDeliveryDay(effectiveDeliveryLeadDays)}`, text: "Preparamos tu pedido con el tiempo necesario para entregarlo perfecto." },
             { Icon: RiGiftLine, title: "Presentación premium", text: "Cada arreglo se prepara con cuidado y materiales seleccionados." },
           ].map((benefit, index) => (
             <article key={benefit.title} className={`flex items-center gap-4 p-5 ${index ? "border-t border-slate-100 md:border-l md:border-t-0" : ""}`}>
@@ -312,21 +299,10 @@ export default function ProductDetail({
               <div><h2 className="font-display text-2xl font-semibold text-slate-950">También te puede gustar</h2><p className="mt-1 text-sm text-slate-500">Seleccionado según tus intereses recientes.</p></div>
               <Link href="/flores" className="hidden items-center gap-2 text-sm font-semibold text-primary-500 hover:text-primary-700 sm:flex">Ver todos <RiArrowRightLine /></Link>
             </div>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              {recommendations.map(item => {
-                const image = item.images?.find((entry: any) => entry.isMain)?.url || item.images?.[0]?.url || "";
-                return (
-                  <article key={item.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <Link href={`/flores/${item.id}`} className="block aspect-[4/3] overflow-hidden bg-slate-50">
-                      {image ? <img src={image} alt={item.name} className="h-full w-full object-cover transition duration-500 hover:scale-105" /> : <span className="grid h-full place-items-center"><RiFlowerLine className="text-slate-200" size={40} /></span>}
-                    </Link>
-                    <div className="flex items-end justify-between gap-2 p-3">
-                      <div className="min-w-0"><Link href={`/flores/${item.id}`} className="block truncate text-xs font-semibold text-slate-900 sm:text-sm">{item.name}</Link><p className="mt-1 text-xs font-bold text-slate-900 sm:text-sm">{formatPrice(item.price)}</p></div>
-                      <button type="button" onClick={() => quickAdd(item)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary-100 text-primary-500 transition hover:bg-primary-500 hover:text-white" aria-label={`Agregar ${item.name}`}><RiAddLine /></button>
-                    </div>
-                  </article>
-                );
-              })}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-8 lg:grid-cols-4 lg:gap-x-5">
+              {recommendations.map(item => (
+                <ProductCard key={item.id} product={item} onAdd={quickAdd} />
+              ))}
             </div>
           </section>
         )}

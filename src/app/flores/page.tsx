@@ -2,7 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { productFlowerInclude } from "@/lib/product-selects";
 import Header from "@/components/client/Header";
 import Footer from "@/components/client/Footer";
-import CartDrawer from "@/components/client/CartDrawer";
 import FloresClient from "@/components/client/FloresClient";
 
 export const dynamic = "force-dynamic";
@@ -10,8 +9,9 @@ export const dynamic = "force-dynamic";
 export default async function FloresPage({
   searchParams,
 }: {
-  searchParams: { categoria?: string; ocasion?: string; q?: string; flor?: string };
+  searchParams: Promise<{ categoria?: string; ocasion?: string; q?: string; flor?: string }>;
 }) {
+  const filters = await searchParams;
   const [products, categories, flowers, occasions] = await Promise.all([
     prisma.product.findMany({
       where: { inStock: true },
@@ -39,15 +39,17 @@ export default async function FloresPage({
   return (
     <main className="min-h-screen bg-[#fffdfa]">
       <Header forceLight />
+      {/* `key`: al ir de /flores?ocasion=amor a ?ocasion=bodas desde la cabecera,
+          el cliente se remonta y toma los filtros nuevos. */}
       <FloresClient
+        key={JSON.stringify(filters)}
         products={serialized}
         categories={categories}
         flowerTypes={flowerTypes}
         occasions={occasions}
-        initialFilters={searchParams}
+        initialFilters={filters}
       />
       <Footer />
-      <CartDrawer />
     </main>
   );
 }

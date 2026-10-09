@@ -1,5 +1,6 @@
 "use client";
 import { motion } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
 import { RiArrowRightLine, RiStarFill, RiTruckLine, RiShieldCheckLine, RiFlowerLine } from "react-icons/ri";
 
@@ -13,16 +14,26 @@ export default function HeroSection() {
       {/* ── HERO ─────────────────────────────────────────── */}
       <section className="relative min-h-screen flex items-end overflow-hidden bg-[#1a0a0f]">
 
-        {/* Full-bleed background image */}
-        <div className="absolute inset-0">
-          <img
-            src="/flowers/ramo1.jpg"
-            alt="Hero"
-            className="w-full h-full object-cover opacity-60"
-            style={{ objectPosition:"center 30%" }}
-          />
-          {/* Gradient overlay — dark at bottom for text legibility */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#1a0a0f] via-[#1a0a0f]/40 to-transparent"/>
+        {/* Fondo (spec 009): la foto es vertical (1080×1440); estirada a toda la
+            pantalla se pixelaba. Va desenfocada como ambiente y la versión
+            nítida se muestra a la derecha a su tamaño real. */}
+        <div className="absolute inset-0" aria-hidden>
+          <Image src="/flowers/ramo1.jpg" alt="" fill sizes="480px" priority className="scale-125 object-cover opacity-70 blur-2xl" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#1a0a0f] via-[#1a0a0f]/55 to-[#1a0a0f]/20"/>
+        </div>
+
+        {/* El centrado va en el contenedor: framer-motion escribe `transform` y
+            anularía el -translate-y-1/2 si estuviera en el mismo elemento. */}
+        <div
+          className="pointer-events-none absolute right-[max(1.5rem,calc((100vw-80rem)/2+1.5rem))] top-1/2 hidden -translate-y-1/2 lg:block"
+          aria-hidden
+        >
+          <motion.div
+            initial={{opacity:0,y:24}} animate={{opacity:1,y:0}} transition={{delay:0.3, duration:0.8}}
+            className="relative h-[520px] w-[390px] overflow-hidden rounded-[2.5rem] ring-1 ring-white/15 shadow-[0_30px_80px_rgba(0,0,0,.45)] xl:h-[580px] xl:w-[435px]"
+          >
+            <Image src="/flowers/ramo1.jpg" alt="" fill sizes="435px" priority className="object-cover" />
+          </motion.div>
         </div>
 
         {/* Content */}
@@ -50,7 +61,7 @@ export default function HeroSection() {
 
           <motion.p
             initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{delay:0.5, duration:0.7}}
-            className="text-white/70 text-lg max-w-md mb-10 leading-relaxed font-light"
+            className="text-white/75 text-lg max-w-lg mb-10 leading-relaxed font-light"
           >
             Arreglos florales únicos, diseñados con amor y entregados con el cuidado que cada momento merece.
           </motion.p>

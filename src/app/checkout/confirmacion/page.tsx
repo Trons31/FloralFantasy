@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { RiCheckboxCircleLine, RiArrowRightLine, RiFlowerLine, RiSearchLine, RiFileCopyLine, RiCheckLine, RiLoader4Line, RiAlertLine, RiBankCardLine, RiRadioButtonLine, RiFileListLine, RiTruckLine, RiGiftLine } from "react-icons/ri";
+import { RiCheckboxCircleLine, RiFlowerLine, RiSearchLine, RiFileCopyLine, RiCheckLine, RiAlertLine, RiBankCardLine, RiRadioButtonLine, RiFileListLine, RiTruckLine, RiGiftLine } from "react-icons/ri";
 import { formatPrice, STATUS_LABELS } from "@/lib/utils";
 
 const STEPS = [

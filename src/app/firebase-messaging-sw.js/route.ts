@@ -26,8 +26,8 @@ messaging.onBackgroundMessage((payload) => {
 
   self.registration.showNotification(data.title || notification.title || "Nueva notificación", {
     body: data.body || notification.body || "",
-    icon: data.icon || "/flowers/logo.png",
-    badge: "/flowers/logo.png",
+    icon: data.icon || "/logo/icon-192.png",
+    badge: "/logo/logo-mark-small.png",
     tag: data.notificationId || notification.title || "fantasia-floral",
     data: {
       url: data.url || "/operaciones",

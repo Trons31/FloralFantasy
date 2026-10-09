@@ -16,15 +16,15 @@ import {
   RiMore2Line,
   RiQrCodeLine,
   RiSaveLine,
-  RiSettings3Line,
   RiShieldCheckLine,
-  RiTimeLine,
   RiTruckLine,
   RiUserLine,
 } from "react-icons/ri";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatTime12 } from "@/lib/utils";
+import TimeInput12 from "@/components/ui/TimeInput12";
+import PageHeader from "@/components/ui/PageHeader";
 
 type PaymentMethod = {
   id: string;
@@ -261,7 +261,7 @@ export default function AjustesClient({
     {
       label: "Entrega",
       value: formatPrice(savedDeliveryFee),
-      detail: `Hoy hasta ${savedSameDayCutoffTime}`,
+      detail: `Hoy hasta ${formatTime12(savedSameDayCutoffTime)}`,
       Icon: RiTruckLine,
       color: "bg-emerald-50 text-emerald-600",
     },
@@ -277,18 +277,11 @@ export default function AjustesClient({
   return (
     <div className="min-w-0">
       <div className="mx-auto max-w-[1500px] space-y-5">
-        <header>
-          <div className="flex items-start gap-3">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Ajustes</h1>
-              <p className="mt-1 text-sm text-slate-500">Métodos de pago y configuración activa del checkout.</p>
-            </div>
-          </div>
-        </header>
+        <PageHeader title="Ajustes" subtitle="Métodos de pago y configuración activa del checkout." />
 
         <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {cards.map(card => (
-            <article key={card.label} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+            <article key={card.label} className="min-w-0 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
               <div className="flex items-center gap-4">
                 <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ${card.color}`}>
                   <card.Icon size={22} />
@@ -305,7 +298,7 @@ export default function AjustesClient({
           ))}
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <section className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
           <div className="mb-5 flex items-start justify-between gap-3">
             <div className="flex gap-3">
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary-50 text-primary-500">
@@ -348,7 +341,7 @@ export default function AjustesClient({
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <section className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
           <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-start gap-3">
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-600">
@@ -382,21 +375,18 @@ export default function AjustesClient({
             </label>
             <label className="block">
               <span className="mb-1.5 block text-xs font-medium text-slate-600">Hora límite para entrega hoy</span>
-              <span className="relative block">
-                <RiTimeLine className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="time"
-                  value={sameDayCutoffTime}
-                  onChange={event => setSameDayCutoffTime(event.target.value)}
-                  className="h-11 w-full rounded-xl border border-slate-200 pl-11 pr-4 text-sm text-slate-900 outline-none transition focus:border-primary-300 focus:ring-2 focus:ring-primary-50"
-                />
-              </span>
+              <TimeInput12
+                value={sameDayCutoffTime}
+                onChange={setSameDayCutoffTime}
+                minuteStep={15}
+                aria-label="Hora límite para entrega hoy"
+              />
               <p className="mt-1.5 text-[11px] leading-5 text-slate-500">Después de esta hora, los productos configurados para entrega hoy se programan para el día siguiente.</p>
             </label>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <section className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex gap-3">
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-violet-50 text-violet-600">

@@ -4,7 +4,8 @@ import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { LuEye, LuEyeOff, LuLock, LuMail, LuShieldCheck, LuShoppingBag, LuTruck } from "react-icons/lu";
 import { PiFlowerTulip } from "react-icons/pi";
-import BrandLogo, { BRAND_NAME } from "@/components/ui/BrandLogo";
+import Image from "next/image";
+import BrandLogo, { BRAND_NAME, LOGO_FULL_SRC } from "@/components/ui/BrandLogo";
 import LoadingButton from "@/components/ui/LoadingButton";
 import { fontInter } from "@/config/fonts";
 
@@ -96,9 +97,8 @@ export default function LoginPage() {
 
         <section className="mx-auto w-full max-w-md">
           <div className="mb-7 text-center lg:hidden">
-            <BrandLogo size={56} variant="dark" priority className="mx-auto mb-4 rounded-2xl" />
-            <h1 className="text-3xl font-black">{BRAND_NAME}</h1>
-            <p className="mt-1 text-sm text-gray-400">Panel de gestión de la floristería</p>
+            <Image src={LOGO_FULL_SRC} alt={BRAND_NAME} width={168} height={191} priority className="mx-auto h-auto w-[168px]" />
+            <p className="mt-2 text-sm text-gray-400">Panel de gestión de la floristería</p>
           </div>
 
           <div className="rounded-[28px] border border-white/10 bg-white p-6 text-gray-950 shadow-lg shadow-brand-950/20 md:p-8 md:shadow-2xl md:shadow-brand-950/30 lg:p-6">

@@ -17,7 +17,6 @@ import type {
 
 const MAX_PROCESSING_ATTEMPTS = 5;
 const STALE_PROCESSING_MINUTES = 5;
-const DEFAULT_SYNC_LIMIT = 50;
 const REMINDER_INTERVAL_MINUTES = 30;
 
 type NotificationPayload = {
@@ -210,7 +209,7 @@ async function processSingleOutboxEntry(entryId: string) {
     const pushPayload = {
       title: outbox.notification.title,
       body: outbox.notification.body,
-      icon: "/flowers/logo.png",
+      icon: "/logo/icon-192.png",
       url: payload.url || "/dashboard/todos-pedidos",
       data: {
         notificationId: outbox.notification.id,

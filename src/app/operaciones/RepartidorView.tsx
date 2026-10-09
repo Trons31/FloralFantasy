@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import {
-  RiTruckLine, RiCheckLine, RiLoader4Line, RiLogoutBoxLine, RiMapPin2Line,
-  RiCameraLine, RiRefreshLine, RiFlowerLine, RiAddLine, RiCloseLine,
+  RiTruckLine, RiCheckLine, RiLoader4Line, RiMapPin2Line,
+  RiCameraLine, RiFlowerLine, RiAddLine, RiCloseLine,
   RiReceiptLine, RiArrowDownLine, RiErrorWarningLine, RiPhoneLine, RiWhatsappLine,
 } from "react-icons/ri";
 import { toast } from "sonner";
+import OpsHeader from "@/components/operations/OpsHeader";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import Modal from "@/components/ui/Modal";
 
@@ -193,39 +194,13 @@ export default function RepartidorView({ user, onLogout }: { user:any; onLogout:
     : { title:"Entregados", count: delivered.length, dot:"bg-purple-500" };
 
   return (
-    <div className="min-h-screen bg-blue-50">
-      {/* Header — mobile first: two rows */}
-      <div className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        {/* Row 1: identity + actions */}
-        <div className="px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-              <RiTruckLine className="text-blue-600" size={17}/>
-            </div>
-            <div>
-              <p className="font-bold text-gray-900 text-sm leading-none">{user.name}</p>
-              <p className="text-xs text-gray-400">Repartidor</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button onClick={load}
-              className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 rounded-xl text-gray-400 transition-colors">
-              <RiRefreshLine size={18}/>
-            </button>
-            <button onClick={onLogout}
-              className="w-9 h-9 flex items-center justify-center hover:bg-red-50 rounded-xl text-gray-400 hover:text-red-500 transition-colors">
-              <RiLogoutBoxLine size={18}/>
-            </button>
-          </div>
-        </div>
-        {/* Row 2: register expense — full width */}
-        <div className="px-4 pb-3">
-          <button onClick={() => setShowEgreso(true)}
-            className="w-full flex items-center justify-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 py-2.5 rounded-xl text-sm font-semibold hover:bg-amber-100 active:scale-95 transition-all">
-            <RiReceiptLine size={16}/> Registrar gasto
-          </button>
-        </div>
-      </div>
+    <div className="min-h-[100svh] bg-gray-50">
+      <OpsHeader role="Repartidor" userName={user.name} onRefresh={load} onLogout={onLogout}>
+        <button type="button" onClick={() => setShowEgreso(true)}
+          className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-700 transition hover:bg-gray-50 active:scale-[0.99]">
+          <RiReceiptLine size={16}/> Registrar gasto
+        </button>
+      </OpsHeader>
 
       <div className="max-w-2xl mx-auto px-4 py-6 pb-28 space-y-6">
         {!loading && orders.length > 0 && (

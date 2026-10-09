@@ -14,17 +14,15 @@ import {
   RiFlowerLine,
   RiHourglassLine,
   RiLoader4Line,
-  RiLogoutBoxLine,
-  RiMapPin2Line,
   RiPlayFill,
   RiRefreshLine,
   RiStackLine,
   RiStickyNoteLine,
   RiTimeLine,
-  RiUser3Line,
 } from "react-icons/ri";
 import { formatFlowerQuantityRange, getFlowerQuantityRange } from "@/lib/flower-quantities";
 import { formatScheduleDate, getEstimatedDeliveryDate, localDateKey, parseLocalDateKey } from "@/lib/order-schedule";
+import OpsHeader from "@/components/operations/OpsHeader";
 
 type Tab = "PAID" | "PROCESSING" | "READY" | "FUTURE";
 type FlowerLine = {
@@ -180,28 +178,12 @@ export default function PreparadorView({ user, onLogout }: { user: any; onLogout
   );
 
   return (
-    <div className="min-h-screen bg-[#f6f8fb] pb-24 text-[#11182c]">
-      <header className="sticky top-0 z-20 border-b border-slate-100 bg-white/95 px-4 py-4 shadow-sm backdrop-blur">
-        <div className="mx-auto flex max-w-xl items-center justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-amber-50 text-amber-500"><RiFlowerLine size={26} /></span>
-            <div className="min-w-0">
-              <h1 className="truncate text-lg font-bold leading-tight">Preparador</h1>
-              <p className="truncate text-sm text-slate-500">{user.name}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={load} className="grid h-10 w-10 place-items-center rounded-xl text-slate-600 hover:bg-slate-50" aria-label="Actualizar pedidos">
-              <RiRefreshLine size={21} />
-            </button>
-            <button type="button" onClick={onLogout} className="grid h-10 w-10 place-items-center rounded-xl text-slate-400 hover:bg-red-50 hover:text-red-500" aria-label="Cerrar sesión"><RiLogoutBoxLine /></button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-[100svh] bg-gray-50 pb-24 text-gray-900">
+      <OpsHeader role="Preparador" userName={user.name} onRefresh={load} onLogout={onLogout} maxWidth="max-w-xl" />
 
-      <main className="mx-auto max-w-xl px-4 py-7">
+      <main className="mx-auto max-w-xl px-4 py-6">
         <div className="mb-5">
-          <h2 className="text-[20px] font-bold leading-tight">{activeTab === "PAID" ? "Por preparar" : activeTab === "PROCESSING" ? "En preparación" : activeTab === "FUTURE" ? "Pedidos futuros" : "Terminados"}</h2>
+          <h2 className="text-xl font-bold leading-tight tracking-tight">{activeTab === "PAID" ? "Por preparar" : activeTab === "PROCESSING" ? "En preparación" : activeTab === "FUTURE" ? "Pedidos futuros" : "Terminados"}</h2>
           <p className="mt-1 flex items-center gap-2 text-[12px] text-slate-400">
             {activeTab === "PROCESSING" && <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />}
             {activeTab === "PAID" ? `Tienes ${activeOrders.length} pedido${activeOrders.length === 1 ? "" : "s"} pendiente${activeOrders.length === 1 ? "" : "s"}` :

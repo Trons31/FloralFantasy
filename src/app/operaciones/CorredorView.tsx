@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  RiRunLine, RiReceiptLine, RiLoader4Line, RiLogoutBoxLine, RiRefreshLine,
+  RiReceiptLine, RiLoader4Line,
   RiCameraLine, RiCloseLine, RiCheckLine, RiArrowDownLine, RiDeleteBinLine,
   RiPencilLine, RiImageLine,
   RiCalendarCheckLine, RiCalendarLine, RiFlowerLine, RiMapPin2Line,
 } from "react-icons/ri";
 import { toast } from "sonner";
+import OpsHeader from "@/components/operations/OpsHeader";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { getFlowerQuantityRange } from "@/lib/flower-quantities";
 import { formatScheduleDate, getEstimatedDeliveryDate, localDateKey, parseLocalDateKey } from "@/lib/order-schedule";
@@ -299,49 +300,25 @@ export default function CorredorView({ user, onLogout }: { user: { id: string; n
   };
 
   return (
-    <div className="min-h-screen bg-green-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
-              <RiRunLine className="text-green-600" size={17}/>
-            </div>
-            <div>
-              <p className="font-bold text-gray-900 text-sm leading-none">{user.name}</p>
-              <p className="text-xs text-gray-400">Corredor</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button onClick={() => { load(); void loadOrders(); }}
-              className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 rounded-xl text-gray-400 transition-colors">
-              <RiRefreshLine size={18}/>
-            </button>
-            <button onClick={onLogout}
-              className="w-9 h-9 flex items-center justify-center hover:bg-red-50 rounded-xl text-gray-400 hover:text-red-500 transition-colors">
-              <RiLogoutBoxLine size={18}/>
-            </button>
-          </div>
+    <div className="min-h-[100svh] bg-gray-50">
+      <OpsHeader role="Corredor" userName={user.name} onRefresh={() => { load(); void loadOrders(); }} onLogout={onLogout}>
+        <div className="grid grid-cols-2 gap-1 rounded-xl bg-gray-100 p-1">
+          <button type="button" onClick={() => setActiveTab("expenses")}
+            className={`flex h-9 items-center justify-center gap-2 rounded-lg text-sm font-semibold transition ${activeTab === "expenses" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-800"}`}>
+            <RiReceiptLine size={16}/> Gastos
+          </button>
+          <button type="button" onClick={() => setActiveTab("orders")}
+            className={`flex h-9 items-center justify-center gap-2 rounded-lg text-sm font-semibold transition ${activeTab === "orders" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-800"}`}>
+            <RiCalendarCheckLine size={16}/> Pedidos
+          </button>
         </div>
-        <div className="px-4 pb-3">
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => setActiveTab("expenses")}
-              className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-all ${activeTab === "expenses" ? "bg-green-500 text-white" : "bg-gray-100 text-gray-600"}`}>
-              <RiReceiptLine size={16}/> Gastos
-            </button>
-            <button onClick={() => setActiveTab("orders")}
-              className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-all ${activeTab === "orders" ? "bg-green-500 text-white" : "bg-gray-100 text-gray-600"}`}>
-              <RiCalendarCheckLine size={16}/> Pedidos
-            </button>
-          </div>
-          {activeTab === "expenses" && (
-            <button onClick={() => setShowCreate(true)}
-              className="mt-2 w-full flex items-center justify-center gap-2 bg-green-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-green-600 active:scale-95 transition-all">
-              <RiReceiptLine size={16}/> Registrar gasto
-            </button>
-          )}
-        </div>
-      </div>
+        {activeTab === "expenses" && (
+          <button type="button" onClick={() => setShowCreate(true)}
+            className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-500 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600 active:scale-[0.99]">
+            <RiReceiptLine size={16}/> Registrar gasto
+          </button>
+        )}
+      </OpsHeader>
 
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
         {activeTab === "orders" ? (
@@ -482,7 +459,7 @@ export default function CorredorView({ user, onLogout }: { user: { id: string; n
    Shared modal for create / edit
 ───────────────────────────────────────────── */
 function ExpenseModal({
-  title, form, setForm, file, preview, fileRef,
+  title, form, setForm, preview, fileRef,
   onFileChange, onClearFile, onSave, onClose,
   saving, saveLabel, accentColor, photoOptional = false,
 }: {

@@ -28,7 +28,7 @@ import PhotoViewer from "@/components/client/PhotoViewer";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import Pagination from "@/components/ui/Pagination";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import { formatPrice } from "@/lib/utils";
+import { formatDateTime, formatPrice } from "@/lib/utils";
 
 type ExpenseItem = {
   id: string;
@@ -510,7 +510,7 @@ export default function EgresosClient({
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${style.badge}`}>{expense.category || "Otro"}</span>
                         <span className="inline-flex items-center gap-1">
                           <RiCalendarLine />
-                          {format(new Date(expense.date), "d MMM yyyy, h:mm a", { locale: es })}
+                          {formatDateTime(expense.date, { day: "numeric", month: "short", year: "numeric" })}
                         </span>
                       </div>
                       <div className="mt-3 flex items-center justify-between gap-2 border-t border-gray-100 pt-3">
@@ -577,7 +577,7 @@ export default function EgresosClient({
                             <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold ${style.badge}`}>{expense.category || "Otro"}</span>
                           </td>
                           <td className="whitespace-nowrap px-3 py-2.5 font-semibold text-gray-700">
-                            {format(new Date(expense.date), "d MMM yyyy, h:mm a", { locale: es })}
+                            {formatDateTime(expense.date, { day: "numeric", month: "short", year: "numeric" })}
                           </td>
                           <td className="px-3 py-2.5">
                             {photos.length ? (

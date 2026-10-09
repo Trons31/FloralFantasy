@@ -27,6 +27,7 @@ import {
 import { toast } from "sonner";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { formatDateTime, formatTime } from "@/lib/utils";
 
 const ROLES = [
   {
@@ -80,13 +81,7 @@ function getRole(role: string) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("es-CO", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
+  return formatDateTime(value, { day: "numeric", month: "short", year: "numeric" });
 }
 
 function formatLastAccess(value: string) {
@@ -102,10 +97,7 @@ function formatLastAccess(value: string) {
     day: "numeric",
     month: "short",
   }).format(date);
-  return `${prefix}, ${new Intl.DateTimeFormat("es-CO", {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date)}`;
+  return `${prefix}, ${formatTime(date)}`;
 }
 
 export default function EquipoManager({

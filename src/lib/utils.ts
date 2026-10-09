@@ -33,9 +33,62 @@ export function getDeliveryDateLabel(days: number, baseDate = new Date()): strin
   }).format(date);
 }
 
+/** Día de entrega en lenguaje natural: "hoy", "mañana, 9 de octubre", "el 12 de octubre". */
+export function formatDeliveryDay(days: number, baseDate = new Date()): string {
+  if (!days || days <= 0) return "hoy";
+  const date = new Date(baseDate);
+  date.setDate(date.getDate() + days);
+  const label = new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "long" }).format(date);
+  return days === 1 ? `mañana, ${label}` : `el ${label}`;
+}
+
 export function formatCustomerDeliveryDate(days: number, baseDate = new Date()): string {
   if (!days || days <= 0) return "Mismo día";
   return `Entrega el ${getDeliveryDateLabel(days, baseDate)}`;
+}
+
+const BUSINESS_TIME_ZONE = "America/Bogota";
+
+function toTime12(hour: number, minute: number) {
+  const period = hour >= 12 ? "PM" : "AM";
+  return `${hour % 12 || 12}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
+/** "16:00" → "4:00 PM". Para valores guardados como "HH:mm" (24 h). */
+export function formatTime12(value: string): string {
+  const [hour, minute] = String(value || "").split(":").map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return value;
+  return toTime12(hour, minute);
+}
+
+/** Hora del día en Colombia, siempre en 12 h: "4:05 PM". */
+export function formatTime(value: Date | string | number): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: BUSINESS_TIME_ZONE,
+    hour: "numeric",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const hour = Number(parts.find(part => part.type === "hour")?.value || 0) % 24;
+  const minute = Number(parts.find(part => part.type === "minute")?.value || 0);
+  return toTime12(hour, minute);
+}
+
+/** Fecha + hora en Colombia: "8 oct, 4:05 PM". */
+export function formatDateTime(
+  value: Date | string | number,
+  dateOptions: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" }
+): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  let datePart = new Intl.DateTimeFormat("es-CO", { timeZone: BUSINESS_TIME_ZONE, ...dateOptions })
+    .format(date)
+    .replace(/\./g, "");
+  // Formato compacto: "8 oct 2026" en vez de "8 de oct de 2026".
+  if (dateOptions.month === "short") datePart = datePart.replace(/ de /g, " ");
+  return `${datePart}, ${formatTime(date)}`;
 }
 
 export function hasSameDayCutoffPassed(cutoffTime: string, now = new Date(), timeZone = "America/Bogota") {

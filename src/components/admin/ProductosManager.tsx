@@ -1,24 +1,33 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import {
-  RiAddLine, RiSubtractLine, RiPencilLine, RiDeleteBinLine, RiLoader4Line, RiUploadCloud2Line,
-  RiCloseLine, RiLeafLine, RiTimeLine, RiBellLine, RiCheckLine, RiStarLine,
-  RiArrowLeftLine, RiArrowRightLine,
-  RiFlowerLine, RiAlertLine, RiSearchLine, RiEqualizerLine, RiShoppingBag3Line, RiFileCopyLine, RiGridLine, RiFireLine,
+  RiAddLine,
+  RiSubtractLine,
+  RiPencilLine,
+  RiDeleteBinLine,
+  RiLoader4Line,
+  RiUploadCloud2Line,
+  RiCloseLine,
+  RiTimeLine,
+  RiBellLine,
+  RiCheckLine,
+  RiStarLine,
+  RiArrowRightLine,
+  RiFlowerLine,
+  RiAlertLine,
+  RiSearchLine,
+  RiEqualizerLine,
+  RiShoppingBag3Line,
+  RiFileCopyLine,
+  RiGridLine,
+  RiFireLine,
 } from "react-icons/ri";
-import { FaStar } from "react-icons/fa6";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import Pagination from "@/components/ui/Pagination";
 import { formatPrice, formatDeliveryLeadDays, getDeliveryDateLabel } from "@/lib/utils";
-
-const TIME_UNITS = [
-  { value: "MINUTES", label: "Minutos" },
-  { value: "HOURS",   label: "Horas"   },
-  { value: "DAYS",    label: "Días"    },
-];
 
 const COLOR_DOT_CLASSES: Record<string, string> = {
   Rojo: "bg-red-500",
@@ -145,11 +154,6 @@ export default function ProductosManager({
     const min = Math.max(1, Number(item.quantityMin ?? fallback) || fallback);
     const max = Math.max(min, Number(item.quantityMax ?? fallback) || fallback);
     return { min, max };
-  };
-
-  const formatFlowerRange = (item: { quantity?: number | null; quantityMin?: number | null; quantityMax?: number | null }) => {
-    const { min, max } = flowerRange(item);
-    return min === max ? `${min}` : `${min}-${max}`;
   };
 
   const handleCreateCat = async () => {

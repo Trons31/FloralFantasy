@@ -10,26 +10,21 @@ import {
   RiShieldUserLine,
   RiRefreshLine,
 } from "react-icons/ri";
-import { formatPrice, STATUS_LABELS } from "@/lib/utils";
+import { formatDateTime, formatPrice, formatTime, STATUS_LABELS } from "@/lib/utils";
 import { toast } from "sonner";
+import PageHeader from "@/components/ui/PageHeader";
 
 function formatDate(iso: string) {
-  const d = new Date(iso);
-  const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-  const h = d.getHours();
-  const m = String(d.getMinutes()).padStart(2, "0");
-  const ampm = h >= 12 ? "p. m." : "a. m.";
-  const h12 = h % 12 || 12;
-  return `${d.getDate()} ${months[d.getMonth()]}, ${h12}:${m} ${ampm}`;
+  return formatDateTime(iso);
 }
 
 const COLS = [
-  { id: "PENDING_PAYMENT_CONFIRMATION", label: "Pago pendiente", dot: "bg-amber-500", bg: "bg-amber-50/70 border-amber-200" },
-  { id: "PAID", label: "Por preparar", dot: "bg-blue-500", bg: "bg-blue-50/70 border-blue-200" },
-  { id: "PROCESSING", label: "En producción", dot: "bg-amber-500", bg: "bg-amber-50/70 border-amber-200" },
-  { id: "READY", label: "Listo", dot: "bg-green-500", bg: "bg-green-50/70 border-green-200" },
-  { id: "OUT_FOR_DELIVERY", label: "En camino", dot: "bg-purple-500", bg: "bg-purple-50/70 border-purple-200" },
-  { id: "DELIVERED", label: "Entregado", dot: "bg-emerald-500", bg: "bg-emerald-50/70 border-emerald-200" },
+  { id: "PENDING_PAYMENT_CONFIRMATION", label: "Pago pendiente", dot: "bg-amber-500" },
+  { id: "PAID", label: "Por preparar", dot: "bg-blue-500" },
+  { id: "PROCESSING", label: "En producción", dot: "bg-amber-500" },
+  { id: "READY", label: "Listo", dot: "bg-green-500" },
+  { id: "OUT_FOR_DELIVERY", label: "En camino", dot: "bg-purple-500" },
+  { id: "DELIVERED", label: "Entregado", dot: "bg-emerald-500" },
 ];
 
 const ACTIVE_STATUSES = COLS.map((col) => col.id);
@@ -111,31 +106,26 @@ export default function KanbanBoard({ initialOrders }: { initialOrders: any[] })
 
   return (
     <>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tablero de pedidos</h1>
-          <p className="text-gray-500 text-sm mt-0.5">
-            Arrastra para cambiar estado - se notifica al cliente automaticamente
-          </p>
-          {lastUpdated && (
-            <p className="text-[11px] text-gray-400 mt-1">
-              Actualizado {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-            </p>
-          )}
-        </div>
-
-        <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+      <PageHeader
+        title="Tablero de pedidos"
+        subtitle={(
+          <>
+            Arrastra para cambiar el estado; se notifica al cliente automáticamente.
+            {lastUpdated && <span className="mt-1 block text-[11px] text-gray-400">Actualizado {formatTime(lastUpdated)}</span>}
+          </>
+        )}
+        action={(
           <button
+            type="button"
             onClick={() => void syncOrders()}
             disabled={refreshing}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 hover:border-primary-200 hover:bg-primary-50
-                       active:scale-95 transition-all text-gray-700 font-semibold text-sm rounded-xl shadow-sm disabled:opacity-60"
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-gray-200 bg-white px-5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-60"
           >
             <RiRefreshLine size={18} className={refreshing ? "animate-spin" : ""} />
-            <span>Actualizar</span>
+            Actualizar
           </button>
-        </div>
-      </div>
+        )}
+      />
 
       <DragDropContext onDragEnd={handleDragEnd}>
         <div
@@ -145,12 +135,12 @@ export default function KanbanBoard({ initialOrders }: { initialOrders: any[] })
           {COLS.map((col) => (
             <div
               key={col.id}
-              className={`rounded-2xl border-2 ${col.bg} flex flex-col h-[calc(100vh-240px)] min-h-[520px] min-w-0 overflow-hidden`}
+              className="flex h-[calc(100vh-240px)] min-h-[520px] min-w-0 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
             >
-              <div className="px-4 py-3 border-b border-current border-opacity-10 flex items-center gap-2 min-h-[56px]">
+              <div className="flex min-h-[52px] items-center gap-2 border-b border-gray-100 px-4 py-3">
                 <span className={`w-2.5 h-2.5 rounded-full ${col.dot}`} />
-                <span className="font-semibold text-gray-800 text-sm leading-tight">{col.label}</span>
-                <span className="ml-auto bg-white text-gray-500 text-xs px-2 py-0.5 rounded-full font-medium">
+                <span className="text-sm font-bold leading-tight text-gray-900">{col.label}</span>
+                <span className="ml-auto rounded-full bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-500">
                   {byStatus(col.id).length}
                 </span>
               </div>
@@ -160,7 +150,7 @@ export default function KanbanBoard({ initialOrders }: { initialOrders: any[] })
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className={`flex-1 min-h-0 p-3 space-y-2.5 overflow-y-auto transition-colors ${snapshot.isDraggingOver ? "bg-white/50" : ""}`}
+                    className={`custom-scrollbar flex-1 min-h-0 space-y-2.5 overflow-y-auto bg-gray-50/80 p-3 transition-colors ${snapshot.isDraggingOver ? "bg-brand-50/60" : ""}`}
                   >
                     {byStatus(col.id).map((order, i) => (
                       <Draggable key={order.id} draggableId={order.id} index={i}>

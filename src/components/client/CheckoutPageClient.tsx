@@ -1,10 +1,12 @@
 "use client";
+import Link from "next/link";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Header from "@/components/client/Header";
 import { useCartStore } from "@/store/cartStore";
-import { formatCustomerDeliveryDate, formatPrice, getEffectiveDeliveryLeadDays, hasSameDayCutoffPassed } from "@/lib/utils";
+import { formatCustomerDeliveryDate, formatDeliveryDay, formatPrice, formatTime12, getEffectiveDeliveryLeadDays, hasSameDayCutoffPassed } from "@/lib/utils";
+import { useMinuteTick } from "@/lib/use-minute-tick";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -25,7 +27,6 @@ import {
   RiGiftLine,
   RiDeleteBinLine,
   RiLockLine,
-  RiWhatsappLine,
 } from "react-icons/ri";
 import { toast } from "sonner";
 import { DEFAULT_DELIVERY_FEE, DEFAULT_SAME_DAY_CUTOFF_TIME } from "@/lib/site-settings";
@@ -90,6 +91,15 @@ function getBouquetSummary(customization: any) {
   return { label: "Normal", detail: "sin cambios" };
 }
 
+/** Estados en los que el pedido todavía espera que el cliente pague. */
+const AWAITING_PAYMENT_STATUSES = ["PENDING", "PENDING_PAYMENT_CONFIRMATION", "PAYMENT_INVALID"];
+
+function isAwaitingPayment(order: { status?: string; paymentProofUrl?: string | null }) {
+  if (!AWAITING_PAYMENT_STATUSES.includes(order.status || "")) return false;
+  // Con comprobante ya subido solo vuelve a esperar pago si lo rechazaron.
+  return !order.paymentProofUrl || order.status === "PAYMENT_INVALID";
+}
+
 const inputCls =
   "w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-primary-400";
 
@@ -97,8 +107,10 @@ export default function CheckoutPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const checkoutToken = searchParams.get("token") || "";
-  const { items, getTotalPrice, getDeliveryLeadDays, clearCart, updateQuantity, removeItem } = useCartStore();
-  const [loading, setLoading] = useState(false);
+  const { items, getTotalPrice, getDeliveryLeadDays, clearCart, updateQuantity, removeItem, pendingOrder, setPendingOrder, clearPendingOrder } = useCartStore();
+  // Los textos de “entrega hoy / mañana” se recalculan cada minuto.
+  useMinuteTick();
+  const [loading] = useState(false);
   const [creatingOrder, setCreatingOrder] = useState(false);
   const [submittingProof, setSubmittingProof] = useState(false);
   const [createdOrder, setCreatedOrder] = useState<any>(null);
@@ -133,8 +145,7 @@ export default function CheckoutPageClient() {
   const subtotal = getTotalPrice();
   const total = subtotal + deliveryFee;
   const cartDelivery = getDeliveryLeadDays(sameDayCutoffTime);
-  const hasSameDayItems = (orderItems.length ? orderItems : items).some(item => (item.deliveryLeadDays || 0) === 0);
-  const sameDayMovedToTomorrow = hasSameDayItems && hasSameDayCutoffPassed(sameDayCutoffTime);
+  const cutoffPassed = hasSameDayCutoffPassed(sameDayCutoffTime);
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormData>({ resolver: zodResolver(schema) });
 
@@ -182,6 +193,15 @@ export default function CheckoutPageClient() {
       .then((r) => r.json())
       .then((order) => {
         if (!order?.id) throw new Error("Pedido no encontrado");
+        const isOwnPending = useCartStore.getState().pendingOrder?.trackingToken === order.trackingToken;
+        if (!isAwaitingPayment(order)) {
+          // Ya tiene comprobante, está pagado o cancelado: nada que retomar.
+          if (isOwnPending) clearPendingOrder();
+          if (order.paymentProofUrl && order.status !== "PAYMENT_INVALID") {
+            router.replace(`/checkout/confirmacion?token=${order.trackingToken}`);
+            return;
+          }
+        }
         const orderDeliveryDays = Array.isArray(order.items)
           ? order.items.reduce((max: number, item: any) => Math.max(max, getEffectiveDeliveryLeadDays(item.product?.deliveryLeadDays || 0, sameDayCutoffTime)), 0)
           : 0;
@@ -214,11 +234,23 @@ export default function CheckoutPageClient() {
         setCustomerAddressRef(order.addressRef || "");
         setCustomerCityId(order.cityId || "");
         setCustomerGiftMessage(order.giftMessage || "");
-        setCheckoutStage("details");
+        // Un pedido que el propio cliente creó ya tiene sus datos: al
+        // retomarlo va directo al pago. Un enlace armado por el equipo pasa
+        // primero por “Completa tus datos”.
+        const hasDetails = Boolean(order.customerName && order.customerPhone && order.address && order.cityId);
+        setCheckoutStage(isOwnPending && hasDetails ? "payment" : "details");
       })
-      .catch(() => {})
+      .catch(() => {
+        if (useCartStore.getState().pendingOrder?.trackingToken === checkoutToken) clearPendingOrder();
+      })
       .finally(() => setLoadingLink(false));
-  }, [checkoutToken, sameDayCutoffTime]);
+  }, [checkoutToken, sameDayCutoffTime, clearPendingOrder, router]);
+
+  // Sin token y con el carrito vacío: si hay un pedido sin pagar, se retoma.
+  const shouldResumePending = !checkoutToken && !createdOrder && !items.length && Boolean(pendingOrder);
+  useEffect(() => {
+    if (shouldResumePending && pendingOrder) router.replace(`/checkout?token=${pendingOrder.trackingToken}`);
+  }, [shouldResumePending, pendingOrder, router]);
 
   const onSubmit = async (data: FormData) => {
     if (!items.length) {
@@ -257,7 +289,11 @@ export default function CheckoutPageClient() {
       setCustomerAddressRef(data.addressRef || "");
       setCustomerCityId(data.cityId);
       setCheckoutStage("payment");
+      // El pedido ya existe en el servidor: se guarda para poder retomarlo
+      // y la URL lleva el token, así recargar no lo pierde (spec 005).
+      setPendingOrder({ id: order.id, trackingToken: order.trackingToken, total, createdAt: new Date().toISOString() });
       clearCart();
+      router.replace(`/checkout?token=${order.trackingToken}`, { scroll: false });
       toast.success("Pedido creado. Ahora sube tu comprobante.");
     } catch (e: any) {
       toast.error("Error: " + e.message);
@@ -373,6 +409,7 @@ export default function CheckoutPageClient() {
       if (!res.ok) throw new Error(data.error || "No fue posible cargar el comprobante");
 
       toast.success("Comprobante cargado correctamente");
+      clearPendingOrder();
       router.push(`/checkout/confirmacion?token=${createdOrder.trackingToken}`);
     } catch (e: any) {
       toast.error(e.message);
@@ -383,7 +420,7 @@ export default function CheckoutPageClient() {
 
   const canContinueToPayment = Boolean(customerName.trim() && customerPhone.trim() && customerAddress.trim() && customerCityId);
 
-  if (checkoutToken && loadingLink && !createdOrder) {
+  if ((checkoutToken && loadingLink && !createdOrder) || shouldResumePending) {
     return (
       <main className="min-h-screen bg-[#fdfcf8]">
         <Header />
@@ -403,7 +440,7 @@ export default function CheckoutPageClient() {
         <div className="pt-28 text-center py-20">
           <div className="flex justify-center mb-4 text-gray-200"><RiFlowerLine size={64} /></div>
           <h2 className="text-2xl font-semibold mb-4">Tu carrito está vacío</h2>
-          <a href="/flores" className="bg-primary-600 text-white px-8 py-3 rounded-full inline-block hover:bg-primary-700 transition-colors">Ver catálogo</a>
+          <Link href="/flores" className="bg-primary-600 text-white px-8 py-3 rounded-full inline-block hover:bg-primary-700 transition-colors">Ver catálogo</Link>
         </div>
       </main>
     );
@@ -584,28 +621,15 @@ export default function CheckoutPageClient() {
                 </div>
                   <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-4 text-sm text-emerald-700">
                     <RiTimeLine size={15} />
-                    <span className="font-semibold">Entrega</span>
-                    <span>· {formatCustomerDeliveryDate(orderDeliveryLeadDays)}</span>
+                    {/* La fecha se fijó al crear el pedido; recalcularla con la
+                        hora actual la movería si el cliente vuelve más tarde. */}
+                    <span>{createdOrder.estimatedTime || formatCustomerDeliveryDate(orderDeliveryLeadDays)}</span>
                   </div>
-                  {sameDayMovedToTomorrow && (
-                    <div className="mb-4 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-800">
-                      <span className="font-semibold">Pedido después de las {sameDayCutoffTime}</span>
-                      <span className="block">Los productos de entrega hoy quedan para {formatCustomerDeliveryDate(1).replace("Entrega el ", "")}.</span>
-                    </div>
-                  )}
                 <div className="border-t pt-4 space-y-2 text-sm">
                   <div className="flex justify-between text-gray-500">
                     <span className="flex items-center gap-1.5"><RiTruckLine size={14} /> Domicilio</span>
                     <span>{formatPrice(deliveryFee)}</span>
                   </div>
-                  {orderDeliveryLeadDays > 0 && (
-                    <div className="flex justify-between text-gray-500">
-                      <span>Entrega</span>
-                      <span className="text-emerald-600 font-medium">
-                        {formatCustomerDeliveryDate(orderDeliveryLeadDays)}
-                      </span>
-                    </div>
-                  )}
                   {orderAdjustment !== 0 && (
                     <div className="flex justify-between text-gray-500">
                       <span>Ajuste manual</span>
@@ -779,6 +803,28 @@ export default function CheckoutPageClient() {
           </div>
         </div>
 
+        {pendingOrder && (
+          <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-amber-600 shadow-sm"><RiTimeLine size={17} /></span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-amber-900">Tienes un pedido pendiente de pago</p>
+                <p className="mt-0.5 text-xs leading-5 text-amber-800">
+                  #{pendingOrder.trackingToken} · {formatPrice(pendingOrder.total)}. Puedes completar ese pago o seguir con esta compra nueva.
+                </p>
+              </div>
+            </div>
+            <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+              <button type="button" onClick={clearPendingOrder} className="h-10 rounded-xl border border-amber-200 bg-white px-4 text-xs font-semibold text-amber-800 transition hover:bg-amber-100">
+                Seguir con esta compra
+              </button>
+              <Link href={`/checkout?token=${pendingOrder.trackingToken}`} className="flex h-10 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 text-xs font-bold text-white transition hover:bg-amber-600">
+                Completar pago pendiente <RiArrowRightLine size={14} />
+              </Link>
+            </div>
+          </div>
+        )}
+
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_430px]">
           <form onSubmit={handleSubmit(onSubmit)} className="rounded-[24px] border border-slate-100 bg-white p-4 shadow-[0_12px_35px_rgba(15,23,42,0.045)] sm:p-5">
             <div className="mb-4 flex items-center gap-2.5">
@@ -882,7 +928,7 @@ export default function CheckoutPageClient() {
                         <div className="min-w-0">
                           <p className="truncate text-[14px] font-bold text-slate-900">{item.name}</p>
                           <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                            <RiTimeLine size={12} /> {formatCustomerDeliveryDate(getEffectiveDeliveryLeadDays(item.deliveryLeadDays || 0, sameDayCutoffTime))}
+                            <RiTimeLine size={12} /> Entrega {formatDeliveryDay(getEffectiveDeliveryLeadDays(item.deliveryLeadDays || 0, sameDayCutoffTime))}
                           </p>
                         </div>
                         <button
@@ -920,26 +966,13 @@ export default function CheckoutPageClient() {
               </div>
                 <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2.5 text-[11px] text-emerald-700">
                   <RiTimeLine size={15} />
-                  <span className="font-semibold">Entrega</span>
-                  <span>· {formatCustomerDeliveryDate(cartDelivery.days)}</span>
+                  <span><span className="font-semibold">Entrega</span> {formatDeliveryDay(cartDelivery.days)}</span>
                 </div>
-                {sameDayMovedToTomorrow && (
-                  <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-[11px] leading-5 text-amber-800">
-                    <span className="font-semibold">Pedido después de las {sameDayCutoffTime}</span>
-                    <span className="block">Tu pedido queda para {formatCustomerDeliveryDate(1).replace("Entrega el ", "")}.</span>
-                  </div>
-                )}
-              <div className="mt-3 flex items-center gap-3 rounded-xl bg-primary-50/60 px-3 py-3">
-                <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white text-primary-500"><RiGiftLine size={14} /></span>
-                <div>
-                  <p className="text-[11px] font-bold text-slate-900">Haz feliz a alguien especial</p>
-                  <p className="mt-0.5 text-[10px] text-slate-500">Dedicatoria gratis en todos los pedidos.</p>
-                </div>
-              </div>
-
               <div className="mt-3 space-y-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3">
                 {[
-                  ["Entrega hoy disponible", `Realiza tu pedido antes de las ${sameDayCutoffTime}`],
+                  cutoffPassed
+                    ? ["Entrega mañana disponible", `Pide ahora y lo entregamos ${formatDeliveryDay(1)}`]
+                    : ["Entrega hoy disponible", `Realiza tu pedido antes de las ${formatTime12(sameDayCutoffTime)}`],
                   ["Pago 100% seguro", "Protegemos tu información"],
                   ["Garantía de satisfacción", "Te acompañamos durante todo el proceso"],
                 ].map(([title, description]) => (

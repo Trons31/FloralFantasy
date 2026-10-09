@@ -26,7 +26,8 @@ import {
   RiUser3Line,
   RiWhatsappLine,
 } from "react-icons/ri";
-import { formatDeliveryLeadDays, formatPrice, STATUS_LABELS } from "@/lib/utils";
+import { formatDateTime, formatDeliveryLeadDays, formatPrice, STATUS_LABELS } from "@/lib/utils";
+import TimeInput12 from "@/components/ui/TimeInput12";
 import { formatFlowerQuantityRange, getFlowerQuantityRange } from "@/lib/flower-quantities";
 
 type Addon = { id: string; name: string; price: number; inStock: boolean; type?: string };
@@ -358,12 +359,7 @@ export default function OrderDetailEditor({ initialOrder }: { initialOrder: any 
       if (!response.ok) throw new Error(data?.error || "No fue posible programar el recordatorio");
 
       setReminder(current => ({ ...current, note: "" }));
-      const scheduled = new Date(data.scheduledFor).toLocaleString("es-CO", {
-        day: "numeric",
-        month: "short",
-        hour: "numeric",
-        minute: "2-digit",
-      });
+      const scheduled = formatDateTime(data.scheduledFor);
       toast.success(`Recordatorio programado para ${scheduled}`);
     } catch (error: any) {
       toast.error(error?.message || "No fue posible programar el recordatorio");
@@ -398,7 +394,7 @@ export default function OrderDetailEditor({ initialOrder }: { initialOrder: any 
           </div>
         </div>
 
-        <header className="mb-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <header className="mb-5 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">#{order.trackingToken}</h1>
@@ -457,7 +453,7 @@ export default function OrderDetailEditor({ initialOrder }: { initialOrder: any 
 
               <div className="space-y-4">
                 {items.map(item => (
-                  <article key={item.key} className="rounded-2xl border border-slate-200 p-3 sm:p-4">
+                  <article key={item.key} className="rounded-2xl border border-gray-100 p-3 sm:p-4">
                     <div className="grid gap-4 sm:grid-cols-[120px_1fr]">
                       <img src={imageOf(item.product)} alt={item.product.name} className="h-28 w-full rounded-xl object-cover" />
                       <div>
@@ -612,7 +608,7 @@ export default function OrderDetailEditor({ initialOrder }: { initialOrder: any 
                       </div>
                       <div className="flex min-w-0 flex-1 justify-between gap-3 text-xs">
                         <span className={order.status === status ? "font-bold text-emerald-600" : ""}>{flowLabel[status]}</span>
-                        <time className="text-[9px] text-slate-400">{entry ? new Date(entry.createdAt).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : ""}</time>
+                        <time className="text-[9px] text-slate-400">{entry ? formatDateTime(entry.createdAt) : ""}</time>
                       </div>
                     </div>
                   );
@@ -681,11 +677,11 @@ export default function OrderDetailEditor({ initialOrder }: { initialOrder: any 
                 ) : (
                   <label className="block">
                     <span className="mb-1 block text-[10px] font-semibold text-slate-500">Hora del día</span>
-                    <input
-                      type="time"
+                    <TimeInput12
+                      size="sm"
                       value={reminder.timeOfDay}
-                      onChange={event => setReminder(current => ({ ...current, timeOfDay: event.target.value }))}
-                      className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold outline-none focus:border-primary-300"
+                      onChange={timeOfDay => setReminder(current => ({ ...current, timeOfDay }))}
+                      aria-label="Hora del día"
                     />
                     <p className="mt-1 text-[10px] text-slate-400">Si la hora ya pasó, se programa para mañana.</p>
                   </label>
@@ -730,7 +726,7 @@ export default function OrderDetailEditor({ initialOrder }: { initialOrder: any 
                 {[...(order.statusHistory || [])].reverse().slice(0, 6).map((entry: any) => (
                   <div key={entry.id} className="flex items-start justify-between gap-3 text-xs">
                     <span className="flex gap-2"><RiCheckLine className="mt-0.5 text-emerald-500" />{entry.note || STATUS_LABELS[entry.status] || entry.status}</span>
-                    <time className="shrink-0 text-[9px] text-slate-400">{new Date(entry.createdAt).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</time>
+                    <time className="shrink-0 text-[9px] text-slate-400">{formatDateTime(entry.createdAt)}</time>
                   </div>
                 ))}
               </div>
@@ -756,7 +752,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className={`rounded-2xl border p-5 shadow-sm ${tone === "rose" ? "border-primary-100 bg-brand-50/60" : "border-slate-200 bg-white"}`}>
+    <section className={`rounded-2xl border p-5 shadow-sm ${tone === "rose" ? "border-primary-100 bg-brand-50/60" : "border-gray-100 bg-white"}`}>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-sm font-bold"><Icon className="text-primary-500" size={19} />{title}</h2>
         {action}

@@ -5,12 +5,9 @@ import { toast } from "sonner";
 import {
   RiAddLine,
   RiArrowDownSLine,
-  RiArrowLeftSLine,
-  RiArrowRightSLine,
   RiBearSmileLine,
   RiCakeLine,
   RiCheckLine,
-  RiCloseLine,
   RiDeleteBinLine,
   RiEditLine,
   RiEyeLine,

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -10,7 +9,6 @@ import {
   RiBankCardLine,
   RiCalendarCheckLine,
   RiCheckLine,
-  RiCheckboxCircleFill,
   RiCloseCircleLine,
   RiCustomerService2Line,
   RiFileList3Line,
@@ -26,7 +24,8 @@ import {
 } from "react-icons/ri";
 import Header from "@/components/client/Header";
 import Footer from "@/components/client/Footer";
-import { formatPrice, STATUS_LABELS } from "@/lib/utils";
+import HeroBackdrop from "@/components/client/HeroBackdrop";
+import { formatDateTime, formatPrice, STATUS_LABELS } from "@/lib/utils";
 
 const STATUS_ORDER = [
   "PENDING",
@@ -108,9 +107,7 @@ const faqs = [
 
 function formatDate(value: string | null | undefined, compact = false) {
   if (!value) return "Pendiente";
-  return new Intl.DateTimeFormat("es-CO", compact
-    ? { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }
-    : { dateStyle: "long", timeStyle: "short" }).format(new Date(value));
+  return compact ? formatDateTime(value) : formatDateTime(value, { dateStyle: "long" });
 }
 
 function getMainImage(order: any) {
@@ -228,18 +225,17 @@ function SearchView({
 }) {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-      <section className="relative isolate overflow-hidden bg-[#fceff2]">
-        <img src="/flowers/ramo2.jpg" alt="" className="absolute inset-0 h-full w-full object-cover object-[72%_50%]" />
-        <div className="absolute inset-0 bg-[#080713]/50" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#090713]/90 via-[#160d1c]/68 to-[#090713]/25" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/10" />
-        <div className="relative mx-auto max-w-7xl px-5 py-14 sm:px-8 sm:py-20">
+      <HeroBackdrop
+        background="/flowers/ramo2.jpg"
+        photos={[{ src: "/flowers/ramo2.jpg", alt: "Arreglo floral" }]}
+        className="py-14 sm:py-20"
+      >
           <div className="max-w-[650px]">
             <span className="inline-flex rounded-md bg-white/15 px-2.5 py-1 text-[9px] font-bold uppercase text-primary-200 backdrop-blur-sm">Seguimiento</span>
-            <h1 className="mt-4 font-display text-5xl font-semibold leading-[.98] text-white drop-shadow-[0_3px_18px_rgba(0,0,0,.38)] sm:text-6xl">
-              Seguimiento<br />de pedido
+            <h1 className="mt-4 max-w-2xl font-display text-5xl font-semibold leading-[1.02] text-white drop-shadow-[0_3px_18px_rgba(0,0,0,.38)] sm:text-6xl">
+              Seguimiento de pedido
             </h1>
-            <p className="mt-5 max-w-sm text-sm leading-6 text-white/85 drop-shadow-sm">
+            <p className="mt-5 max-w-lg text-sm leading-6 text-white/85 drop-shadow-sm sm:text-base sm:leading-7">
               Consulta el estado actual de tu pedido en tiempo real con tu guía de seguimiento.
             </p>
 
@@ -263,8 +259,7 @@ function SearchView({
               {error && <p className="mt-3 flex items-center gap-2 text-xs font-medium text-red-600"><RiCloseCircleLine />{error}</p>}
             </div>
           </div>
-        </div>
-      </section>
+      </HeroBackdrop>
 
       <div className="mx-auto max-w-7xl space-y-7 px-5 py-9 sm:px-8 sm:py-12">
         <section>

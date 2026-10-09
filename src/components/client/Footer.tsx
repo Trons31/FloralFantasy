@@ -17,7 +17,7 @@ export default function Footer() {
         <div className="mb-12 grid gap-10 md:grid-cols-4">
           <div>
             <div className="mb-3 flex items-center gap-2">
-              <Image src="/flowers/logo.png" alt="Fantasía Floral" width={36} height={36} className="object-contain" />
+              <Image src="/logo/logo-mark-small.png" alt="Fantasía Floral" width={36} height={36} className="object-contain" />
               <div>
                 <p className={`${cinzel.className} text-lg font-semibold leading-none`}>Fantasía Floral</p>
                 <p className="text-[10px] uppercase tracking-widest text-white/40">Florería</p>

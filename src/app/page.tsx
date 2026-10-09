@@ -6,7 +6,6 @@ import FeaturedProducts from "@/components/client/FeaturedProducts";
 import OccasionsSection from "@/components/client/OccasionsSection";
 import TestimonialsSection from "@/components/client/TestimonialsSection";
 import Footer from "@/components/client/Footer";
-import CartDrawer from "@/components/client/CartDrawer";
 import WhatsAppButton from "@/components/client/WhatsAppButton";
 
 export const dynamic = "force-dynamic";
@@ -56,7 +55,6 @@ export default async function HomePage() {
       <OccasionsSection occasions={occasions} />
       <TestimonialsSection />
       <Footer />
-      <CartDrawer />
       <WhatsAppButton />
     </main>
   );

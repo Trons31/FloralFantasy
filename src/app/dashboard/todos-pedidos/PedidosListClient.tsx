@@ -7,14 +7,13 @@ import PhotoViewer from "@/components/client/PhotoViewer";
 import CreateOrderModal from "@/components/admin/CreateOrderModal";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import Pagination from "@/components/ui/Pagination";
-import { formatPrice } from "@/lib/utils";
+import { formatDateTime as formatDateTimeCO, formatPrice } from "@/lib/utils";
 import {
   RiAddLine,
   RiAlarmWarningLine,
   RiArrowDownSLine,
   RiArrowLeftSLine,
   RiArrowRightSLine,
-  RiBarChartLine,
   RiCheckboxCircleLine,
   RiCloseCircleLine,
   RiCloseLine,
@@ -30,7 +29,6 @@ import {
   RiSearchLine,
   RiShoppingBagLine,
   RiSortAsc,
-  RiTimeLine,
   RiWhatsappLine,
   RiWifiOffLine,
   RiZoomInLine,
@@ -149,12 +147,7 @@ function formatDay(value: string) {
 
 
 function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleDateString("es-CO", {
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return formatDateTimeCO(iso);
 }
 
 function getProductName(order: any) {
@@ -252,22 +245,8 @@ function getTrend(current: number, previous: number) {
   return { value: `${percentage}%`, down: current < previous };
 }
 
-function visiblePages(page: number, total: number) {
-  if (total <= 5) return Array.from({ length: total }, (_, index) => index + 1);
-  const pages: Array<number | "ellipsis"> = [1];
-  if (page > 3) pages.push("ellipsis");
-  for (let value = Math.max(2, page - 1); value <= Math.min(total - 1, page + 1); value++) {
-    pages.push(value);
-  }
-  if (page < total - 2) pages.push("ellipsis");
-  pages.push(total);
-  return pages;
-}
-
 export default function PedidosListClient({
   orders,
-  summary,
-  statusBreakdown,
   dashboardStats,
   previousStats,
   days,
@@ -921,6 +900,30 @@ export default function PedidosListClient({
         title="Validar pago"
         description={selectedOrder?.trackingToken || ""}
         size="2xl"
+        footer={selectedOrder ? (
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
+            <button type="button"
+              onClick={() => router.push(`/dashboard/pedidos/${selectedOrder.id}`)}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50">
+              Editar pedido
+            </button>
+            {canValidatePayment(selectedOrder.status) && (
+              <div className="flex flex-col-reverse gap-2 sm:ml-auto sm:flex-row">
+                <button type="button" onClick={() => handleStatusChange(selectedOrder.id, "PAYMENT_INVALID")}
+                  disabled={updating === selectedOrder.id}
+                  className="h-11 rounded-xl bg-red-50 px-5 text-sm font-semibold text-red-600 transition hover:bg-red-100 disabled:opacity-50">
+                  Pago inválido
+                </button>
+                <button type="button" onClick={() => handleStatusChange(selectedOrder.id, "PAID")}
+                  disabled={updating === selectedOrder.id}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-green-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-green-700 disabled:opacity-50">
+                  {updating === selectedOrder.id ? <RiLoader4Line className="animate-spin" size={18} /> : <RiCheckboxCircleLine size={18} />}
+                  Validar pago
+                </button>
+              </div>
+            )}
+          </div>
+        ) : undefined}
       >
         {selectedOrder && (
           <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
@@ -1006,38 +1009,19 @@ export default function PedidosListClient({
 
             <div className="space-y-3">
               <div className="rounded-2xl border border-gray-100 bg-white p-4">
+                <p className="mb-2 text-sm font-semibold text-gray-900">Estado del pago</p>
                 {canValidatePayment(selectedOrder.status) ? (
-                  <>
-                    <p className="mb-2 text-sm font-semibold text-gray-900">Acciones de validación</p>
-                    <div className="space-y-2">
-                      <button type="button" onClick={() => handleStatusChange(selectedOrder.id, "PAID")}
-                        disabled={updating === selectedOrder.id}
-                        className="w-full rounded-xl bg-green-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">
-                        {updating === selectedOrder.id ? <RiLoader4Line className="mx-auto animate-spin" size={18} /> : "Validar pago"}
-                      </button>
-                      <button type="button" onClick={() => handleStatusChange(selectedOrder.id, "PAYMENT_INVALID")}
-                        disabled={updating === selectedOrder.id}
-                        className="w-full rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 disabled:opacity-50">
-                        Pago inválido
-                      </button>
-                    </div>
-                  </>
+                  <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+                    <p className="text-sm font-semibold text-amber-800">Pendiente de validación</p>
+                    <p className="mt-1 text-xs text-amber-700">Revisa el comprobante y confirma o rechaza el pago desde los botones de abajo.</p>
+                  </div>
                 ) : (
-                  <>
-                    <p className="mb-2 text-sm font-semibold text-gray-900">Estado del pago</p>
-                    <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
-                      <p className="text-sm font-semibold text-green-700">El pago fue validado correctamente.</p>
-                      <p className="mt-1 text-xs text-green-600">El pedido continúa en el flujo de preparación y entrega.</p>
-                    </div>
-                  </>
+                  <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
+                    <p className="text-sm font-semibold text-green-700">El pago fue validado correctamente.</p>
+                    <p className="mt-1 text-xs text-green-600">El pedido continúa en el flujo de preparación y entrega.</p>
+                  </div>
                 )}
               </div>
-
-              <button type="button"
-                onClick={() => router.push(`/dashboard/pedidos/${selectedOrder.id}`)}
-                className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white">
-                Editar pedido
-              </button>
             </div>
           </div>
         )}
@@ -1049,6 +1033,19 @@ export default function PedidosListClient({
         title="Orden y urgencia"
         description={priorityOrder?.trackingToken || ""}
         size="xl"
+        footer={(
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setPriorityOrder(null)} disabled={prioritySaving}
+              className="h-11 rounded-xl border border-gray-200 bg-white px-5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50">
+              Cancelar
+            </button>
+            <button type="button" onClick={handlePrioritySave} disabled={prioritySaving}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600 disabled:opacity-50">
+              {prioritySaving ? <RiLoader4Line className="animate-spin" /> : <RiSortAsc />}
+              {prioritySaving ? "Guardando..." : "Guardar orden/urgencia"}
+            </button>
+          </div>
+        )}
       >
         {priorityOrder && (
           <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
@@ -1090,7 +1087,7 @@ export default function PedidosListClient({
                     className="h-11 w-full rounded-xl border border-amber-200 bg-white px-3 text-sm outline-none focus:border-amber-400"
                   />
                 </label>
-                <label className="mb-3 flex items-center gap-2 rounded-xl bg-white px-3 py-3 text-sm font-semibold text-red-600">
+                <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-3 text-sm font-semibold text-red-600">
                   <input
                     type="checkbox"
                     checked={Boolean(priorityOrder.isUrgent)}
@@ -1099,15 +1096,6 @@ export default function PedidosListClient({
                   />
                   Marcar como entrega urgente
                 </label>
-                <button
-                  type="button"
-                  onClick={handlePrioritySave}
-                  disabled={prioritySaving}
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:opacity-50"
-                >
-                  {prioritySaving ? <RiLoader4Line className="animate-spin" /> : <RiSortAsc />}
-                  {prioritySaving ? "Guardando..." : "Guardar orden/urgencia"}
-                </button>
               </div>
             </div>
 

@@ -2,13 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  RiCloseLine,
   RiSearchLine,
   RiAddLine,
   RiSubtractLine,
   RiShoppingBagLine,
   RiLoaderLine,
-  RiCheckLine,
   RiLinkM,
   RiSaveLine,
 } from "react-icons/ri";
@@ -206,7 +204,7 @@ export default function EditOrderModal({
   const [error, setError] = useState("");
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
-  const [addons, setAddons] = useState<Addon[]>([]);
+  const [, setAddons] = useState<Addon[]>([]);
   const [flowers, setFlowers] = useState<Flower[]>([]);
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -327,16 +325,6 @@ export default function EditOrderModal({
       prev
         .map((item) => (item.product.id === productId ? { ...item, quantity: item.quantity + delta } : item))
         .filter((item) => item.quantity > 0)
-    );
-  };
-
-  const toggleAddon = (productId: string, addon: Addon) => {
-    setCart((prev) =>
-      prev.map((item) => {
-        if (item.product.id !== productId) return item;
-        const has = item.addons.find((a) => a.id === addon.id);
-        return { ...item, addons: has ? item.addons.filter((a) => a.id !== addon.id) : [...item.addons, addon] };
-      })
     );
   };
 

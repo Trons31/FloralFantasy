@@ -4,7 +4,6 @@ import { productFlowerInclude } from "@/lib/product-selects";
 import { notFound } from "next/navigation";
 import Header from "@/components/client/Header";
 import Footer from "@/components/client/Footer";
-import CartDrawer from "@/components/client/CartDrawer";
 import ProductDetail from "@/components/client/ProductDetail";
 
 export const dynamic = "force-dynamic";
@@ -81,7 +80,6 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         recommendations={recommendations}
       />
       <Footer />
-      <CartDrawer />
     </main>
   );
 }

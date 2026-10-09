@@ -30,14 +30,30 @@ export interface CartItem {
   subtotal: number;
 }
 
+/**
+ * Pedido ya creado en el servidor que aún no tiene comprobante. Se guarda para
+ * que el cliente pueda retomarlo si recarga o vuelve más tarde (spec 005).
+ */
+export interface PendingOrder {
+  id: string;
+  trackingToken: string;
+  total: number;
+  createdAt: string;
+}
+
 interface CartStore {
   items: CartItem[];
   isOpen: boolean;
+  pendingOrder: PendingOrder | null;
   addItem: (item: Omit<CartItem, "subtotal">) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, qty: number) => void;
   clearCart: () => void;
   toggleCart: () => void;
+  openCart: () => void;
+  closeCart: () => void;
+  setPendingOrder: (order: PendingOrder) => void;
+  clearPendingOrder: () => void;
   getTotalItems: () => number;
   getTotalPrice: () => number;
   getEstimatedTime: () => { value: number; unit: string; label: string };
@@ -52,6 +68,7 @@ export const useCartStore = create<CartStore>()(
     (set, get) => ({
       items: [],
       isOpen: false,
+      pendingOrder: null,
       addItem: (item) => {
         const existing = get().items.find(
           i => i.productId === item.productId &&
@@ -80,6 +97,10 @@ export const useCartStore = create<CartStore>()(
       },
       clearCart: () => set({ items: [] }),
       toggleCart: () => set(s => ({ isOpen: !s.isOpen })),
+      openCart: () => set({ isOpen: true }),
+      closeCart: () => set({ isOpen: false }),
+      setPendingOrder: (order) => set({ pendingOrder: order }),
+      clearPendingOrder: () => set({ pendingOrder: null }),
       getTotalItems: () => get().items.reduce((s, i) => s + i.quantity, 0),
       getTotalPrice: () => get().items.reduce((s, i) => s + i.subtotal, 0),
       getEstimatedTime: () =>
@@ -96,6 +117,11 @@ export const useCartStore = create<CartStore>()(
         return { days, label, dateLabel };
       },
     }),
-    { name: "fantasia-floral-cart" }
+    {
+      name: "fantasia-floral-cart",
+      // `isOpen` no se persiste: si se guardara, un carrito abierto reaparecería
+      // solo al recargar o al llegar a otra página.
+      partialize: (state) => ({ items: state.items, pendingOrder: state.pendingOrder }),
+    }
   )
 );

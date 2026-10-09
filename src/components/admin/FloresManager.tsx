@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import Pagination from "@/components/ui/Pagination";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { formatTime } from "@/lib/utils";
 
 const FLOWER_COLORS = [
   "Rojo",
@@ -268,7 +269,7 @@ export default function FloresManager({ flowers: initial }: { flowers: Flower[] 
       today.getFullYear() === lastUpdated.getFullYear() &&
       today.getMonth() === lastUpdated.getMonth() &&
       today.getDate() === lastUpdated.getDate();
-    const time = new Intl.DateTimeFormat("es-CO", { hour: "numeric", minute: "2-digit" }).format(lastUpdated);
+    const time = formatTime(lastUpdated);
     return sameDay ? `Hoy, ${time}` : new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "short", year: "numeric" }).format(lastUpdated);
   };
 

@@ -41,6 +41,14 @@ const config = {
         display: ["var(--font-cormorant)", "Georgia", "serif"],
         sans:    ["var(--font-dm-sans)", "system-ui", "sans-serif"],
       },
+      // Apertura de carrito y menú (spec 011): un fade corto en CSS, más
+      // barato que deslizar con framer-motion.
+      keyframes: {
+        "fade-in": { from: { opacity: "0" }, to: { opacity: "1" } },
+      },
+      animation: {
+        "fade-in": "fade-in 150ms ease-out both",
+      },
     },
   },
   plugins: [],

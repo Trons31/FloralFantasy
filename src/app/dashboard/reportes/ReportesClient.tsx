@@ -20,7 +20,8 @@ import {
   RiWallet3Line,
 } from "react-icons/ri";
 import { toast } from "sonner";
-import { formatPrice } from "@/lib/utils";
+import { formatDateTime as formatDateTimeCO, formatPrice, formatTime as formatTimeCO } from "@/lib/utils";
+import PageHeader from "@/components/ui/PageHeader";
 
 type ReportMode = "day" | "month";
 
@@ -114,20 +115,12 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("es-CO", {
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
+  return formatDateTimeCO(value);
 }
 
 function formatTime(value: string | null) {
   if (!value) return "Sin actividad";
-  return new Intl.DateTimeFormat("es-CO", {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
+  return formatTimeCO(value);
 }
 
 function DayCarousel({
@@ -342,14 +335,11 @@ export default function ReportesClient({
   return (
     <div className="min-w-0">
       <div className="mx-auto max-w-[1500px] space-y-5">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Reportes</h1>
-              <p className="mt-1 text-sm text-slate-500">Ingresos, egresos y actividad operativa del negocio.</p>
-            </div>
-          </div>
-          <button
+        <PageHeader
+          title="Reportes"
+          subtitle="Ingresos, egresos y actividad operativa del negocio."
+          action={(
+            <button
             type="button"
             onClick={exportPdf}
             disabled={exporting}
@@ -358,10 +348,11 @@ export default function ReportesClient({
             {exporting ? <RiLoader4Line className="animate-spin" /> : <RiDownloadLine />}
             {exporting ? "Generando..." : "Exportar PDF"}
           </button>
-        </header>
+          )}
+        />
 
         <section className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)]">
-          <div className="inline-flex rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+          <div className="inline-flex rounded-2xl border border-gray-100 bg-white p-2 shadow-sm">
             {(["day", "month"] as ReportMode[]).map(mode => (
               <button
                 key={mode}
@@ -378,7 +369,7 @@ export default function ReportesClient({
             ))}
           </div>
 
-          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm sm:px-4">
+          <div className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white px-3 py-3 shadow-sm sm:px-4">
             <button
               type="button"
               onClick={() => changeMonth(-1)}
@@ -414,7 +405,7 @@ export default function ReportesClient({
         </section>
 
         {selection.mode === "day" && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+          <section className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
             <div className="mb-3 flex items-center justify-between px-1 sm:hidden">
               <span className="text-xs font-semibold capitalize text-slate-700">{selection.periodLabel}</span>
               <button type="button" onClick={goToday} className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-600">Hoy</button>
@@ -429,7 +420,7 @@ export default function ReportesClient({
 
         <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           {financialCards.map(card => (
-            <article key={card.label} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+            <article key={card.label} className="min-w-0 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
                 <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${card.color}`}>
                   <card.Icon size={21} />
@@ -445,7 +436,7 @@ export default function ReportesClient({
         </section>
 
         {activity.length > 0 && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <section className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h2 className="font-bold text-slate-950">Actividad operativa</h2>
@@ -479,7 +470,7 @@ export default function ReportesClient({
           </section>
         )}
 
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
           <div className="flex flex-col gap-4 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
             <div>
               <h2 className="font-bold text-slate-950">Movimientos del período</h2>

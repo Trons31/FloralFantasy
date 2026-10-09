@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { RiCloseLine, RiSearchLine, RiAddLine, RiSubtractLine, RiShoppingBagLine, RiWhatsappLine, RiLoaderLine, RiCheckLine, RiLinkM, RiFileCopyLine } from "react-icons/ri";
+import { RiSearchLine, RiAddLine, RiSubtractLine, RiShoppingBagLine, RiWhatsappLine, RiLoaderLine, RiCheckLine, RiLinkM, RiFileCopyLine } from "react-icons/ri";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import LoadingButton from "@/components/ui/LoadingButton";
 import { DEFAULT_DELIVERY_FEE } from "@/lib/site-settings";

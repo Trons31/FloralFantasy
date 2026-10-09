@@ -21,6 +21,11 @@ specs/<NNN-nombre>/
 
 1. **Spec** — redacta `spec.md`. Los criterios de aceptación deben poder
    comprobarse (“el card del login mide máx. 448px”), nunca “se ve mejor”.
+   **La UX es prioridad en cada spec**: `spec.md` lleva siempre una sección
+   *Experiencia de usuario* que describe lo que percibe la persona (pasos,
+   feedback, carga, estados vacíos y de error, táctil vs. mouse, 375px vs.
+   escritorio). Si una decisión técnica empeora la experiencia, se justifica
+   ahí.
 2. **Plan** — `plan.md`: qué archivos se tocan, qué primitivas se usan,
    qué puede romperse.
 3. **Tasks** — `tasks.md`: tareas pequeñas y ordenadas. Cada una deja el repo
@@ -51,6 +56,12 @@ CliqCut** y se cambia solo el color de marca.
 | Fondo de página | `bg-gray-50` | igual |
 | Cards | `rounded-2xl border border-gray-100 bg-white shadow-sm` | igual |
 
+**Textos para el cliente final** (spec 006): decir lo que le importa
+(“Entrega mañana, 9 de octubre”), nunca las reglas internas (“hora límite
+configurada”, “Ya pasaron las 4:00 PM”). La hora límite solo se menciona
+*antes* de que pase, como beneficio (“Pide antes de las 4:00 PM”). Fechas con
+`formatDeliveryDay`.
+
 **La tienda pública (`/`, `/flores`, `/checkout`, `/seguimiento`) conserva su
 identidad propia** (tipografía y estética floral). El rediseño CliqCut aplica a
 `/auth/*`, `/dashboard/*` y `/operaciones`.
@@ -69,12 +80,32 @@ Viven en `src/components/ui/`. Son ports directos de CliqCut:
 | `EmptyState` | Listas vacías. |
 | `Pagination` | Paginación de tablas: “Mostrando X a Y de Z · Anterior · Página N de M · Siguiente · N por página”. |
 | `ScrollableTabs` | Pestañas que desbordan en móvil. |
+| `TimeInput12` | Selector de hora en 12 h (hora · minutos · AM/PM). Emite `"HH:mm"`. Nunca usar `<input type="time">`. |
+| `OpsHeader` (`components/operations`) | Cabecera común de las vistas de operaciones. |
+| `ProductCard` (`components/client`) | **Única** tarjeta de producto de la tienda (home, catálogo, recomendaciones). Agregar al carrito con `useQuickAdd`. |
+| `HeroBackdrop` (`components/client`) | Banner con foto: fondo desenfocado + foto nítida a su tamaño real. **Nunca estirar una foto de producto a todo el ancho**: son ≈960×1280 y se pixelan (spec 009). |
+| `CatalogDropdown` (`components/client`) | Desplegable de la tienda (listbox accesible). **No usar `<select>` nativo en la tienda** (spec 008). |
+| `CartDrawer` (`components/client`) | Lo monta **solo** `Header`; no montarlo en páginas. Abrir con `openCart()`, no `toggleCart()`. El pedido creado sin pagar vive en `cartStore.pendingOrder` (spec 005). |
+| `BrandLogo` | Isotipo oficial en baldosa. Exporta `LOGO_FULL_SRC` (flor + “FANTASIA FLORAL”). |
+
+**Logo oficial** (`public/logo/`): `logo.png` es el original del cliente; el
+resto se genera a partir de él. `logo-full.png` (completo, transparente),
+`logo-mark.png` (solo la flor), `logo-mark-small.png` (flor con trazo
+engrosado para ≤ 64px), `icon-192/512.png` y `apple-touch-icon.png` (PWA, fondo
+blanco) y `src/app/icon.png` (favicon). `public/flowers/logo.png` es el logo
+anterior y ya no se usa.
 
 Reglas:
 
 - **Bloqueo de scroll**: solo con `useBodyScrollLock` de `src/lib/scroll-lock.ts`.
   Nunca escribir `document.body.style.overflow` a mano: con dos capas abiertas
   la página queda bloqueada.
+- **Aperturas ligeras, como CliqCut** (specs 010–011): carrito, menú y capas
+  aparecen con `animate-fade-in` (CSS, 150 ms) y se desmontan al cerrar; sin
+  deslizamientos con framer-motion ni `backdrop-blur` en capas que se animan.
+  Los elementos `fixed` usan `right: var(--scroll-lock-gap, 0px)` para no
+  saltar al bloquear el scroll. Carruseles horizontales: `ScrollArrows`
+  (degradado + chevron sutil, como `ScrollableTabs` de CliqCut).
 - **No definir componentes dentro de otros componentes** (`const Content = () => …`
   dentro del render). Se re-montan en cada render y producen parpadeos — era la
   causa del parpadeo del sidebar en móvil.
@@ -133,6 +164,10 @@ mismas en dashboard, tablero, lista y operaciones.
    `eslint.config.mjs`).
 6. Fechas: el negocio opera en hora de Colombia (UTC-5). Cuidado con
    `new Date()` en servidor al calcular “hoy”.
+   **Toda hora visible va en 12 horas** (`4:00 PM`), en tienda, panel,
+   operaciones, PDF y CSV: usar `formatTime`, `formatTime12` (para el
+   `"HH:mm"` guardado) o `formatDateTime` de `src/lib/utils.ts`. Nunca `HH:mm`,
+   `toLocaleTimeString` ni interpolar la hora cruda (spec 003).
 7. Prisma: usar `select` explícito en consultas nuevas.
 
 ---

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdminUser } from "@/lib/route-auth";
+import { formatDateTime as formatDateTimeCO } from "@/lib/utils";
 
 const REVENUE_STATUSES = ["PAID", "PROCESSING", "READY", "OUT_FOR_DELIVERY", "DELIVERED"] as const;
 
@@ -17,16 +18,12 @@ function formatDate(value: Date) {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: "America/Bogota",
   }).format(value);
 }
 
 function formatDateTime(value: Date) {
-  return new Intl.DateTimeFormat("es-CO", {
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(value);
+  return formatDateTimeCO(value);
 }
 
 function escapeHtml(value: unknown) {
@@ -109,11 +106,6 @@ export async function GET(req: NextRequest) {
     }),
   ]);
 
-  const prepared = Array.from(new Map(
-    histories
-      .filter(item => item.status === "PROCESSING" || item.status === "READY")
-      .map(item => [item.order.id, item])
-  ).values());
   const delivered = Array.from(new Map(
     histories.filter(item => item.status === "DELIVERED").map(item => [item.order.id, item])
   ).values());

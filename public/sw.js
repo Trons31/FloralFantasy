@@ -12,8 +12,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title ?? "Nueva notificación", {
       body: data.body ?? "",
-      icon: data.icon ?? "/flowers/logo.png",
-      badge: data.badge ?? "/flowers/logo.png",
+      icon: data.icon ?? "/logo/icon-192.png",
+      badge: data.badge ?? "/logo/logo-mark-small.png",
       tag: data.tag ?? data.title ?? "fantasia-floral",
       data: {
         url: data.url ?? "/dashboard/todos-pedidos",

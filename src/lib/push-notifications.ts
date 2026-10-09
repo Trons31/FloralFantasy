@@ -25,7 +25,7 @@ function serializePayload(payload: PushPayload) {
   return JSON.stringify({
     title: payload.title,
     body: payload.body,
-    icon: payload.icon || "/flowers/logo.png",
+    icon: payload.icon || "/logo/icon-192.png",
     url: payload.url || "/dashboard/todos-pedidos",
     data: payload.data ?? {},
   });

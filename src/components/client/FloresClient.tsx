@@ -1,18 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
-import { motion } from "framer-motion";
-import { nanoid } from "nanoid";
-import { toast } from "sonner";
 import {
-  RiAddLine,
   RiArrowDownSLine,
+  RiCloseLine,
   RiArrowRightLine,
   RiCake2Line,
   RiFlowerLine,
   RiGift2Line,
-  RiHeart3Fill,
   RiHeart3Line,
   RiLeafLine,
   RiLockLine,
@@ -23,9 +18,33 @@ import {
   RiWhatsappLine,
 } from "react-icons/ri";
 import { GiDiamondRing, GiFlowerPot, GiRose, GiSunflower, GiTiara } from "react-icons/gi";
-import { formatCustomerDeliveryDate, formatPrice, getEffectiveDeliveryLeadDays, hasSameDayCutoffPassed } from "@/lib/utils";
-import { useCartStore } from "@/store/cartStore";
+import { formatDeliveryDay, formatTime12, hasSameDayCutoffPassed } from "@/lib/utils";
 import { DEFAULT_SAME_DAY_CUTOFF_TIME } from "@/lib/site-settings";
+import ProductCard from "@/components/client/ProductCard";
+import HeroBackdrop from "@/components/client/HeroBackdrop";
+import ScrollArrows from "@/components/client/ScrollArrows";
+import CatalogDropdown from "@/components/client/CatalogDropdown";
+import { useQuickAdd } from "@/components/client/useQuickAdd";
+
+/** Productos que se pintan por tanda al hacer scroll (spec 004). */
+const PAGE_SIZE = 12;
+const GRID_SIZES = "(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw";
+
+const SORT_OPTIONS = [
+  { value: "recent", label: "Recientes" },
+  { value: "popular", label: "Más vendidos" },
+  { value: "price-asc", label: "Menor precio" },
+  { value: "price-desc", label: "Mayor precio" },
+];
+
+const PRICE_OPTIONS = [
+  // “Todos” y no “Todos los precios”: la etiqueta “Precio” ya va encima y en
+  // 390px el texto largo se cortaba.
+  { value: "all", label: "Todos" },
+  { value: "low", label: "Hasta $70.000" },
+  { value: "mid", label: "$70.000 – $100.000" },
+  { value: "high", label: "Más de $100.000" },
+];
 
 type CatalogProduct = {
   id: string;
@@ -88,8 +107,10 @@ export default function FloresClient({
     return { type: "all", value: "" };
   });
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const productsRef = useRef<HTMLDivElement>(null);
-  const { addItem, toggleCart } = useCartStore();
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const quickAdd = useQuickAdd();
 
   useEffect(() => setFavorites(readCookieArray("ff_favorite_products")), []);
 
@@ -164,6 +185,13 @@ export default function FloresClient({
   const heroProduct = featured[0] || products[0];
   const heroImage = heroProduct ? getImage(heroProduct) : "";
 
+  const hasActiveFilters = Boolean(search.trim()) || activeFilter.type !== "all" || priceRange !== "all";
+  const clearFilters = () => {
+    setSearch("");
+    setPriceRange("all");
+    setActiveFilter({ type: "all", value: "" });
+  };
+
   const selectFilter = (type: FilterKey, value: string) => {
     setActiveFilter({ type, value });
     productsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -177,126 +205,201 @@ export default function FloresClient({
     });
   };
 
-  const handleAdd = (product: CatalogProduct) => {
-    addItem({
-      id: nanoid(),
-      productId: product.id,
-      name: product.name,
-      price: product.price,
-      image: getImage(product),
-      quantity: 1,
-      preparationTimeValue: 0,
-      preparationTimeUnit: "MINUTES",
-      deliveryLeadDays: product.deliveryLeadDays || 0,
-      addons: [],
-    });
-    toast.success(`${product.name} agregado al carrito`);
-    toggleCart();
-  };
+  // Cada búsqueda, filtro u orden empieza otra vez por la primera tanda.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [search, activeFilter, priceRange, sortBy]);
+
+  const visible = filtered.slice(0, visibleCount);
+  const hasMore = visibleCount < filtered.length;
+  const loadMore = () => setVisibleCount(count => count + PAGE_SIZE);
+
+  // Pide la siguiente tanda cuando el final del grid está a 600px. El
+  // observador se recrea tras cada tanda: si el centinela sigue a la vista
+  // (pantallas altas), vuelve a disparar sin esperar más scroll.
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!hasMore || !sentinel || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      entries => { if (entries[0]?.isIntersecting) loadMore(); },
+      { rootMargin: "600px 0px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, visibleCount]);
+
+  const cutoffPassed = hasSameDayCutoffPassed(sameDayCutoffTime);
+  const hasSameDayProducts = filtered.some(product => !product.requiresSpecialOrder && (product.deliveryLeadDays || 0) === 0);
 
   return (
     <div className="min-h-screen bg-[#fffdfa] pt-[65px] text-[#101827] sm:pt-[70px]">
-      <section className="relative isolate min-h-[310px] overflow-hidden border-b border-rose-100 sm:min-h-[370px]">
-        {heroImage ? (
-          <img src={heroImage} alt="" className="absolute inset-0 h-full w-full object-cover object-center sm:object-[70%_45%]" />
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-r from-[#f7eadc] via-[#f9e8e4] to-[#f4d8dd]" />
-        )}
-        <div className="absolute inset-0 bg-[#080713]/55" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#090713]/90 via-[#130c1c]/68 to-[#090713]/28" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-black/10" />
-        <div className="relative mx-auto flex min-h-[310px] max-w-7xl items-center px-5 py-12 sm:min-h-[370px] sm:px-8">
-          <div className="max-w-[490px]">
-            <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.24em] text-primary-300">Colección floral</p>
-            <h1 className="font-display text-[2.55rem] font-semibold leading-[0.98] text-white drop-shadow-[0_3px_18px_rgba(0,0,0,.35)] sm:text-6xl">
-              Arreglos que<br />cuentan historias
-            </h1>
-            <p className="mt-5 max-w-xs text-sm leading-6 text-white/85 drop-shadow-sm">Flores frescas seleccionadas con amor para cada ocasión especial.</p>
-            <button type="button" onClick={() => productsRef.current?.scrollIntoView({ behavior: "smooth" })} className="mt-6 inline-flex h-12 items-center gap-3 rounded-2xl bg-primary-500 px-6 text-sm font-bold text-white shadow-[0_12px_30px_rgba(232,24,90,.22)] transition hover:-translate-y-0.5 hover:bg-primary-600">
-              Explorar colección <RiArrowRightLine />
-            </button>
-          </div>
-        </div>
-      </section>
+      <HeroBackdrop
+        background={heroImage || "/flowers/ramo1.jpg"}
+        photos={featured.slice(0, 3).map(product => ({ src: getImage(product), alt: product.name })).filter(photo => photo.src)}
+        className="min-h-[300px] py-12 sm:min-h-[380px] sm:py-14"
+      >
+        <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.24em] text-primary-300">Colección floral</p>
+        <h1 className="max-w-2xl font-display text-[2.55rem] font-semibold leading-[1.02] text-white drop-shadow-[0_3px_18px_rgba(0,0,0,.35)] sm:text-6xl">
+          Arreglos que cuentan historias
+        </h1>
+        <p className="mt-5 max-w-lg text-sm leading-6 text-white/85 drop-shadow-sm sm:text-base sm:leading-7">
+          Flores frescas seleccionadas con amor para cada ocasión especial, preparadas a mano y entregadas a domicilio.
+        </p>
+        <button type="button" onClick={() => productsRef.current?.scrollIntoView({ behavior: "smooth" })} className="mt-7 inline-flex h-12 items-center gap-3 rounded-2xl bg-primary-500 px-6 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:bg-primary-600">
+          Explorar colección <RiArrowRightLine />
+        </button>
+      </HeroBackdrop>
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
-        <section className="py-5">
-          <div className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {filters.map(({ label, type, value, Icon }) => {
-              const active = activeFilter.type === type && activeFilter.value === value;
-              return (
-                <button key={`${type}-${value}`} type="button" onClick={() => selectFilter(type, value)} className={`flex h-[82px] min-w-[92px] shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border bg-white px-3 text-xs font-semibold transition sm:h-[96px] sm:min-w-[108px] ${active ? "border-primary-500 text-slate-950 shadow-[0_8px_22px_rgba(232,24,90,.08)]" : "border-slate-200 text-slate-700 hover:border-primary-200"}`}>
-                  <Icon className={active ? "text-primary-500" : "text-slate-500"} size={25} />
-                  <span className="max-w-[90px] truncate">{label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        <section ref={productsRef} className="scroll-mt-24 border-t border-slate-100 py-5">
-          <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto_auto]">
-            <label className="relative block">
-              <RiSearchLine className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar arreglo floral..." className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-primary-300" />
-            </label>
-            <CatalogSelect value={sortBy} onChange={setSortBy} label="Ordenar">
-              <option value="popular">Más vendidos</option>
-              <option value="recent">Recientes</option>
-              <option value="price-asc">Menor precio</option>
-              <option value="price-desc">Mayor precio</option>
-            </CatalogSelect>
-            <CatalogSelect value={priceRange} onChange={setPriceRange} label="Precio">
-              <option value="all">Todos los precios</option>
-              <option value="low">Hasta $70.000</option>
-              <option value="mid">$70.000 - $100.000</option>
-              <option value="high">Más de $100.000</option>
-            </CatalogSelect>
-            <CatalogSelect value={sortBy} onChange={setSortBy} label="Recientes">
-              <option value="recent">Recientes</option>
-              <option value="popular">Destacados</option>
-            </CatalogSelect>
-          </div>
-        </section>
-
-        {featured.length > 0 && !search && activeFilter.type === "all" && priceRange === "all" && (
-          <section className="py-3">
+        {/* Siempre visible: si se ocultara al filtrar, la barra de filtros saltaría hacia arriba. */}
+        {featured.length > 0 && (
+          <section className="pb-6 pt-8">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="flex items-center gap-2 text-base font-bold"><RiFlowerLine className="text-primary-500" /> Más vendidos</h2>
               <button type="button" onClick={() => setSortBy("popular")} className="flex items-center gap-1 text-xs font-bold text-primary-500">Ver todos <RiArrowRightLine /></button>
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-              {featured.map(product => <CompactProductCard key={product.id} product={product} favorite={favorites.includes(product.id)} onFavorite={toggleFavorite} />)}
-            </div>
+            {/* Móvil: carrusel horizontal (5 tarjetas en 2 columnas dejarían una sola). */}
+            <ScrollArrows
+              label="productos"
+              wrapperClassName="-mx-4 sm:mx-0"
+              className="flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:grid sm:grid-cols-3 sm:gap-x-4 sm:gap-y-8 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-5 lg:gap-x-5 [&::-webkit-scrollbar]:hidden"
+            >
+              {featured.map((product, index) => (
+                <div key={product.id} className="w-[44%] shrink-0 snap-start sm:w-auto">
+                  <ProductCard
+                    product={product}
+                    onAdd={quickAdd}
+                    favorite={favorites.includes(product.id)}
+                    onFavorite={toggleFavorite}
+                    priority={index < 2}
+                    sizes="(min-width: 1024px) 20vw, (min-width: 640px) 33vw, 44vw"
+                  />
+                </div>
+              ))}
+            </ScrollArrows>
           </section>
         )}
+
+        {/* Barra de filtros (spec 008): buscador + orden + precio, y debajo las categorías. */}
+        <section ref={productsRef} className="scroll-mt-24 space-y-4 border-t border-slate-100 pt-7 pb-2">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-[1fr_auto_auto]">
+            <label className="relative col-span-2 block lg:col-span-1">
+              <span className="sr-only">Buscar arreglo floral</span>
+              <RiSearchLine className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input
+                value={search}
+                onChange={event => setSearch(event.target.value)}
+                placeholder="Buscar arreglo floral..."
+                className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-11 text-sm outline-none transition placeholder:text-slate-400 hover:border-primary-200 focus:border-primary-300 focus:ring-4 focus:ring-primary-50"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  aria-label="Borrar búsqueda"
+                  className="absolute right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-primary-50 hover:text-primary-600"
+                >
+                  <RiCloseLine size={15} />
+                </button>
+              )}
+            </label>
+            <CatalogDropdown label="Ordenar" value={sortBy} onChange={setSortBy} options={SORT_OPTIONS} />
+            <CatalogDropdown label="Precio" value={priceRange} onChange={setPriceRange} options={PRICE_OPTIONS} align="right" />
+          </div>
+
+          <ScrollArrows
+            label="categorías"
+            wrapperClassName="-mx-4 sm:mx-0"
+            className="flex items-center gap-2 overflow-x-auto px-4 py-0.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden"
+          >
+              {filters.map(({ label, type, value, Icon }) => {
+                const active = activeFilter.type === type && activeFilter.value === value;
+                return (
+                  <button
+                    key={`${type}-${value}`}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => selectFilter(type, value)}
+                    className={`inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 text-[13px] font-semibold transition ${
+                      active
+                        ? "border-primary-500 bg-primary-500 text-white"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-primary-200 hover:bg-primary-50/60 hover:text-primary-700"
+                    }`}
+                  >
+                    <Icon className={active ? "text-white" : "text-primary-400"} size={17} />
+                    {label}
+                  </button>
+                );
+              })}
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold text-primary-600 transition hover:bg-primary-50"
+                >
+                  <RiCloseLine size={16} /> Limpiar filtros
+                </button>
+              )}
+          </ScrollArrows>
+        </section>
 
         <section className="py-7">
           <div className="mb-5">
             <h2 className="text-xl font-bold">Todos los arreglos</h2>
-            <p className="mt-1 text-xs text-slate-500">{filtered.length} {filtered.length === 1 ? "producto disponible" : "productos disponibles"}</p>
+            <p className="mt-1 text-xs text-slate-500">
+              {hasMore
+                ? `Mostrando ${visible.length} de ${filtered.length} productos`
+                : `${filtered.length} ${filtered.length === 1 ? "producto disponible" : "productos disponibles"}`}
+            </p>
           </div>
+          {cutoffPassed && hasSameDayProducts && (
+            <div className="mb-6 inline-flex max-w-full items-center gap-2.5 rounded-full bg-primary-50 py-2 pl-2 pr-4 text-xs text-primary-800 sm:text-sm">
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white text-primary-500 shadow-sm">
+                <RiTruckLine size={15} />
+              </span>
+              <p>
+                Los arreglos de entrega inmediata que pidas ahora llegan <strong>{formatDeliveryDay(1)}</strong>.
+              </p>
+            </div>
+          )}
           {filtered.length === 0 ? (
             <div className="rounded-3xl border border-slate-200 bg-white py-20 text-center">
               <RiFlowerLine className="mx-auto text-slate-200" size={52} />
               <p className="mt-4 font-semibold text-slate-700">No encontramos arreglos</p>
-              <button type="button" onClick={() => { setSearch(""); setPriceRange("all"); setActiveFilter({ type: "all", value: "" }); }} className="mt-4 text-sm font-bold text-primary-500">Limpiar filtros</button>
+              <button type="button" onClick={clearFilters} className="mt-4 text-sm font-bold text-primary-500">Limpiar filtros</button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-5">
-              {filtered.map((product, index) => (
-                <motion.div key={product.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index * 0.025, 0.25) }}>
-                  <ProductCard product={product} favorite={favorites.includes(product.id)} onFavorite={toggleFavorite} onAdd={handleAdd} sameDayCutoffTime={sameDayCutoffTime} />
-                </motion.div>
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 lg:gap-x-5 lg:gap-y-10">
+                {visible.map((product, index) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    onAdd={quickAdd}
+                    favorite={favorites.includes(product.id)}
+                    onFavorite={toggleFavorite}
+                    priority={index < 4}
+                    sizes={GRID_SIZES}
+                  />
+                ))}
+              </div>
+              <div ref={sentinelRef} className="mt-10 flex flex-col items-center gap-2 text-center">
+                {hasMore ? (
+                  <button type="button" onClick={loadMore} className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 transition hover:border-primary-200 hover:text-primary-600">
+                    Ver más arreglos <RiArrowDownSLine className="text-primary-500" />
+                  </button>
+                ) : filtered.length > PAGE_SIZE ? (
+                  <p className="text-xs text-slate-400">Ya viste todos los arreglos</p>
+                ) : null}
+              </div>
+            </>
           )}
         </section>
 
         <section className="mb-5 grid rounded-2xl border border-slate-200 bg-white sm:grid-cols-2 lg:grid-cols-4">
           {[
             { Icon: RiFlowerLine, title: "Flores frescas", text: "Seleccionadas cuidadosamente cada día." },
-            { Icon: RiTruckLine, title: "Entrega el mismo día", text: `Haz tu pedido antes de las ${sameDayCutoffTime}.` },
+            { Icon: RiTruckLine, title: "Entrega el mismo día", text: `Haz tu pedido antes de las ${formatTime12(sameDayCutoffTime)}.` },
             { Icon: RiGift2Line, title: "Presentación premium", text: "Cada arreglo se prepara con amor." },
             { Icon: RiShoppingBagLine, title: "Tarjeta personalizada", text: "Incluye tu mensaje sin costo adicional." },
           ].map(({ Icon, title, text }) => (
@@ -317,67 +420,5 @@ export default function FloresClient({
         </section>
       </div>
     </div>
-  );
-}
-
-function CatalogSelect({ value, onChange, label, children }: { value: string; onChange: (value: string) => void; label: string; children: React.ReactNode }) {
-  return (
-    <label className="relative min-w-0">
-      <span className="sr-only">{label}</span>
-      <select value={value} onChange={event => onChange(event.target.value)} className="h-12 w-full appearance-none rounded-2xl border border-slate-200 bg-white pl-4 pr-10 text-xs font-semibold outline-none focus:border-primary-300 lg:min-w-[140px]">
-        {children}
-      </select>
-      <RiArrowDownSLine className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
-    </label>
-  );
-}
-
-function FavoriteButton({ active, name, onClick }: { active: boolean; name: string; onClick: () => void }) {
-  return (
-    <button type="button" onClick={event => { event.preventDefault(); onClick(); }} aria-label={`${active ? "Quitar" : "Agregar"} ${name} de favoritos`} className="grid h-8 w-8 place-items-center rounded-full border border-slate-200 bg-white/95 text-slate-600 shadow-sm transition hover:text-primary-500">
-      {active ? <RiHeart3Fill className="text-primary-500" /> : <RiHeart3Line />}
-    </button>
-  );
-}
-
-function CompactProductCard({ product, favorite, onFavorite }: { product: CatalogProduct; favorite: boolean; onFavorite: (id: string) => void }) {
-  const image = getImage(product);
-  return (
-    <Link href={`/flores/${product.id}`} className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-      <div className="relative aspect-[1.35] overflow-hidden bg-slate-50">
-        {image ? <img src={image} alt={product.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="grid h-full place-items-center"><RiFlowerLine className="text-slate-200" size={35} /></div>}
-        <div className="absolute right-2 top-2"><FavoriteButton active={favorite} name={product.name} onClick={() => onFavorite(product.id)} /></div>
-      </div>
-      <div className="p-3"><p className="truncate text-xs font-bold">{product.name}</p><p className="mt-1 text-xs font-bold">{formatPrice(product.price)}</p></div>
-    </Link>
-  );
-}
-
-function ProductCard({ product, favorite, onFavorite, onAdd, sameDayCutoffTime }: { product: CatalogProduct; favorite: boolean; onFavorite: (id: string) => void; onAdd: (product: CatalogProduct) => void; sameDayCutoffTime: string }) {
-  const image = getImage(product);
-  const flower = product.flowers[0]?.flower;
-  const effectiveDeliveryLeadDays = getEffectiveDeliveryLeadDays(product.deliveryLeadDays || 0, sameDayCutoffTime);
-  const sameDayMovedToTomorrow = (product.deliveryLeadDays || 0) === 0 && hasSameDayCutoffPassed(sameDayCutoffTime);
-  return (
-    <article className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
-      <Link href={`/flores/${product.id}`} className="relative block aspect-[1.25] overflow-hidden bg-slate-50">
-        {image ? <img src={image} alt={product.name} className="h-full w-full object-cover transition duration-700 group-hover:scale-105" /> : <div className="grid h-full place-items-center"><RiFlowerLine className="text-slate-200" size={45} /></div>}
-        <span className={`absolute left-2 top-2 rounded-md px-2 py-1 text-[8px] font-bold uppercase ${product.featured ? "bg-primary-500 text-white" : "bg-emerald-50 text-emerald-700"}`}>{product.featured ? "Premium" : "Disponible"}</span>
-        <div className="absolute right-2 top-2"><FavoriteButton active={favorite} name={product.name} onClick={() => onFavorite(product.id)} /></div>
-      </Link>
-      <div className="p-3">
-        <Link href={`/flores/${product.id}`} className="line-clamp-1 text-sm font-bold hover:text-primary-500">{product.name}</Link>
-        <p className="mt-1 text-base font-extrabold">{formatPrice(product.price)}</p>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          <span className="rounded-md bg-rose-50 px-2 py-1 text-[9px] text-primary-500">{flower?.name || product.category?.name}</span>
-          {!product.requiresSpecialOrder && product.deliveryLeadDays === 0 && <span className="rounded-md bg-emerald-50 px-2 py-1 text-[9px] text-emerald-600">{formatCustomerDeliveryDate(effectiveDeliveryLeadDays)}</span>}
-          {sameDayMovedToTomorrow && <span className="rounded-md bg-amber-50 px-2 py-1 text-[9px] text-amber-700">Después de {sameDayCutoffTime}</span>}
-        </div>
-        <div className="mt-3 grid grid-cols-[1fr_38px] gap-2">
-          <Link href={`/flores/${product.id}`} className="flex h-9 items-center justify-center rounded-lg border border-primary-300 text-[10px] font-bold text-primary-500 transition hover:bg-primary-500 hover:text-white">Ver producto</Link>
-          <button type="button" onClick={() => onAdd(product)} aria-label={`Agregar ${product.name} al carrito`} className="grid h-9 place-items-center rounded-lg bg-primary-500 text-white transition hover:bg-primary-600"><RiAddLine /></button>
-        </div>
-      </div>
-    </article>
   );
 }
