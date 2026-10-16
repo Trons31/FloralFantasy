@@ -16,6 +16,7 @@ import { DEFAULT_DELIVERY_FEE } from "@/lib/site-settings";
 import { toast } from "sonner";
 import { formatPrice, formatDeliveryLeadDays } from "@/lib/utils";
 import { formatFlowerQuantityRange, getFlowerQuantityRange } from "@/lib/flower-quantities";
+import { EMPTY_ORDER_ITEM_CARD, pickOrderItemCard, type OrderItemCardData } from "@/lib/card-options";
 
 interface ProductImage { url: string; isMain: boolean }
 interface Addon { id: string; name: string; price: number; type: string; inStock: boolean }
@@ -45,6 +46,8 @@ type CartItem = {
     baseFlowers: { id: string; name: string; baseQuantity: number; quantity: number; baseQuantityMin?: number; baseQuantityMax?: number; quantityMin?: number; quantityMax?: number }[];
     extraFlowers: { id: string; name: string; quantity: number }[];
   };
+  /** Tarjeta elegida por el cliente (spec 012); se conserva al guardar. */
+  card: OrderItemCardData;
 };
 
 type OrderItem = {
@@ -184,6 +187,7 @@ function buildCartFromOrder(order: OrderDetail): CartItem[] {
         baseFlowers,
         extraFlowers: customization?.extraFlowers || [],
       },
+      card: pickOrderItemCard(item),
     };
   });
 }
@@ -315,6 +319,7 @@ export default function EditOrderModal({
           baseFlowers: buildBaseFlowers(product),
           extraFlowers: [],
         },
+        card: { ...EMPTY_ORDER_ITEM_CARD },
       },
       ];
     });
@@ -404,7 +409,7 @@ export default function EditOrderModal({
   };
 
   const subtotal = cart.reduce(
-    (acc, item) => acc + item.price * item.quantity + item.addons.reduce((sum, addon) => sum + addon.price, 0) * item.quantity,
+    (acc, item) => acc + (item.price + item.addons.reduce((sum, addon) => sum + addon.price, 0) + item.card.cardPrice) * item.quantity,
     0
   );
   const maxDeliveryDays = cart.reduce((max, item) => Math.max(max, item.product.deliveryLeadDays || 0), 0);
@@ -443,6 +448,7 @@ export default function EditOrderModal({
               ...item.customization,
               bouquetSize: getBouquetSummary(item.customization).storedSize,
             },
+            cardSnapshot: item.card,
           })),
           deliveryFee,
           manualAdjustment: manualAdjustmentValue,
@@ -792,6 +798,11 @@ export default function EditOrderModal({
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-gray-900">{item.product.name}</p>
                       <p className="text-xs text-gray-400">x{item.quantity}</p>
+                      {item.card.cardName && (
+                        <p className="truncate text-[11px] text-gray-500">
+                          {item.card.cardName}{item.card.cardPrice > 0 ? ` · +${formatPrice(item.card.cardPrice)}` : ""}
+                        </p>
+                      )}
                       <p className="text-[11px] text-primary-600 font-semibold mt-0.5">
                         {getBouquetSummary(item.customization).label}
                         {getBouquetSummary(item.customization).detail !== "Sin cambios"

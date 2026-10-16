@@ -16,6 +16,12 @@ Cada carpeta es un cambio con su `spec.md` (qué/por qué), `plan.md` (cómo) y
 | 009 | [Banners con foto nítida, textos amplios y filtros tras “Más vendidos”](009-banners-nitidos/spec.md) | Implementada |
 | 010 | [Tienda sin parpadeos al abrir el carrito y el menú; flechas en carruseles](010-sin-parpadeos-tienda/spec.md) | Implementada |
 | 011 | [Animaciones ligeras (fade-in) y flechas sutiles, como CliqCut](011-animaciones-ligeras/spec.md) | Implementada |
+| 012 | [Ficha de producto: estilo boutique, tarjeta de dedicatoria y “Comprar ahora”](012-ficha-tarjetas-comprar-ahora/spec.md) | En curso |
+| 013 | [Checkout: mensaje general solo cuando hace falta](013-checkout-mensaje-general/spec.md) | Implementada |
+| 014 | [Pagos con logos oficiales, Ajustes por secciones y comprobante paso a paso](014-ajustes-pagos-logos/spec.md) | En curso |
+| 015 | [Confirmación compacta y seguimiento minimalista](015-confirmacion-seguimiento-minimal/spec.md) | En curso |
+| 016 | [Menú de la tienda: Catálogo, Mi pedido, Rastrear](016-menu-tienda-minimal/spec.md) | En curso |
+| 017 | [Pedido pendiente: cancelar y vencer en 1 h](017-pedido-pendiente-cancelar-expirar/spec.md) | En curso |
 
 ## Plantilla
 

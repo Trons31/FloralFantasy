@@ -135,6 +135,23 @@ model AddOn {
   orderItems OrderItemAddOn[]
 }
 
+// Tarjeta de dedicatoria que el cliente elige por arreglo (spec 012).
+// Nunca se borra: se desactiva con `isActive`.
+model CardOption {
+  id            String      @id @default(cuid())
+  name          String
+  description   String      @default("")
+  price         Float       @default(0)
+  maxChars      Int         @default(200)
+  imageUrl      String?
+  imagePublicId String?
+  isActive      Boolean     @default(true)
+  sortOrder     Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  orderItems    OrderItem[]
+}
+
 model City {
   id        String   @id @default(cuid())
   name      String
@@ -274,6 +291,13 @@ model OrderItem {
   price     Float
   customization Json?
   addons    OrderItemAddOn[]
+  // Tarjeta y dedicatoria del arreglo (spec 012). Nombre y precio se copian
+  // al comprar para que el pedido no cambie si luego se edita la opción.
+  cardOptionId String?
+  cardOption   CardOption? @relation(fields: [cardOptionId], references: [id])
+  cardName     String?
+  cardPrice    Float       @default(0)
+  cardMessage  String?
 }
 
 model OrderItemAddOn {

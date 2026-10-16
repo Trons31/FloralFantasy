@@ -5,7 +5,8 @@ import { generateTrackingToken } from "@/lib/tokens";
 import { sendPushToAdmins } from "@/lib/webpush";
 import { formatCustomerDeliveryDate, getEffectiveDeliveryLeadDays, STATUS_LABELS } from "@/lib/utils";
 import { requireAdminUser, requireOrderManagementUser } from "@/lib/route-auth";
-import { DEFAULT_SAME_DAY_CUTOFF_TIME, normalizeSameDayCutoffTime } from "@/lib/site-settings";
+import { DEFAULT_DELIVERY_FEE, DEFAULT_SAME_DAY_CUTOFF_TIME, normalizeDeliveryFee, normalizeSameDayCutoffTime } from "@/lib/site-settings";
+import { resolveOrderItemCards } from "@/lib/card-options";
 
 export async function POST(req: NextRequest) {
   try {
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
     const productIds = items.map((i: any) => i.productId);
     const existingProducts = await prisma.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true, deliveryLeadDays: true },
+      select: { id: true, deliveryLeadDays: true, price: true },
     });
     const foundIds = existingProducts.map((p) => p.id);
     const missingIds = productIds.filter((id: string) => !foundIds.includes(id));
@@ -73,6 +74,56 @@ export async function POST(req: NextRequest) {
       0
     );
 
+    // Tarjeta y dedicatoria por arreglo (spec 012). Nombre y precio salen de
+    // la base de datos; las líneas sin `card` siguen funcionando como antes.
+    const resolvedCards = await resolveOrderItemCards(items, (ids) =>
+      prisma.cardOption.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, name: true, price: true, maxChars: true, isActive: true },
+      })
+    );
+    if ("error" in resolvedCards) {
+      return NextResponse.json({ error: resolvedCards.error }, { status: 400 });
+    }
+
+    // Pedidos de la tienda: precios y total se calculan aquí, nunca se toman
+    // del navegador (spec 012). Los borradores del admin conservan su flujo.
+    let orderTotal = total;
+    let orderDeliveryFee = deliveryFee;
+    let itemPrices: number[] = items.map((item: any) => item.price);
+    let itemAddons: { addonId: string; price: number }[][] = items.map((item: any) =>
+      (item.addons || []).map((a: any) => ({ addonId: a.id, price: a.price }))
+    );
+    if (!isAdminDraft) {
+      const addonIds = Array.from(new Set(items.flatMap((item: any) => (item.addons || []).map((a: any) => a?.id)).filter(Boolean))) as string[];
+      const [dbAddons, deliveryFeeSetting] = await Promise.all([
+        addonIds.length
+          ? prisma.addOn.findMany({ where: { id: { in: addonIds }, inStock: true }, select: { id: true, price: true } })
+          : Promise.resolve([]),
+        prisma.appSetting.findUnique({ where: { key: "deliveryFee" } }).catch(() => null),
+      ]);
+      const addonMap = new Map(dbAddons.map((addon) => [addon.id, addon]));
+      if (addonIds.some((addonId) => !addonMap.has(addonId))) {
+        return NextResponse.json(
+          { error: "Uno o más adicionales ya no están disponibles. Recarga la página y vuelve a agregarlos." },
+          { status: 400 }
+        );
+      }
+      const productPriceMap = new Map(existingProducts.map((product) => [product.id, Number(product.price || 0)]));
+
+      itemPrices = items.map((item: any) => productPriceMap.get(item.productId) ?? 0);
+      itemAddons = items.map((item: any) =>
+        (item.addons || []).map((a: any) => ({ addonId: a.id, price: Number(addonMap.get(a.id)?.price || 0) }))
+      );
+      orderDeliveryFee = normalizeDeliveryFee(deliveryFeeSetting?.value ?? process.env.DELIVERY_FEE ?? DEFAULT_DELIVERY_FEE);
+      orderTotal =
+        items.reduce((sum: number, item: any, index: number) => {
+          const quantity = Math.max(1, Number(item.quantity) || 1);
+          const addonTotal = itemAddons[index].reduce((s, addon) => s + addon.price, 0);
+          return sum + (itemPrices[index] + addonTotal + resolvedCards.cards[index].cardPrice) * quantity;
+        }, 0) + orderDeliveryFee;
+    }
+
     const trackingToken = generateTrackingToken();
     const initialStatus = isAdminDraft ? "PENDING" : "PENDING_PAYMENT_CONFIRMATION";
 
@@ -86,8 +137,8 @@ export async function POST(req: NextRequest) {
         addressRef: addressRef ?? "",
         cityId: activeCityId,
         giftMessage: cleanGiftMessage || null,
-        total,
-        deliveryFee,
+        total: orderTotal,
+        deliveryFee: orderDeliveryFee,
         estimatedTime: formatCustomerDeliveryDate(effectiveDeliveryLeadDays),
         adminNote: typeof adminNote === "string" ? adminNote.trim() || null : null,
         manualAdjustment: Number(manualAdjustment || 0),
@@ -103,16 +154,14 @@ export async function POST(req: NextRequest) {
           },
         },
         items: {
-          create: items.map((item: any) => ({
+          create: items.map((item: any, index: number) => ({
             productId: item.productId,
-            quantity: item.quantity,
-            price: item.price,
+            quantity: isAdminDraft ? item.quantity : Math.max(1, Number(item.quantity) || 1),
+            price: itemPrices[index],
             customization: item.customization ?? undefined,
+            ...resolvedCards.cards[index],
             addons: {
-              create: (item.addons || []).map((a: any) => ({
-                addonId: a.id,
-                price: a.price,
-              })),
+              create: itemAddons[index],
             },
           })),
         },
@@ -138,7 +187,7 @@ export async function POST(req: NextRequest) {
             style: "currency",
             currency: "COP",
             minimumFractionDigits: 0,
-          }).format(total)}`,
+          }).format(orderTotal)}`,
       url: "/dashboard/todos-pedidos",
       data: {
         trackingToken,

@@ -36,8 +36,14 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     .map(term => term.trim().toLocaleLowerCase("es"))
     .filter(Boolean);
 
-  const [addons, candidates] = await Promise.all([
+  const [addons, cardOptions, candidates] = await Promise.all([
     prisma.addOn.findMany({ where: { inStock: true } }).catch(() => []),
+    // Si la migración de la spec 012 aún no se aplicó, la ficha funciona sin tarjetas.
+    prisma.cardOption.findMany({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: "asc" }, { price: "asc" }],
+      select: { id: true, name: true, description: true, price: true, maxChars: true, imageUrl: true },
+    }).catch(() => []),
     prisma.product.findMany({
       where: { id: { not: product.id }, inStock: true },
       include: {
@@ -77,6 +83,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       <ProductDetail
         product={{ ...product, createdAt: product.createdAt.toISOString() }}
         addons={addons}
+        cardOptions={cardOptions}
         recommendations={recommendations}
       />
       <Footer />

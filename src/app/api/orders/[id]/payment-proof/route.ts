@@ -4,6 +4,7 @@ import { uploadImage, deleteImage } from "@/lib/cloudinary";
 import { sendOrderConfirmation } from "@/lib/email";
 import { sendPushToAdmins } from "@/lib/webpush";
 import { optimizeImageFileToDataUrl } from "@/lib/image-optimization";
+import { expireIfStale } from "@/lib/pending-order-server";
 
 function isValidImage(file: File) {
   return file.type.startsWith("image/");
@@ -58,11 +59,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         id: true,
         trackingToken: true,
         paymentProofPublicId: true,
+        paymentProofUrl: true,
+        status: true,
+        createdAt: true,
       },
     });
 
     if (!order || order.trackingToken !== trackingToken) {
       return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
+    }
+
+    // Spec 017: un pedido cancelado o vencido sin pago ya no recibe comprobante.
+    if (order.status === "CANCELLED" || (await expireIfStale(order))) {
+      return NextResponse.json({ error: "Este pedido se canceló porque no se recibió el pago a tiempo. Haz uno nuevo desde el catálogo." }, { status: 409 });
     }
 
     const method = await prisma.paymentMethod.findFirst({

@@ -1,20 +1,22 @@
 "use client";
-import { useEffect, useMemo, useState, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { RiCheckboxCircleLine, RiFlowerLine, RiSearchLine, RiFileCopyLine, RiCheckLine, RiAlertLine, RiBankCardLine, RiRadioButtonLine, RiFileListLine, RiTruckLine, RiGiftLine } from "react-icons/ri";
-import { formatPrice, STATUS_LABELS } from "@/lib/utils";
+import { RiCheckLine, RiFileCopyLine, RiSearchLine, RiShareLine, RiBookmarkLine } from "react-icons/ri";
+import { toast } from "sonner";
+import { formatPrice } from "@/lib/utils";
+import { copyText, trackingStatus } from "@/lib/order-tracking";
+import PaymentProviderLogo from "@/components/ui/PaymentProviderLogo";
 
-const STEPS = [
-  { status: "PENDING_PAYMENT_CONFIRMATION", label: "Pendiente de confirmación", Icon: RiFileListLine },
-  { status: "PAYMENT_INVALID", label: "Pago inválido", Icon: RiAlertLine },
-  { status: "PAID", label: "Pago confirmado", Icon: RiBankCardLine },
-  { status: "PROCESSING", label: "Preparando", Icon: RiFlowerLine },
-  { status: "READY", label: "Listo", Icon: RiCheckLine },
-  { status: "OUT_FOR_DELIVERY", label: "En camino", Icon: RiTruckLine },
-  { status: "DELIVERED", label: "Entregado", Icon: RiGiftLine },
-];
+/** Fila corta del resumen (spec 015). */
+function SummaryRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-3">
+      <span className="shrink-0 text-[12px] text-slate-500">{label}</span>
+      <span className="min-w-0 text-right text-[13px] font-semibold text-slate-900">{children}</span>
+    </div>
+  );
+}
 
 function Content() {
   const searchParams = useSearchParams();
@@ -22,169 +24,132 @@ function Content() {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [canShare, setCanShare] = useState(false);
 
   useEffect(() => {
+    setCanShare(typeof navigator !== "undefined" && typeof navigator.share === "function");
     if (!token) {
       setLoading(false);
       return;
     }
     fetch(`/api/seguimiento?token=${token}`)
-      .then(r => r.json())
-      .then(data => setOrder(data))
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => setOrder(data?.id ? data : null))
       .catch(() => setOrder(null))
       .finally(() => setLoading(false));
   }, [token]);
 
-  const currentIdx = order ? STEPS.findIndex(step => step.status === order.status) : -1;
-  const paymentMethodLabel = order?.paymentMethod?.visibleLabel || order?.paymentMethod?.provider || order?.paymentMethod?.title || "Método de pago";
-  const paymentMethodTypeLabel = order?.paymentMethod?.type === "QR"
-    ? "QR"
-    : order?.paymentMethod?.type === "BANK_ACCOUNT"
-      ? "Cuenta bancaria"
-      : order?.paymentMethod?.type === "INSTRUCTIONS"
-        ? "Instrucciones"
-        : "";
-  const guideText = useMemo(() => {
-    if (!order) return "";
-    return [
-      `Guía de seguimiento: ${order.trackingToken}`,
-      `Cliente: ${order.customerName}`,
-      `Total: ${formatPrice(order.total)}`,
-      `Estado: ${STATUS_LABELS[order.status] || order.status}`,
-      order.paymentMethod ? `Método de pago: ${paymentMethodLabel}` : "",
-      order.paymentMethod?.provider ? `Proveedor: ${order.paymentMethod.provider}` : "",
-      order.paymentMethod?.accountNumber ? `Cuenta: ${order.paymentMethod.accountNumber}` : "",
-      order.address ? `Dirección: ${order.address}` : "",
-    ].filter(Boolean).join("\n");
-  }, [order, paymentMethodLabel]);
-  const message = useMemo(() => {
-    if (!order) return "Estamos procesando tu pedido y validando tu pago. Apenas confirmemos el pago podrás ver la actualización de tu pedido en la guía.";
-    if (order.status === "PAYMENT_INVALID") {
-      return "Tu comprobante fue marcado como inválido. Revisa el detalle del pedido y sube uno nuevo para continuar.";
-    }
-    return "Estamos procesando tu pedido y validando tu pago. Apenas confirmemos el pago podrás ver la actualización de tu pedido en la guía.";
-  }, [order]);
+  const guide = order?.trackingToken || token || "";
+  const trackingUrl = guide ? `/seguimiento?token=${encodeURIComponent(guide)}` : "/seguimiento";
+  const status = order ? trackingStatus(order.status) : null;
+  const method = order?.paymentMethod;
+  const methodLabel = method?.visibleLabel || method?.provider || method?.title;
 
   const handleCopy = async () => {
-    if (!guideText) return;
-    await navigator.clipboard.writeText(guideText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (!guide) return;
+    if (await copyText(guide)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } else {
+      toast.error("No se pudo copiar, toma una captura de pantalla");
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      await navigator.share({
+        title: "Mi pedido en Fantasía Floral",
+        text: `Mi guía de seguimiento es ${guide}`,
+        url: `${window.location.origin}${trackingUrl}`,
+      });
+    } catch {
+      // El cliente cerró el menú de compartir: nada que hacer.
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#fdfcf8] flex items-center justify-center p-4">
-      <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="bg-white rounded-3xl p-8 max-w-xl w-full shadow-xl"
-      >
-        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <RiCheckboxCircleLine className="text-green-500" size={40} />
+    <main className="flex min-h-screen items-center justify-center bg-[#fdfcf8] px-4 py-10">
+      <div className="w-full max-w-md animate-fade-in rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_32px_rgba(15,23,42,0.08)] sm:p-7">
+        <div className="text-center">
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+            <RiCheckLine size={28} />
+          </span>
+          <h1 className="mt-4 font-display text-[28px] font-semibold leading-tight text-slate-950">¡Pedido recibido!</h1>
+          <p className="mt-1.5 text-[13px] leading-5 text-slate-500">
+            {order?.status === "PAYMENT_INVALID"
+              ? "Hay un problema con tu comprobante. Escríbenos para resolverlo."
+              : "Estamos validando tu pago. Con tu guía puedes ver cómo avanza."}
+          </p>
         </div>
 
-        <h1
-          className="font-semibold mb-2 text-center"
-          style={{ fontFamily: "var(--font-cormorant),Georgia,serif", fontSize: "clamp(1.6rem,4vw,2rem)" }}
-        >
-          ¡Gracias por tu pedido!
-          <RiFlowerLine className="text-primary-500 inline-block ml-2" size={24} />
-        </h1>
-        <p className="text-gray-500 text-sm mb-6 text-center">{message}</p>
-
-        {loading ? (
-          <div className="bg-gray-50 rounded-2xl p-5 mb-6 animate-pulse h-32" />
-        ) : order ? (
-          <>
-            <div className="bg-primary-50 border border-primary-100 rounded-2xl p-5 mb-6">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold text-primary-600 uppercase tracking-widest mb-2">Tu guía final</p>
-                  <p className="font-mono font-bold text-2xl text-gray-900 tracking-widest">{order.trackingToken}</p>
-                  <p className="text-xs text-gray-500 mt-3">
-                    Estado actual: <strong>{STATUS_LABELS[order.status] || order.status}</strong>
-                  </p>
-                </div>
+        {guide && (
+          <section className="mt-6 rounded-2xl border border-primary-100 bg-primary-50/60 p-4 text-center">
+            <p className="flex items-center justify-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-primary-600">
+              <RiBookmarkLine size={13} /> Guarda tu guía
+            </p>
+            <p className="mt-2 font-mono text-[26px] font-bold tracking-[0.12em] text-slate-950">{guide}</p>
+            <div className="mt-3 flex justify-center gap-2">
+              <button
+                type="button"
+                onClick={handleCopy}
+                className={`inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-xl px-4 text-[13px] font-semibold transition ${copied ? "bg-emerald-500 text-white" : "border border-primary-200 bg-white text-primary-700 hover:bg-primary-50"}`}
+              >
+                {copied ? <RiCheckLine size={15} /> : <RiFileCopyLine size={15} />}
+                {copied ? "Copiada" : "Copiar guía"}
+              </button>
+              {canShare && (
                 <button
-                  onClick={handleCopy}
-                  className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold transition-all ${copied ? "bg-green-500 text-white" : "bg-white text-primary-700 border border-primary-200"}`}
+                  type="button"
+                  onClick={handleShare}
+                  className="inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-xl border border-primary-200 bg-white px-4 text-[13px] font-semibold text-primary-700 transition hover:bg-primary-50"
                 >
-                  {copied ? <><RiCheckLine size={15} /> Copiado</> : <><RiFileCopyLine size={15} /> Copiar guía</>}
+                  <RiShareLine size={15} /> Compartir
                 </button>
-              </div>
-              <p className="text-sm text-gray-600 mt-3">
-                {order.customerName} · {formatPrice(order.total)}
-              </p>
+              )}
             </div>
-
-            {order.paymentMethod && (
-              <div className="bg-white border border-gray-100 rounded-2xl p-4 mb-6 shadow-sm">
-                <div className="flex flex-col gap-4">
-                  <div className="w-full max-w-[300px] mx-auto aspect-square rounded-3xl bg-gray-50 border border-gray-100 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                    {order.paymentMethod.type === "QR" && order.paymentMethod.imageUrl ? (
-                      <img src={order.paymentMethod.imageUrl} alt={paymentMethodLabel} className="w-full h-full object-contain p-4" />
-                    ) : (
-                      <RiBankCardLine className="text-gray-300" size={28} />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-gray-900">{paymentMethodLabel}</p>
-                        <p className="text-xs uppercase tracking-widest text-gray-400">{paymentMethodTypeLabel}</p>
-                      </div>
-                    </div>
-                    {order.paymentMethod.provider && <p className="text-sm text-gray-600 mt-1">{order.paymentMethod.provider}</p>}
-                    {order.paymentMethod.accountNumber && (
-                      <p className="font-mono text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 inline-block mt-2">
-                        {order.paymentMethod.accountNumber}
-                      </p>
-                    )}
-                    {order.paymentMethod.details && <p className="text-sm text-gray-500 mt-2 whitespace-pre-line">{order.paymentMethod.details}</p>}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-0 mb-6">
-              {STEPS.map((step, idx) => {
-                const done = idx < currentIdx;
-                const active = idx === currentIdx;
-                return (
-                  <div key={step.status} className="flex items-start gap-4">
-                    <div className="flex flex-col items-center">
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center ${done ? "bg-green-100 text-green-600" : active ? "bg-primary-100 text-primary-600" : "bg-gray-100 text-gray-300"}`}>
-                        {done ? <RiCheckboxCircleLine size={18} /> : active ? <step.Icon size={16} /> : <RiRadioButtonLine size={16} />}
-                      </div>
-                      {idx < STEPS.length - 1 && <div className={`w-0.5 h-7 mt-1 ${done ? "bg-green-300" : "bg-gray-100"}`} />}
-                    </div>
-                    <div className={`pt-1.5 pb-2 ${idx > currentIdx ? "opacity-40" : ""}`}>
-                      <p className={`text-sm font-semibold ${active ? "text-primary-700" : done ? "text-green-700" : "text-gray-400"}`}>{step.label}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        ) : (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 text-sm text-amber-700">
-            No pudimos cargar tu pedido. Si acabas de subir el comprobante, intenta abrir la guía de seguimiento con tu token.
-          </div>
+            <p className="mt-3 text-[11px] leading-4 text-slate-500">La necesitas para consultar tu pedido. Cópiala o toma una captura.</p>
+          </section>
         )}
 
-        <div className="flex flex-col gap-3">
+        {loading ? (
+          <div className="mt-5 h-40 animate-pulse rounded-2xl bg-slate-50" />
+        ) : order ? (
+          <div className="mt-4 divide-y divide-slate-100">
+            <SummaryRow label="Estado">
+              <span className={status?.tone === "problem" ? "text-red-600" : "text-amber-600"}>{status?.title}</span>
+            </SummaryRow>
+            {order.estimatedTime && <SummaryRow label="Entrega">{order.estimatedTime}</SummaryRow>}
+            {method && (
+              <SummaryRow label="Pago">
+                <span className="inline-flex items-center gap-2">
+                  <PaymentProviderLogo provider={method.provider || method.title} size="sm" />
+                  <span className="truncate">{methodLabel}</span>
+                </span>
+              </SummaryRow>
+            )}
+            <SummaryRow label="Total">
+              <span className="text-[15px] text-primary-600">{formatPrice(order.total)}</span>
+            </SummaryRow>
+          </div>
+        ) : (
+          <p className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-[13px] text-amber-700">
+            No pudimos cargar el detalle ahora. Tu pedido está guardado: consúltalo con tu guía.
+          </p>
+        )}
+
+        <div className="mt-6 flex flex-col gap-2">
           <Link
-            href={order?.trackingToken ? `/seguimiento?token=${order.trackingToken}` : "/seguimiento"}
-            className="flex items-center justify-center gap-2 bg-primary-600 text-white py-3.5 rounded-full font-semibold hover:bg-primary-700 transition-colors"
+            href={trackingUrl}
+            className="flex h-12 items-center justify-center gap-2 rounded-full bg-primary-600 text-[14px] font-semibold text-white transition hover:bg-primary-700"
           >
             <RiSearchLine size={16} /> Ver seguimiento
           </Link>
-          <Link href="/" className="text-gray-400 hover:text-gray-600 text-sm py-2 transition-colors text-center">
-            Volver al inicio
+          <Link href="/" className="py-2 text-center text-[13px] text-slate-500 transition hover:text-slate-800">
+            Volver a la tienda
           </Link>
         </div>
-      </motion.div>
-    </div>
+      </div>
+    </main>
   );
 }
 

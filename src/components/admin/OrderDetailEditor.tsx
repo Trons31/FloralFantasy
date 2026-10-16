@@ -29,6 +29,7 @@ import {
 import { formatDateTime, formatDeliveryLeadDays, formatPrice, STATUS_LABELS } from "@/lib/utils";
 import TimeInput12 from "@/components/ui/TimeInput12";
 import { formatFlowerQuantityRange, getFlowerQuantityRange } from "@/lib/flower-quantities";
+import { EMPTY_ORDER_ITEM_CARD, pickOrderItemCard, type OrderItemCardData } from "@/lib/card-options";
 
 type Addon = { id: string; name: string; price: number; inStock: boolean; type?: string };
 type Flower = { id: string; name: string; type: string };
@@ -54,6 +55,8 @@ type EditorItem = {
     baseFlowers: Array<{ id: string; name: string; baseQuantity: number; quantity: number; baseQuantityMin?: number; baseQuantityMax?: number; quantityMin?: number; quantityMax?: number }>;
     extraFlowers: Array<{ id: string; name: string; quantity: number }>;
   };
+  /** Tarjeta elegida por el cliente (spec 012); se conserva al guardar. */
+  card: OrderItemCardData;
 };
 
 const FLOW_STATUSES = [
@@ -109,6 +112,7 @@ function normalizeItems(order: any): EditorItem[] {
         baseFlowers,
         extraFlowers: stored.extraFlowers || [],
       },
+      card: pickOrderItemCard(item),
     };
   });
 }
@@ -160,7 +164,7 @@ export default function OrderDetailEditor({ initialOrder }: { initialOrder: any 
     [products, search]
   );
   const subtotal = items.reduce((sum, item) =>
-    sum + (item.price + item.addons.reduce((addonSum, addon) => addonSum + addon.price, 0)) * item.quantity, 0);
+    sum + (item.price + item.addons.reduce((addonSum, addon) => addonSum + addon.price, 0) + item.card.cardPrice) * item.quantity, 0);
   const delivery = Math.max(0, Number(deliveryFee) || 0);
   const adjustment = Number(manualAdjustment) || 0;
   const total = subtotal + delivery + adjustment;
@@ -187,6 +191,7 @@ export default function OrderDetailEditor({ initialOrder }: { initialOrder: any 
           baseFlowers: baseFlowersOf(product),
           extraFlowers: [],
         },
+        card: { ...EMPTY_ORDER_ITEM_CARD },
       }];
     });
     setShowProducts(false);
@@ -287,6 +292,7 @@ export default function OrderDetailEditor({ initialOrder }: { initialOrder: any 
             price: item.price,
             addons: item.addons,
             customization: item.customization,
+            cardSnapshot: item.card,
           })),
         }),
       });
@@ -458,7 +464,14 @@ export default function OrderDetailEditor({ initialOrder }: { initialOrder: any 
                       <img src={imageOf(item.product)} alt={item.product.name} className="h-28 w-full rounded-xl object-cover" />
                       <div>
                         <div className="flex items-start justify-between gap-3">
-                          <div><h3 className="font-bold">{item.product.name}</h3><p className="mt-1 line-clamp-2 text-xs text-slate-500">{item.product.description}</p><p className="mt-3 font-bold">{formatPrice(item.price)}</p></div>
+                          <div><h3 className="font-bold">{item.product.name}</h3><p className="mt-1 line-clamp-2 text-xs text-slate-500">{item.product.description}</p><p className="mt-3 font-bold">{formatPrice(item.price)}</p>
+                            {(item.card.cardName || item.card.cardMessage) && (
+                              <div className="mt-2 rounded-xl bg-gray-50 px-3 py-2 text-xs text-slate-600">
+                                <strong className="block text-slate-800">{item.card.cardName || "Dedicatoria"}{item.card.cardPrice > 0 ? ` · +${formatPrice(item.card.cardPrice)}` : ""}</strong>
+                                {item.card.cardMessage && <p className="mt-1 whitespace-pre-line">{item.card.cardMessage}</p>}
+                              </div>
+                            )}
+                          </div>
                           <button type="button" onClick={() => setItems(current => current.filter(entry => entry.key !== item.key))} className="text-red-400" aria-label={`Eliminar ${item.product.name}`}><RiDeleteBinLine /></button>
                         </div>
                         <div className="mt-3"><Counter value={item.quantity} onMinus={() => changeQuantity(item.key, -1)} onPlus={() => changeQuantity(item.key, 1)} /></div>

@@ -968,6 +968,18 @@ export default function PedidosListClient({
                 </div>
               )}
 
+              {selectedOrder.items
+                .filter((item: any) => item.cardName || item.cardMessage)
+                .map((item: any, index: number) => (
+                  <div key={item.id || index} className="rounded-2xl border border-brand-100 bg-brand-50 p-4">
+                    <p className="mb-2 text-sm font-semibold text-brand-800">
+                      {item.cardName || "Tarjeta"}
+                      {selectedOrder.items.length > 1 ? ` · ${item.product?.name || ""}` : ""}
+                    </p>
+                    <p className="whitespace-pre-line text-sm text-brand-900">{item.cardMessage || "Tarjeta sin mensaje"}</p>
+                  </div>
+                ))}
+
               <div className="rounded-2xl border border-gray-100 bg-white p-4">
                 <p className="mb-3 text-sm font-semibold text-gray-900">Productos</p>
                 <div className="space-y-2">

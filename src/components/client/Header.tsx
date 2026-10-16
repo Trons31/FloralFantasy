@@ -16,7 +16,7 @@ export default function Header({ forceLight = false }: { forceLight?: boolean })
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
-  const { getTotalItems, openCart } = useCartStore();
+  const { getTotalItems, openCart, pendingOrder } = useCartStore();
   const total = getTotalItems();
 
   useEffect(() => setMounted(true), []);
@@ -36,13 +36,14 @@ export default function Header({ forceLight = false }: { forceLight?: boolean })
     return () => window.removeEventListener("keydown", onKey);
   }, [mobileOpen]);
 
+  // Spec 016: "Mi pedido" es el pedido creado sin pagar (vive en localStorage),
+  // por eso solo se pinta tras montar, como el contador del carrito.
   const links = [
-    { href: "/flores", label: "Catálogo" },
-    { href: "/flores?ocasion=amor", label: "Amor" },
-    { href: "/flores?ocasion=cumpleanos", label: "Cumpleaños" },
-    { href: "/flores?ocasion=bodas", label: "Bodas" },
-    { href: "/flores", label: "Ocasiones" },
-    { href: "/seguimiento", label: "Mi Pedido" },
+    { href: "/flores", label: "Catálogo", match: "/flores", pending: false },
+    ...(mounted && pendingOrder
+      ? [{ href: `/checkout?token=${pendingOrder.trackingToken}`, label: "Mi pedido", match: "/checkout", pending: true }]
+      : []),
+    { href: "/seguimiento", label: "Rastrear", match: "/seguimiento", pending: false },
   ];
   // `compact` (alto) no depende del menú: si abrirlo cambiara el padding, la
   // cabecera y el menú saltarían a la vez. El menú solo cambia los colores.
@@ -69,15 +70,16 @@ export default function Header({ forceLight = false }: { forceLight?: boolean })
         </Link>
 
         <nav className="hidden items-center gap-7 md:flex">
-          {links.map((link, index) => {
-            const active = pathname === "/flores" && index === 0;
+          {links.map(link => {
+            const active = pathname === link.match;
             return (
               <Link
-                key={`${link.href}-${link.label}`}
+                key={link.label}
                 href={link.href}
-                className={`relative text-sm font-medium transition-colors ${active ? "text-primary-500" : isLight ? "text-gray-700 hover:text-primary-600" : "text-white/80 hover:text-white"}`}
+                className={`relative inline-flex items-center gap-1.5 text-sm font-medium transition-colors ${active ? "text-primary-500" : isLight ? "text-gray-700 hover:text-primary-600" : "text-white/80 hover:text-white"}`}
               >
                 {link.label}
+                {link.pending && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-label="pago pendiente" />}
               </Link>
             );
           })}
@@ -103,8 +105,9 @@ export default function Header({ forceLight = false }: { forceLight?: boolean })
         <nav className="absolute inset-x-0 top-full animate-fade-in border-t border-gray-100 bg-white md:hidden">
           <div className="flex flex-col px-4 py-3">
             {links.map(link => (
-              <Link key={`${link.href}-${link.label}`} href={link.href} onClick={() => setMobileOpen(false)} className="border-b border-gray-50 px-3 py-3.5 font-medium text-gray-700 last:border-0 active:text-primary-600">
+              <Link key={link.label} href={link.href} onClick={() => setMobileOpen(false)} className={`flex items-center justify-between border-b border-gray-50 px-3 py-3.5 font-medium last:border-0 active:text-primary-600 ${pathname === link.match ? "text-primary-500" : "text-gray-700"}`}>
                 {link.label}
+                {link.pending && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-600">Pago pendiente</span>}
               </Link>
             ))}
           </div>

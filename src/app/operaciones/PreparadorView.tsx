@@ -42,6 +42,8 @@ type OrderItem = {
   id: string;
   quantity: number;
   addons: Array<{ id: string; addon: { name: string } }>;
+  cardName?: string | null;
+  cardMessage?: string | null;
   customization?: {
     bouquetSize?: "STANDARD" | "ENLARGED" | "REDUCED";
     baseFlowers?: FlowerLine[];
@@ -444,8 +446,18 @@ function FlowersList({ flowers, extras, processing = false, compact = false }: {
 }
 
 function Notes({ order, addons }: { order: Order; addons: Array<{ addon: { name: string } }> }) {
+  // Tarjeta por arreglo (spec 012). Con varios arreglos se indica a cuál va.
+  const cards = (order.items || []).filter(entry => entry.cardName || entry.cardMessage);
   return (
     <div className="space-y-2.5">
+      {cards.map(entry => (
+        <div key={entry.id} className="rounded-2xl border border-rose-100 bg-rose-50 p-3.5">
+          <h4 className="flex items-center gap-2 text-[11px] font-bold text-rose-700">
+            <RiFlowerLine /> {entry.cardName || "Tarjeta"}{order.items.length > 1 ? ` · ${entry.product.name}` : ""}
+          </h4>
+          <p className="mt-2 whitespace-pre-line text-[11px] leading-5 text-slate-700">{entry.cardMessage || "Sin mensaje: tarjeta en blanco."}</p>
+        </div>
+      ))}
       {order.giftMessage && (
         <div className="rounded-2xl border border-rose-100 bg-rose-50 p-3.5">
           <h4 className="flex items-center gap-2 text-[11px] font-bold text-rose-700"><RiFlowerLine /> Mensaje para la tarjeta</h4>

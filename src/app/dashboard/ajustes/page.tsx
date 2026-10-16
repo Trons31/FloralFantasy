@@ -8,12 +8,13 @@ export const dynamic = "force-dynamic";
 
 export default async function AjustesPage() {
   const session = await getServerSession(authOptions);
-  const [deliveryFeeSetting, cutoffSetting, methods] = await Promise.all([
+  const [deliveryFeeSetting, cutoffSetting, methods, activeCardOptions] = await Promise.all([
     prisma.appSetting.findUnique({ where: { key: "deliveryFee" } }).catch(() => null),
     prisma.appSetting.findUnique({ where: { key: "sameDayCutoffTime" } }).catch(() => null),
     prisma.paymentMethod.findMany({
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     }).catch(() => []),
+    prisma.cardOption.count({ where: { isActive: true } }).catch(() => 0),
   ]);
 
   return (
@@ -22,6 +23,7 @@ export default async function AjustesPage() {
       initialDeliveryFee={Number(deliveryFeeSetting?.value || 8000)}
       initialSameDayCutoffTime={normalizeSameDayCutoffTime(cutoffSetting?.value || DEFAULT_SAME_DAY_CUTOFF_TIME)}
       initialLoginEmail={session?.user?.email || ""}
+      activeCardOptions={activeCardOptions}
     />
   );
 }

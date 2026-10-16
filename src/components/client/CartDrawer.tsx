@@ -15,21 +15,59 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCartStore } from "@/store/cartStore";
-import { formatDeliveryDay, formatPrice, getEffectiveDeliveryLeadDays } from "@/lib/utils";
+import { toast } from "sonner";
+import { formatDeliveryDay, formatPrice, formatTime, getEffectiveDeliveryLeadDays } from "@/lib/utils";
+import { isPendingOrderExpired, pendingOrderExpiresAt } from "@/lib/pending-order";
 import { DEFAULT_DELIVERY_FEE, DEFAULT_SAME_DAY_CUTOFF_TIME } from "@/lib/site-settings";
 import { useBodyScrollLock } from "@/lib/scroll-lock";
 import { useMinuteTick } from "@/lib/use-minute-tick";
+import CartItemCardNote from "@/components/client/CartItemCardNote";
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 export default function CartDrawer() {
-  const { items, isOpen, closeCart, removeItem, updateQuantity, getTotalPrice, getDeliveryLeadDays, pendingOrder } = useCartStore();
+  const { items, isOpen, closeCart, removeItem, updateQuantity, getTotalPrice, getDeliveryLeadDays, pendingOrder, clearPendingOrder } = useCartStore();
   const [deliveryFee, setDeliveryFee] = useState(DEFAULT_DELIVERY_FEE);
   const [sameDayCutoffTime, setSameDayCutoffTime] = useState(DEFAULT_SAME_DAY_CUTOFF_TIME);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const pathname = usePathname();
-  // Recalcula “hoy / mañana” cada minuto mientras la página siga abierta.
-  useMinuteTick();
+  // Recalcula “hoy / mañana” y el vencimiento del pedido cada minuto.
+  const now = useMinuteTick();
   useBodyScrollLock(isOpen);
+
+  // Spec 017: el pedido sin pagar vence a la hora. El carrito vive en toda
+  // página con cabecera, así que aquí se olvida (y con él “Mi pedido”).
+  const pendingExpired = Boolean(pendingOrder && isPendingOrderExpired(pendingOrder.createdAt, now));
+  useEffect(() => {
+    if (pendingExpired) clearPendingOrder();
+  }, [pendingExpired, clearPendingOrder]);
+  const activePending = pendingOrder && !pendingExpired ? pendingOrder : null;
+  useEffect(() => {
+    if (!isOpen) setConfirmCancel(false);
+  }, [isOpen]);
+
+  const cancelPending = async () => {
+    if (!activePending) return;
+    setCancelling(true);
+    try {
+      const res = await fetch(`/api/orders/${activePending.id}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trackingToken: activePending.trackingToken }),
+      });
+      const data = await res.json().catch(() => ({}));
+      // 404: el pedido ya no existe para este navegador; igual se olvida.
+      if (!res.ok && res.status !== 404) throw new Error(data.error || "No fue posible cancelar el pedido");
+      clearPendingOrder();
+      setConfirmCancel(false);
+      toast.success("Pedido cancelado");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible cancelar el pedido");
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   // Al navegar (p. ej. “Continuar al pago”), el carrito se cierra.
   useEffect(() => {
@@ -47,7 +85,26 @@ export default function CartDrawer() {
   const total = subtotal + deliveryFee;
   const delivery = getDeliveryLeadDays(sameDayCutoffTime);
   const itemCount = items.reduce((count, item) => count + item.quantity, 0);
-  const pendingHref = pendingOrder ? `/checkout?token=${pendingOrder.trackingToken}` : "";
+  const pendingHref = activePending ? `/checkout?token=${activePending.trackingToken}` : "";
+  const pendingExpiresLabel = activePending ? formatTime(pendingOrderExpiresAt(activePending.createdAt)) : "";
+
+  const cancelControls = confirmCancel ? (
+    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-left">
+      <p className="text-xs font-semibold text-red-800">¿Seguro que quieres cancelar este pedido?</p>
+      <div className="mt-2.5 grid grid-cols-2 gap-2">
+        <button type="button" onClick={() => setConfirmCancel(false)} disabled={cancelling} className="h-10 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">
+          No, seguir
+        </button>
+        <button type="button" onClick={cancelPending} disabled={cancelling} className="h-10 rounded-xl bg-red-600 text-xs font-semibold text-white transition hover:bg-red-700 disabled:opacity-60">
+          {cancelling ? "Cancelando…" : "Sí, cancelar"}
+        </button>
+      </div>
+    </div>
+  ) : (
+    <button type="button" onClick={() => setConfirmCancel(true)} className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-white text-xs font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-50">
+      <RiCloseLine size={15} /> Cancelar pedido
+    </button>
+  );
 
   useEffect(() => {
     fetch("/api/settings")
@@ -112,7 +169,41 @@ export default function CartDrawer() {
 
             {/* Lista: única zona con scroll (spec 007). */}
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4 sm:py-4">
-              {pendingOrder && (
+              {activePending && items.length === 0 ? (
+                // Spec 017: sin productos, el pedido en proceso es lo único que se ve.
+                <div className="grid min-h-full place-items-center py-6 text-center">
+                  <div className="w-full max-w-sm">
+                    <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+                      <RiTimeLine size={26} />
+                    </span>
+                    <h3 className="mt-4 text-base font-bold tracking-tight text-slate-950">Tienes un pedido en proceso</h3>
+                    <p className="mx-auto mt-1 max-w-[18rem] text-[12px] leading-5 text-slate-500">
+                      Sube el comprobante para que empecemos a prepararlo.
+                    </p>
+                    <div className="mt-5 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                      <div className="flex items-center justify-between gap-3 text-[12px]">
+                        <span className="text-slate-500">Guía</span>
+                        <span className="font-mono font-semibold tracking-wider text-slate-900">{activePending.trackingToken}</span>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between gap-3 border-t border-slate-100 pt-2 text-[12px]">
+                        <span className="text-slate-500">Total</span>
+                        <span className="text-sm font-bold text-primary-500">{formatPrice(activePending.total)}</span>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-[11px] leading-4 text-amber-700">
+                      Si no subes el comprobante, se cancela a las <strong>{pendingExpiresLabel}</strong>.
+                    </p>
+                    <Link
+                      href={pendingHref}
+                      className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary-500 text-xs font-bold text-white transition hover:bg-primary-600"
+                    >
+                      Completar pago <RiArrowRightLine size={14} />
+                    </Link>
+                    <div className="mt-3">{cancelControls}</div>
+                  </div>
+                </div>
+              ) : null}
+              {activePending && items.length > 0 && (
                 <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-3">
                   <div className="flex items-start gap-3">
                     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-amber-600">
@@ -121,7 +212,7 @@ export default function CartDrawer() {
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-bold text-amber-900">Tienes un pedido pendiente de pago</p>
                       <p className="mt-0.5 text-[11px] leading-4 text-amber-800">
-                        #{pendingOrder.trackingToken} · {formatPrice(pendingOrder.total)}. Sube el comprobante para que lo preparemos.
+                        #{activePending.trackingToken} · {formatPrice(activePending.total)}. Se cancela a las {pendingExpiresLabel} si no subes el comprobante.
                       </p>
                     </div>
                   </div>
@@ -131,9 +222,10 @@ export default function CartDrawer() {
                   >
                     Completar pago <RiArrowRightLine size={14} />
                   </Link>
+                  <div className="mt-2 text-center">{cancelControls}</div>
                 </div>
               )}
-              {items.length === 0 ? (
+              {activePending && items.length === 0 ? null : items.length === 0 ? (
                 <div className="grid min-h-[46vh] place-items-center text-center">
                   <div className="max-w-sm">
                     <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-slate-50 text-slate-300">
@@ -169,6 +261,7 @@ export default function CartDrawer() {
                               <RiTimeLine size={11} />
                               Entrega {formatDeliveryDay(getEffectiveDeliveryLeadDays(item.deliveryLeadDays || 0, sameDayCutoffTime))}
                             </p>
+                            <CartItemCardNote item={item} />
                           </div>
                           <button
                             onClick={() => removeItem(item.id)}

@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { productFlowerInclude } from "@/lib/product-selects";
+import { expireIfStale } from "@/lib/pending-order-server";
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
   if (!token) return NextResponse.json({ error: "Token requerido" }, { status: 400 });
+  // Spec 017: si venció sin pago, se cancela antes de responder.
+  const current = await prisma.order.findUnique({
+    where: { trackingToken: token },
+    select: { id: true, status: true, paymentProofUrl: true, createdAt: true },
+  });
+  if (current) await expireIfStale(current);
   const order = await prisma.order.findUnique({
     where: { trackingToken: token },
     include: {

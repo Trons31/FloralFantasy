@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import { formatCustomerDeliveryDate, getDeliveryDateLabel, getEffectiveDeliveryLeadDays, maxPreparationTime } from "@/lib/utils";
 
 export interface CartAddon {
@@ -15,6 +15,15 @@ export interface CartFlower {
   quantityMax?: number;
 }
 
+/** Tarjeta de dedicatoria elegida en la ficha (spec 012). */
+export interface CartCard {
+  id: string;
+  name: string;
+  price: number;
+  maxChars: number;
+  message: string;
+}
+
 export interface CartItem {
   id: string;
   productId: string;
@@ -27,6 +36,10 @@ export interface CartItem {
   deliveryLeadDays: number;
   addons: CartAddon[];
   flowers?: CartFlower[];
+  /** Opcional: los carritos guardados antes de la spec 012 no la tienen. */
+  card?: CartCard | null;
+  /** Dedicatoria sin tarjeta (cuando la tienda no tiene tarjetas activas). */
+  message?: string;
   subtotal: number;
 }
 
@@ -60,8 +73,26 @@ interface CartStore {
   getDeliveryLeadDays: (sameDayCutoffTime?: string) => { days: number; label: string; dateLabel: string };
 }
 
-const calcSubtotal = (item: Omit<CartItem, "subtotal">) =>
-  item.price * item.quantity + item.addons.reduce((s, a) => s + a.price, 0);
+/** Precio de una unidad: arreglo + complementos + tarjeta. */
+export const calcUnitPrice = (item: Pick<CartItem, "price" | "addons" | "card">) =>
+  item.price + item.addons.reduce((s, a) => s + a.price, 0) + (item.card?.price || 0);
+
+// Complementos y tarjeta se cobran por unidad, igual que en la ficha, el
+// checkout y el servidor (spec 012).
+const calcSubtotal = (item: Omit<CartItem, "subtotal">) => calcUnitPrice(item) * item.quantity;
+
+/** Dos líneas se fusionan solo si son el mismo arreglo con los mismos extras. */
+const sameLine = (a: Omit<CartItem, "subtotal">, b: Omit<CartItem, "subtotal">) =>
+  a.productId === b.productId &&
+  JSON.stringify(a.addons) === JSON.stringify(b.addons) &&
+  (a.card?.id || "") === (b.card?.id || "") &&
+  (a.card?.message ?? a.message ?? "") === (b.card?.message ?? b.message ?? "");
+
+/** Cuerpo de cada línea para `POST /api/orders`. */
+export const toOrderItemPayload = (item: CartItem) => ({
+  ...item,
+  card: item.card ? { id: item.card.id, message: item.card.message } : item.message ? { message: item.message } : undefined,
+});
 
 export const useCartStore = create<CartStore>()(
   persist(
@@ -70,10 +101,7 @@ export const useCartStore = create<CartStore>()(
       isOpen: false,
       pendingOrder: null,
       addItem: (item) => {
-        const existing = get().items.find(
-          i => i.productId === item.productId &&
-               JSON.stringify(i.addons) === JSON.stringify(item.addons)
-        );
+        const existing = get().items.find(i => sameLine(i, item));
         if (existing) {
           set(s => ({
             items: s.items.map(i =>
@@ -122,6 +150,47 @@ export const useCartStore = create<CartStore>()(
       // `isOpen` no se persiste: si se guardara, un carrito abierto reaparecería
       // solo al recargar o al llegar a otra página.
       partialize: (state) => ({ items: state.items, pendingOrder: state.pendingOrder }),
+      // v1 (spec 012): los subtotales guardados contaban los complementos una
+      // sola vez; se recalculan por unidad.
+      version: 1,
+      migrate: (persisted: any) => ({
+        ...persisted,
+        items: Array.isArray(persisted?.items)
+          ? persisted.items.map((item: CartItem) => ({ ...item, addons: item.addons || [], subtotal: calcSubtotal({ ...item, addons: item.addons || [] }) }))
+          : [],
+      }),
+    }
+  )
+);
+
+/**
+ * “Comprar ahora” (spec 012): un único arreglo que va directo al checkout sin
+ * tocar el carrito. Vive en sessionStorage para sobrevivir a una recarga,
+ * pero no a cerrar la pestaña.
+ */
+interface BuyNowStore {
+  item: CartItem | null;
+  setItem: (item: Omit<CartItem, "subtotal">) => void;
+  setQuantity: (qty: number) => void;
+  clear: () => void;
+}
+
+export const useBuyNowStore = create<BuyNowStore>()(
+  persist(
+    (set, get) => ({
+      item: null,
+      setItem: (item) => set({ item: { ...item, subtotal: calcSubtotal(item) } }),
+      setQuantity: (qty) => {
+        const current = get().item;
+        if (!current) return;
+        const quantity = Math.max(1, qty);
+        set({ item: { ...current, quantity, subtotal: calcSubtotal({ ...current, quantity }) } });
+      },
+      clear: () => set({ item: null }),
+    }),
+    {
+      name: "fantasia-floral-buy-now",
+      storage: createJSONStorage(() => sessionStorage),
     }
   )
 );

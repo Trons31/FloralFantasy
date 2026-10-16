@@ -13,6 +13,7 @@ import {
   FiGrid,
   FiList,
   FiLogOut,
+  FiMail,
   FiMenu,
   FiPackage,
   FiSettings,
@@ -46,6 +47,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/dashboard/productos", label: "Productos", icon: FiPackage },
       { href: "/dashboard/ocasiones", label: "Ocasiones", icon: FiCalendar },
       { href: "/dashboard/addons", label: "Adicionales", icon: FiGift },
+      { href: "/dashboard/tarjetas", label: "Tarjetas", icon: FiMail },
     ],
   },
   {

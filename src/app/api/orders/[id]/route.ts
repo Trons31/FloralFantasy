@@ -4,6 +4,7 @@ import { productFlowerInclude } from "@/lib/product-selects";
 import { requireAdminUser } from "@/lib/route-auth";
 import { formatCustomerDeliveryDate, getEffectiveDeliveryLeadDays, maxDeliveryLeadDays } from "@/lib/utils";
 import { DEFAULT_SAME_DAY_CUTOFF_TIME, normalizeSameDayCutoffTime } from "@/lib/site-settings";
+import { pickOrderItemCard } from "@/lib/card-options";
 
 async function getOrderDetails(id: string) {
   return prisma.order.findUnique({
@@ -131,13 +132,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             .map((addon: any) => ({ addonId: addon.id, price: Number(addon.price || 0) }))
         : [];
       const addonTotal = normalizedAddons.reduce((sum: number, addon: { addonId: string; price: number }) => sum + addon.price, 0);
-      subtotal += (price + addonTotal) * quantity;
+      // La tarjeta que eligió el cliente se conserva al editar (spec 012).
+      const card = pickOrderItemCard(item.cardSnapshot);
+      subtotal += (price + addonTotal + card.cardPrice) * quantity;
 
       return {
         productId: product.id,
         quantity,
         price,
         customization: item.customization ?? undefined,
+        ...card,
         addons: {
           create: normalizedAddons,
         },
